@@ -1,0 +1,15 @@
+{
+  "AutoScalingGroupName": "todayorder-api-asg",
+  "PolicyName": "cpu-predictive",
+  "PolicyType": "PredictiveScaling",
+  "PredictiveScalingConfiguration": {
+    "MetricSpecifications": [
+      {
+        "TargetValue": 50.0,
+        "PredefinedMetricPairSpecification": { "PredefinedMetricType": "ASGCPUUtilization" }
+      }
+    ],
+    "Mode": "ForecastOnly",
+    "SchedulingBufferTime": 300
+  }
+}

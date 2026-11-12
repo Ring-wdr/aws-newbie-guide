@@ -1,0 +1,8 @@
+{
+  "AutoScalingGroupName": "todayorder-api-asg",
+  "PolicyName": "cpu-simple-out",
+  "PolicyType": "SimpleScaling",
+  "AdjustmentType": "ChangeInCapacity",
+  "ScalingAdjustment": 2,
+  "Cooldown": 300
+}

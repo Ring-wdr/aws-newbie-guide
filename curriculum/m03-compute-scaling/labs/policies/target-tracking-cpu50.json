@@ -1,0 +1,13 @@
+{
+  "AutoScalingGroupName": "todayorder-api-asg",
+  "PolicyName": "cpu-target-50",
+  "PolicyType": "TargetTrackingScaling",
+  "EstimatedInstanceWarmup": 120,
+  "TargetTrackingConfiguration": {
+    "PredefinedMetricSpecification": {
+      "PredefinedMetricType": "ASGAverageCPUUtilization"
+    },
+    "TargetValue": 50.0,
+    "DisableScaleIn": false
+  }
+}
