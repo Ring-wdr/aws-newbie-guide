@@ -27,7 +27,7 @@ flowchart LR
 | `DeletionPolicy: Retain / Snapshot / RetainExceptOnCreate` | 스택(또는 리소스)을 지울 때 실제 리소스를 남기거나 스냅샷을 뜬다 |
 | `UpdateReplacePolicy: Retain / Snapshot` | 업데이트로 리소스가 **교체**될 때 옛 리소스를 남기거나 스냅샷 |
 | `CreationPolicy` + `cfn-signal` (또는 WaitCondition) | EC2·ASG가 "만들어졌다"가 아니라 **부트스트랩(사용자 데이터) 완료 신호**를 보낼 때까지 CREATE_COMPLETE를 미룬다. 신호가 안 오면 실패 → 롤백 |
-| 롤백 트리거 | 생성·업데이트 직후 지정한 CloudWatch 알람이 울리면 자동 롤백 |
+| 롤백 트리거 | 생성·업데이트 **중**과, 모든 리소스를 배포한 뒤의 **모니터링 기간**(0~180분, 기본 0) 동안 지정한 CloudWatch 알람이 `ALARM`이 되면 스택 작업 전체를 자동 롤백 ([롤백 트리거](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/using-cfn-rollback-triggers.html)) |
 
 ### 템플릿 해부
 
