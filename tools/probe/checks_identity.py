@@ -211,6 +211,11 @@ def run_organizations(p: Probe) -> None:
             p.behavior("OU에 SCP가 연결되어 조회됨", any(x["Id"] == pid for x in t["Policies"]), f"{len(t['Policies'])}개")
         p.cleanup("detach", lambda: (org.detach_policy(PolicyId=pid, TargetId=ou_id), org.delete_policy(PolicyId=pid),
                                      org.delete_organizational_unit(OrganizationalUnitId=ou_id)))
+    p.call("ListPolicies(SCP)", org.list_policies, Filter="SERVICE_CONTROL_POLICY")
+    if ou:
+        # SCP 생성이 501 이어도 AttachPolicy 자체가 구현됐는지 확인 (AWS 관리형 FullAWSAccess 정책 ID)
+        p.call("AttachPolicy(FullAWSAccess → OU)", org.attach_policy, PolicyId="p-FullAWSAccess",
+               TargetId=ou["OrganizationalUnit"]["Id"])
     acct = p.call("CreateAccount", org.create_account, Email="probe@example.com", AccountName=p.name("acct"))
     if acct:
         sid = acct["CreateAccountStatus"]["Id"]

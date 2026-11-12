@@ -112,7 +112,7 @@ def run_lambda(p: Probe) -> None:
                        f"FunctionError={bi.get('FunctionError')} payload={bp[:100]}")
     logs = p.client("logs")
     lg = wait_until(lambda: bool(logs.describe_log_groups(logGroupNamePrefix=f"/aws/lambda/{fn}")["logGroups"]), timeout=10)
-    p.behavior("Invoke 후 /aws/lambda/<함수> 로그 그룹이 생김(CloudWatch Logs 연동)", lg)
+    p.behavior("Invoke 후 /aws/lambda/<함수> 로그 그룹이 생김(실행 역할에 logs:* 권한이 있을 때)", lg)
     dry = p.call("Invoke(DryRun)", lam.invoke, FunctionName=fn, InvocationType="DryRun")
     if dry:
         p.behavior("DryRun은 204 반환(실행 없이 권한·파라미터만 검사)", dry.get("StatusCode") == 204, f"StatusCode={dry.get('StatusCode')}")
@@ -283,6 +283,12 @@ def run_apigatewayv2(p: Probe) -> None:
             p.behavior("HTTP API → Lambda 프록시를 HTTPS로 호출하면 함수가 실행되어 응답 (AddPermission 없이도 성공)",
                        code == 200 and '"routeKey": "GET /orders"' in body,
                        f"{papi['ApiEndpoint']}/orders → {code} {body[:90]}")
+            if code == 200:
+                logs = p.client("logs")
+                time.sleep(2)
+                no_lg = not logs.describe_log_groups(logGroupNamePrefix=f"/aws/lambda/{fn}")["logGroups"]
+                p.behavior("실행 역할에 logs 권한이 없으면 /aws/lambda/<함수> 로그 그룹이 생기지 않음(AWS와 동일)", no_lg,
+                           "생기지 않음" if no_lg else "생겼다")
     ws = p.call("CreateApi(WEBSOCKET)", ag.create_api, Name=p.name("ws"), ProtocolType="WEBSOCKET",
                 RouteSelectionExpression="$request.body.action")
     if ws:

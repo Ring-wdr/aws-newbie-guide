@@ -6,7 +6,7 @@
 |---|---|
 | 에뮬레이터 버전 | `1.0.322` (릴리스 2026.11.10) |
 | 에뮬레이터 커밋 | `7753983c6e495ec3612695b1336bf4936fc7b7fd` |
-| 탐침 실행 시각 | 2026-11-12 11:00 UTC |
+| 탐침 실행 시각 | 2026-11-12 11:45 UTC |
 | 클라이언트 | `aws-cli/2.40.1 Python/3.14.8 Darwin/24.6.0 script-exe/arm64` · boto3 1.44.1 · Python 3.15.0 |
 
 다시 만들기:
@@ -20,13 +20,13 @@ uv run python tools/probe/probe.py   # 전체 (약 수 분) · 일부: --service
 
 탐침은 실행마다 새 이름(`todayorder-probe-*-<무작위>`)을 쓰고 끝나면 대부분 정리하므로 같은 에뮬레이터에서 다시 돌려도 된다. 다만 계정에 한 번만 되는 호출(`iam GenerateCredentialReport`, `macie2 EnableMacie`, `securityhub EnableSecurityHub`)은 두 번째 실행부터 409 오류로 기록된다(AWS와 같은 동작). 보고서를 갱신할 때는 깨끗한 에뮬레이터에서 실행한다.
 
-등급 정의는 [CURRICULUM.md 3장](./CURRICULUM.md#3-에뮬레이터-충실도-등급): 🟢 재현 · 🟡 부분(리소스는 생기지만 동작은 안 일어남) · 🔴 개념(501이거나 의미 없음).
+등급 정의는 [CURRICULUM.md 3장](./CURRICULUM.md#3-에뮬레이터-충실도-등급): 🟢 재현 · 🟡 부분(리소스는 만들어지지만 동작(실행·전달·차단)의 일부 또는 전부가 일어나지 않는다) · 🔴 개념(501이거나 의미 없음).
 
 ## 요약
 
 에뮬레이터 1.0.322(2026-11-10 릴리스)는 **설계 시점의 예상(CURRICULUM.md)보다 훨씬 많이 "실제로" 동작한다.** 가장 큰 차이 다섯 가지:
 
-1. **Lambda `Invoke`가 함수 코드를 실제로 실행한다** (CURRICULUM은 501로 예상). 동기 호출은 핸들러의 반환값을, 예외는 `FunctionError=Unhandled`를 돌려주고, `/aws/lambda/<함수>` 로그 그룹도 생긴다. SQS→Lambda 이벤트 소스 매핑은 큐의 메시지를 실제로 소비하고, API Gateway(HTTP API)→Lambda 프록시도 실행된다.
+1. **Lambda `Invoke`가 함수 코드를 실제로 실행한다** (CURRICULUM은 501로 예상). 동기 호출은 핸들러의 반환값을, 예외는 `FunctionError=Unhandled`를 돌려준다. `/aws/lambda/<함수>` 로그 그룹은 **실행 역할에 logs 권한이 있을 때만** 생긴다(AWS와 같음). SQS→Lambda 이벤트 소스 매핑은 큐의 메시지를 실제로 소비하고, API Gateway(HTTP API)→Lambda 프록시도 실행된다.
 2. **서비스 간 전달이 실제로 일어난다.** SNS→SQS(필터 정책 포함), S3 이벤트→SQS, EventBridge 규칙→SQS, Pipes, Step Functions 실행(SQS 서비스 통합 포함), CloudWatch 경보→SNS→SQS, S3 복제, Firehose→S3가 모두 관찰됐다.
 3. **IAM 정책은 "평가하지 않는다"가 아니라 "서비스마다 다르다".** 사용자에게 붙인 정책을 IAM·EC2·KMS·STS(신뢰 정책)는 평가해 거부하고(명시적 Deny 우선도 재현), S3·SQS·DynamoDB는 평가하지 않는다. 반면 S3 **버킷 정책**의 명시적 Deny, **KMS 키 정책**의 Deny, CloudFront OAC↔버킷 정책, 서비스 역할의 신뢰 정책(Step Functions·Pipes·Glue·Backup·Cognito 자격 증명 풀)은 집행된다. `iam simulate-custom-policy`/`simulate-principal-policy`도 올바르게 판정한다.
 4. **VPC·EC2 컨트롤 플레인은 🟢 수준이다.** 서브넷이 AZ·CIDR과 함께 저장되고(/24 → 사용 가능 IP 251), CIDR 범위·중복 오류, NAT 게이트웨이 pending→available, 게이트웨이 엔드포인트의 prefix-list 경로, TGW가 AWS처럼 동작한다. EC2 인스턴스는 pending→running→stopped→terminated로 상태가 바뀐다(부팅은 안 함).
@@ -45,7 +45,7 @@ API 열은 `성공/시도`, 동작 열은 `실제처럼 관찰/검사`. 등급 �
 | M00 | [`client-config`](#svc-client-config) | 🟢 | 1/1 |  |  | 5/5 | ✍️ 127.0.0.1 필수·S3 Control 도달 불가·호스트 접두사 문제가 문서대로 재현됨 |
 | M01 | [`iam`](#svc-iam) | 🟢 | 22/22 |  |  | 9/13 | ✍️ CRUD·정책 버전·시뮬레이터 완전. IAM API 자체는 권한도 평가. 단 S3·SQS·DynamoDB에 대한 사용자 정책은 무시됨 |
 | M01 | [`sts`](#svc-sts) | 🟢 | 6/6 |  |  | 4/4 | ✍️ AssumeRole 임시 자격 증명·신뢰 정책 거부까지 재현 (키 접두사만 ASIA가 아니라 EMULATOR) |
-| M01 | [`organizations`](#svc-organizations) | 🟡 | 3/7 | 4 |  | 1/1 | ✍️ 조직·루트·OU만. SCP 생성·연결, 계정 생성·목록은 501 |
+| M01 | [`organizations`](#svc-organizations) | 🟡 | 3/9 | 6 |  | 1/1 | ✍️ 조직·루트·OU만. SCP 활성화·생성·목록·연결(EnablePolicyType·CreatePolicy·ListPolicies·AttachPolicy), 계정 생성·목록은 501 |
 | M02 | [`ec2-vpc`](#svc-ec2-vpc) | 🟢 | 40/43 | 3 |  | 26/27 | ✍️ VPC·서브넷·라우팅·IGW·NAT·SG·NACL·엔드포인트·TGW 🟢. 피어링 수락·Egress-only IGW·VPN 501. 트래픽은 흐르지 않음 |
 | M03 | [`ec2-instances`](#svc-ec2-instances) | 🟡 | 15/18 | 3 |  | 9/9 | ✍️ 상태 전이는 실제처럼 관찰되지만 부팅·사용자 데이터 실행 없음. DescribeInstanceStatus·ModifyInstanceAttribute·DescribeTags 501 |
 | M03 | [`ebs-ami`](#svc-ebs-ami) | 🟡 | 15/18 | 2 | 1 | 10/10 | ✍️ 볼륨·스냅샷·시작 템플릿(버전 포함) OK. CreateImage·RegisterImage 501, 스냅샷에서 볼륨 복원 실패 |
@@ -61,9 +61,9 @@ API 열은 `성공/시도`, 동작 열은 `실제처럼 관찰/검사`. 등급 �
 | M06 | [`eventbridge`](#svc-eventbridge) | 🟢 | 15/15 |  |  | 4/4 | ✍️ 패턴 일치 이벤트만 SQS 대상에 전달, Pipes 전달, Scheduler 생성 |
 | M06 | [`stepfunctions`](#svc-stepfunctions) | 🟢 | 11/11 |  |  | 6/6 | ✍️ 실행이 SUCCEEDED/FAILED까지, 이력, SQS 서비스 통합, EXPRESS 동기 실행 |
 | M06 | [`kinesis`](#svc-kinesis) | 🟢 | 12/12 |  |  | 6/6 | ✍️ 상태 전이·파티션 키→샤드·GetRecords 순서·리샤딩 |
-| M07 | [`lambda`](#svc-lambda) | 🟢 | 26/26 |  |  | 15/15 | ✍️ 생성·버전·별칭·동시성·Invoke(실제 실행)·이벤트 소스 매핑 소비·함수 URL 발급 |
+| M07 | [`lambda`](#svc-lambda) | 🟢 | 26/26 |  |  | 15/15 | ✍️ 생성·버전·별칭·동시성·Invoke(실제 실행)·이벤트 소스 매핑 소비·함수 URL 발급. 로그 그룹은 역할에 logs 권한이 있을 때만 생김 |
 | M07 | [`apigateway`](#svc-apigateway) | 🟢 | 15/15 |  |  | 1/1 | ✍️ REST API MOCK 통합을 `https://127.0.0.1:<포트>/_aws/execute-api/<id>/<stage>/<경로>` 로 실제 호출 |
-| M07 | [`apigatewayv2`](#svc-apigatewayv2) | 🟢 | 11/11 |  |  | 2/2 | ✍️ HTTP API → Lambda 프록시 실제 실행. Lambda 리소스 정책(AddPermission) 없이도 통과함은 AWS와 다름 |
+| M07 | [`apigatewayv2`](#svc-apigatewayv2) | 🟢 | 11/11 |  |  | 3/3 | ✍️ HTTP API → Lambda 프록시 실제 실행. Lambda 리소스 정책(AddPermission) 없이도 통과함은 AWS와 다름 |
 | M07 | [`ecr`](#svc-ecr) | 🟢 | 7/7 |  |  | 1/1 | ✍️ 저장소·수명 주기 정책·인증 토큰 (이미지 푸시는 시험 안 함) |
 | M07 | [`ecs`](#svc-ecs) | 🟡 | 6/6 |  |  | 1/2 | ✍️ 클러스터·작업 정의·서비스 생성. 태스크는 이미지 풀 실패로 STOPPED |
 | M07 | [`cognito`](#svc-cognito) | 🟢 | 12/12 |  |  | 5/5 | ✍️ 사용자 풀 가입·확인·로그인으로 JWT 발급, 자격 증명 풀 임시 자격 증명 |
@@ -126,7 +126,7 @@ CURRICULUM.md 5장의 **예상 등급과 관찰이 다른 실습**만 모았다.
 
 | 모듈 | 실습 (예상) | 관찰 | 제안·우회 |
 |---|---|---|---|
-| M01 | Organizations OU·SCP (🟢/🟡) | 조직은 처음부터 존재(`CreateOrganization` 불필요, FeatureSet=ALL). OU 생성 OK. **`EnablePolicyType`·`CreatePolicy`(SCP)·`CreateAccount`·`ListAccounts` 모두 501** | OU 🟢 / SCP 🔴. SCP는 JSON 문서를 쓰고 `iam simulate-custom-policy`로 "SCP+IAM 교집합"을 손으로 판정하는 워크시트로 대체 |
+| M01 | Organizations OU·SCP (🟢/🟡) | 조직은 처음부터 존재(`CreateOrganization` 불필요, FeatureSet=ALL). OU 생성 OK. **`EnablePolicyType`·`CreatePolicy`(SCP)·`ListPolicies`·`AttachPolicy`(기본 `FullAWSAccess`도)·`CreateAccount`·`ListAccounts` 모두 501** | OU 🟢 / SCP 🔴. SCP는 JSON 문서를 쓰고 `iam simulate-custom-policy`로 "SCP+IAM 교집합"을 손으로 판정하는 워크시트로 대체 |
 | M02 | NAT GW vs Egress-only IGW (레슨 3) | `CreateEgressOnlyInternetGateway` **501** (2026-10-22 보고 그대로) | 🔴. 개념·다이어그램 |
 | M02 | Peering (🟡) | 생성 → `pending-acceptance`까지. **`AcceptVpcPeeringConnection` 501** → active가 안 됨, 피어링 경로 실습 불가 | 🟡(요청까지) / 수락·라우팅은 🔴. TGW로 연결 실습을 대신하면 🟢 |
 | M02 | Site-to-Site VPN (레슨 6) | `CreateVpnConnection` 501 | 🔴 |
@@ -156,9 +156,10 @@ CURRICULUM.md 5장의 **예상 등급과 관찰이 다른 실습**만 모았다.
 
 - **큐·버킷·역할 정책을 실제처럼 써야 한다.** SNS→SQS(큐 정책), S3→SQS 알림(큐 정책), Step Functions·Pipes·Glue·Backup(역할 신뢰 정책·권한), CloudFront OAC(버킷 정책), Config 전달 채널(버킷 정책)은 정책이 없으면 실패하거나 **조용히 아무 일도 일어나지 않는다**. 실습 스크립트가 "전달됐다"를 단언하기 전에 정책부터 만든다.
 - **리소스 엔드포인트(RDS, ALB, CloudFront)는 컨테이너 안에만 있다.** 호스트에서 접속하는 실습을 설계하지 말 것.
-- **비동기 상태는 기다린다.** DynamoDB 테이블은 boto3로 만들면 즉시 ACTIVE, CLI 응답에는 CREATING이 보이는 등 타이밍이 실제와 다르다. waiter/폴링으로 쓰고, "몇 초 뒤"를 단언하지 말 것.
+- **비동기 상태는 기다린다.** 예: DynamoDB `CreateTable` 응답은 (CLI·boto3 모두) `CREATING`이고, 에뮬레이터는 1초 안에 `ACTIVE`가 되는 경우가 많아 직후 `DescribeTable` 결과는 실행마다 다르다(경쟁 상태). 생성 응답의 상태를 보여 주거나 waiter/폴링 뒤의 상태를 보여 주고, "직후 상태"나 "몇 초 뒤"를 단언하지 말 것.
 - **시간 기반 동작은 빠르거나 없다.** TTL 삭제는 수 초(실제는 최대 수일), Firehose 버퍼 무시, CloudTrail 로그 즉시, S3 수명 주기 전환은 일어나지 않음.
-- **페이지네이션 토큰을 `--output text`로 받지 말 것** (`None`이 섞임 — M00 레슨 5).
+- **페이지네이션되는 목록 명령의 결과를 `--query ... --output text`로 변수에 담지 말 것.** CLI가 페이지마다 쿼리를 적용해 `None` 줄이 섞일 수 있다(S3 `list-objects-v2`, API Gateway `get-resources` 등에서 실제로 겪음). `--output json`으로 받아 가공하거나 `--no-paginate`를 쓴다 (M00 레슨 5).
+- **모든 boto3 예제는 클라이언트를 만들기 전에 `from emulator_guard import require_emulator; require_emulator()`** 를 호출한다. env.sh 없이 실행하면 네트워크 호출 전에 종료한다. 학습자가 자기 AWS 계정에서 돌릴 때만 `TODAYORDER_ALLOW_REAL_AWS=1`(기본 꺼짐). verify.sh에 "env.sh 없이 실행하면 거부되는지" 확인을 넣는 방법은 `curriculum/m00-orientation/labs/verify.sh`의 `guard_refuses` 참고.
 - `misc-optional`의 "한눈에" 서비스(Elastic Beanstalk, Lightsail, Batch, Storage Gateway, DataSync, FSx, Redshift, OpenSearch, EMR, MSK, MQ, AppFlow, Transfer, Service Catalog, RAM, Directory Service, Service Quotas, Compute Optimizer, Control Tower, Lake Formation, Comprehend, Translate, Rekognition, Polly, Well-Architected, License Manager)는 대부분 호출이 된다. 필요하면 "설정값을 읽는" 짧은 실습을 붙일 수 있다. QuickSight `ListDashboards`, SageMaker `ListNotebookInstances`는 501.
 
 ## 501 NotImplemented 오퍼레이션
@@ -167,6 +168,8 @@ CURRICULUM.md 5장의 **예상 등급과 관찰이 다른 실습**만 모았다.
 |---|---|---|
 | M01 | `organizations` | EnablePolicyType(SCP) |
 | M01 | `organizations` | CreatePolicy(SCP) |
+| M01 | `organizations` | ListPolicies(SCP) |
+| M01 | `organizations` | AttachPolicy(FullAWSAccess → OU) |
 | M01 | `organizations` | CreateAccount |
 | M01 | `organizations` | ListAccounts |
 | M02 | `ec2-vpc` | CreateEgressOnlyInternetGateway |
@@ -214,7 +217,7 @@ CURRICULUM.md 5장의 **예상 등급과 관찰이 다른 실습**만 모았다.
 | M05 | `elasticache` | 엔드포인트 포트에 실제 캐시 서버가 떠 있음(컨테이너 안 TCP) | ⚠️ 다름 | 컨테이너 안: CLOSED |
 | M07 | `ecs` | RunTask 태스크가 RUNNING까지 전이 (실제로 이미지를 받아 실행하려 함) | ⚠️ 다름 | 전이 PROVISIONING → PENDING → STOPPED; stoppedReason=CannotPullContainerError: failed to resolve ref public.ecr.aws/nginx/nginx:latest: failed to do request: Get " |
 | M08 | `route53` | 상태 확인이 실제로 대상을 검사함(존재하지 않는 도메인 → 실패여야 함) | ⚠️ 다름 | 관찰 8건 ['Success: HTTP Status Code 200, OK', 'Success: HTTP Status Code 200, OK'] — 존재하지 않는 대상인데 Success면 시뮬레이션된 결과 |
-| M08 | `cloudfront` | 배포 도메인 이름(*.cloudfront.net) 발급 | ⚠️ 다름 | DomainName=127.0.0.1:41079 Status=InProgress — 에뮬레이터는 컨테이너 안의 로컬 포트를 준다 |
+| M08 | `cloudfront` | 배포 도메인 이름(*.cloudfront.net) 발급 | ⚠️ 다름 | DomainName=127.0.0.1:40875 Status=InProgress — 에뮬레이터는 컨테이너 안의 로컬 포트를 준다 |
 | M09 | `secretsmanager` | RotateSecret(Lambda ARN 지정) | ❌ | HTTP 400 AccessDeniedException: Secrets Manager cannot invoke the specified Lambda function. Ensure that the function policy grants access to the principal secretsmanager.amazonaws.com. |
 | M09 | `ssm` | 공개 파라미터(리전 목록)가 들어 있음 | ⚠️ 다름 | 0개 |
 | M09 | `acm` | Route 53에 검증 CNAME을 만들면 ISSUED로 전환(20초 대기) | ⚠️ 다름 | PENDING_VALIDATION |
@@ -234,7 +237,7 @@ CURRICULUM.md 5장의 **예상 등급과 관찰이 다른 실습**만 모았다.
 |---|---|---|---|
 | API | CreateBucket(127.0.0.1) | ✅ |  |
 | 동작 | boto3 + localhost 엔드포인트로 S3 HeadBucket | ✅ 동작 | boto3(Python)는 localhost여도 경로 방식으로 보내 성공한다 (JS/Java/Go SDK는 가상 호스트 방식이라 실패한다고 문서에 명시) |
-| 동작 | 가상 호스트 방식(<bucket>.localhost)은 실패해야 함 | ✅ 동작 | EndpointConnectionError: Could not connect to the endpoint URL: "https://todayorder-probe-cfgbucket-9432c427.localhost:9297/" |
+| 동작 | 가상 호스트 방식(<bucket>.localhost)은 실패해야 함 | ✅ 동작 | EndpointConnectionError: Could not connect to the endpoint URL: "https://todayorder-probe-cfgbucket-abaf7654.localhost:9297/" |
 | 동작 | S3 Control은 에뮬레이터에 도달하지 못함 | ✅ 동작 | EndpointConnectionError: Could not connect to the endpoint URL: "https://000000000000.127.0.0.1:9297/v20180820/configuration/publicAccessBlock" |
 | 동작 | 호스트 접두사 주입을 켜면 sync- 접두사로 연결 실패 | ✅ 동작 | Could not connect to the endpoint URL: "https://sync-127.0.0.1:9297/" |
 | 동작 | 에뮬레이터 키가 아닌 키로 서명하면 거부 | ✅ 동작 | InvalidClientTokenId: The security token included in the request is invalid. |
@@ -269,7 +272,7 @@ CURRICULUM.md 5장의 **예상 등급과 관찰이 다른 실습**만 모았다.
 | API | SimulatePrincipalPolicy | ✅ |  |
 | 동작 | SimulatePrincipalPolicy가 그룹 정책을 반영 | ✅ 동작 | 결과 {'s3:GetObject': 'allowed', 'ec2:RunInstances': 'implicitDeny'} |
 | API | CreateAccessKey | ✅ |  |
-| 동작 | IAM 사용자 액세스 키로 서명한 요청을 받아 줌 | ✅ 동작 | arn:aws:iam::000000000000:user/todayorder-probe-user-9432c427 |
+| 동작 | IAM 사용자 액세스 키로 서명한 요청을 받아 줌 | ✅ 동작 | arn:aws:iam::000000000000:user/todayorder-probe-user-abaf7654 |
 | 동작 | 권한 없는 사용자의 iam:CreateUser가 거부됨(암묵적 Deny) | ✅ 동작 | AccessDenied |
 | 동작 | 정책 없는 사용자의 s3:ListAllMyBuckets 거부(암묵적 Deny) | ⚠️ 다름 | 허용됨 — 이 서비스는 IAM 정책을 평가하지 않는다 |
 | 동작 | 정책 없는 사용자의 sqs:ListQueues 거부(암묵적 Deny) | ⚠️ 다름 | 허용됨 — 이 서비스는 IAM 정책을 평가하지 않는다 |
@@ -292,7 +295,7 @@ CURRICULUM.md 5장의 **예상 등급과 관찰이 다른 실습**만 모았다.
 | API | CreateRole(사전) | ✅ |  |
 | API | AssumeRole | ✅ |  |
 | 동작 | AssumeRole 임시 자격 증명(SessionToken, Expiration 포함) | ✅ 동작 | AccessKeyId 접두사=EMUL (실제 AWS는 ASIA) |
-| 동작 | 임시 자격 증명으로 호출하면 assumed-role ARN | ✅ 동작 | arn:aws:sts::000000000000:assumed-role/todayorder-probe-assume-9432c427/probe |
+| 동작 | 임시 자격 증명으로 호출하면 assumed-role ARN | ✅ 동작 | arn:aws:sts::000000000000:assumed-role/todayorder-probe-assume-abaf7654/probe |
 | API | CreateRole(EC2 전용 신뢰 정책) | ✅ |  |
 | 동작 | 신뢰 정책에 없는 주체의 AssumeRole이 거부됨 | ✅ 동작 | AccessDenied: User: arn:aws:iam::000000000000:user/emulator is not authorized to perform: sts:AssumeRole on resource: arn:aws:iam::000000000000:role/todayorder-probe-ec2only- |
 | API | GetSessionToken | ✅ |  |
@@ -310,6 +313,8 @@ CURRICULUM.md 5장의 **예상 등급과 관찰이 다른 실습**만 모았다.
 | API | EnablePolicyType(SCP) | ⛔ 501 | HTTP 501 NotImplemented: operation EnablePolicyType is scaffolded but not implemented in this emulator |
 | API | CreateOrganizationalUnit | ✅ |  |
 | API | CreatePolicy(SCP) | ⛔ 501 | HTTP 501 NotImplemented: operation CreatePolicy is scaffolded but not implemented in this emulator |
+| API | ListPolicies(SCP) | ⛔ 501 | HTTP 501 NotImplemented: operation ListPolicies is scaffolded but not implemented in this emulator |
+| API | AttachPolicy(FullAWSAccess → OU) | ⛔ 501 | HTTP 501 NotImplemented: operation AttachPolicy is scaffolded but not implemented in this emulator |
 | API | CreateAccount | ⛔ 501 | HTTP 501 NotImplemented: operation CreateAccount is scaffolded but not implemented in this emulator |
 | API | ListAccounts | ⛔ 501 | HTTP 501 NotImplemented: operation ListAccounts is scaffolded but not implemented in this emulator |
 
@@ -399,7 +404,7 @@ CURRICULUM.md 5장의 **예상 등급과 관찰이 다른 실습**만 모았다.
 | API | SSM GetParameter(/aws/service/ami-amazon-linux-latest/al2023…) | ✅ |  |
 | 동작 | 사용 가능한 AMI 확보 | ✅ 동작 | ami-0000000000000004c |
 | API | CreateKeyPair | ✅ |  |
-| 동작 | CreateKeyPair가 개인 키(KeyMaterial)를 반환 | ✅ 동작 | 1a:e8:3a:76:36:eb:73:09:fd:d2:d0:ad:9f:7 |
+| 동작 | CreateKeyPair가 개인 키(KeyMaterial)를 반환 | ✅ 동작 | 71:e9:a4:83:47:8c:ea:09:7f:14:de:0e:3b:c |
 | API | RunInstances(t3.micro, UserData) | ✅ |  |
 | 동작 | 인스턴스 상태 pending→running | ✅ 동작 | pending → running |
 | 동작 | 프라이빗 IP·서브넷·AZ가 채워짐 | ✅ 동작 | 10.20.1.4 subnet-00000000000000089 us-east-1a |
@@ -466,7 +471,7 @@ CURRICULUM.md 5장의 **예상 등급과 관찰이 다른 실습**만 모았다.
 | 종류 | 오퍼레이션/동작 | 결과 | 상세 |
 |---|---|---|---|
 | API | CreateLoadBalancer(ALB) | ✅ |  |
-| 동작 | ALB DNSName 발급 | ✅ 동작 | 127.0.0.1:45783 |
+| 동작 | ALB DNSName 발급 | ✅ 동작 | 127.0.0.1:42025 |
 | 동작 | ALB provisioning→active | ✅ 동작 | 생성 직후 provisioning |
 | API | CreateLoadBalancer(NLB) | ✅ |  |
 | API | CreateTargetGroup(instance, /health) | ✅ |  |
@@ -481,7 +486,7 @@ CURRICULUM.md 5장의 **예상 등급과 관찰이 다른 실습**만 모았다.
 | API | CreateRule(fixed-response) | ✅ |  |
 | 동작 | 리스너 규칙 우선순위 조회(default 포함) | ✅ 동작 | ['10', '20', 'default'] |
 | 동작 | 리스너 연결 후 대상 헬스 상태 | ✅ 동작 | ['healthy', 'healthy'] |
-| 동작 | ALB 리스너가 실제로 HTTP를 처리(컨테이너 안에서 fixed-response 규칙 확인) | ✅ 동작 | DNSName=127.0.0.1:45783 → hello-from-alb HTTP200 |
+| 동작 | ALB 리스너가 실제로 HTTP를 처리(컨테이너 안에서 fixed-response 규칙 확인) | ✅ 동작 | DNSName=127.0.0.1:42025 → hello-from-alb HTTP200 |
 | 동작 | ALB forward 규칙 → 대상 인스턴스(실체 없음)로 전달 시 응답 | ✅ 동작 | /api/x → HTTP502 |
 | 동작 | 호스트(macOS)에서 ALB DNSName으로 직접 연결 | ⚠️ 다름 | ConnectionRefusedError — 리스너 포트가 컨테이너 밖으로 게시되지 않음 |
 
@@ -502,7 +507,7 @@ CURRICULUM.md 5장의 **예상 등급과 관찰이 다른 실습**만 모았다.
 | API | PutLifecycleHook(launching) | ⛔ 501 | HTTP 501 NotImplemented: operation PutLifecycleHook is scaffolded but not implemented in this emulator |
 | API | SetDesiredCapacity(3) | ✅ |  |
 | 동작 | SetDesiredCapacity 3 → 인스턴스 3개 | ✅ 동작 | Instances=3 |
-| 동작 | Max 초과 Desired → ValidationError | ✅ 동작 | ValidationError: New SetDesiredCapacity value 10 is above max value 4 for the AutoScalingGroup: todayorder-probe-asg-9432c427 |
+| 동작 | Max 초과 Desired → ValidationError | ✅ 동작 | ValidationError: New SetDesiredCapacity value 10 is above max value 4 for the AutoScalingGroup: todayorder-probe-asg-abaf7654 |
 | API | DescribeScalingActivities | ⛔ 501 | HTTP 501 NotImplemented: operation DescribeScalingActivities is scaffolded but not implemented in this emulator |
 | 동작 | 인스턴스를 직접 종료하면 ASG가 대체 인스턴스를 띄움(자가 치유) | ⚠️ 다름 | 20초 후에도 종료된 인스턴스가 ASG에 ['InService/Healthy'] 로 남음 |
 
@@ -527,9 +532,9 @@ CURRICULUM.md 5장의 **예상 등급과 관찰이 다른 실습**만 모았다.
 | API | PutObjectTagging | ✅ |  |
 | API | PutBucketTagging | ✅ |  |
 | API | PutBucketVersioning(Enabled) | ✅ |  |
-| 동작 | 버전 관리 켠 뒤 PutObject마다 VersionId 발급 | ✅ 동작 | 42d8d954d13c933964847afbf299510c / c3b4a5dd0cac974f04b705443346c20d |
+| 동작 | 버전 관리 켠 뒤 PutObject마다 VersionId 발급 | ✅ 동작 | e1a977e512112e3c074795ca858b4486 / 671e229e94ff57252b5467adc25547e3 |
 | API | DeleteObject(버전 관리 버킷) | ✅ |  |
-| 동작 | 삭제하면 삭제 마커(DeleteMarker=true)가 생김 | ✅ 동작 | VersionId=6edd4bd9182de6be12b9f1477cb2a3cf |
+| 동작 | 삭제하면 삭제 마커(DeleteMarker=true)가 생김 | ✅ 동작 | VersionId=0cd86c64bc203aa85963230f138d1afc |
 | 동작 | 삭제 마커가 최신이면 GetObject → NoSuchKey | ✅ 동작 | NoSuchKey: The specified key does not exist. |
 | API | ListObjectVersions | ✅ |  |
 | 동작 | ListObjectVersions: 버전 2개 + 삭제 마커 1개 | ✅ 동작 | Versions=2 DeleteMarkers=1 |
@@ -561,13 +566,13 @@ CURRICULUM.md 5장의 **예상 등급과 관찰이 다른 실습**만 모았다.
 | 동작 | 잘못된 정책 JSON → MalformedPolicy | ✅ 동작 | MalformedPolicy: Policy must be a JSON policy document with a non-empty Statement list, each statement carrying an Effect of Allow or Deny and an Action |
 | API | PutPublicAccessBlock(버킷 수준) | ✅ |  |
 | API | GetPublicAccessBlock | ✅ |  |
-| 동작 | 퍼블릭 액세스 차단 상태에서 퍼블릭 정책 → AccessDenied | ✅ 동작 | AccessDenied: User: arn:aws:iam::000000000000:user/emulator is not authorized to perform: s3:PutBucketPolicy on resource: "arn:aws:s3:::todayorder-probe-main-9432c427" becaus |
+| 동작 | 퍼블릭 액세스 차단 상태에서 퍼블릭 정책 → AccessDenied | ✅ 동작 | AccessDenied: User: arn:aws:iam::000000000000:user/emulator is not authorized to perform: s3:PutBucketPolicy on resource: "arn:aws:s3:::todayorder-probe-main-abaf7654" becaus |
 | API | GetBucketOwnershipControls | ✅ |  |
 | 동작 | 기본 객체 소유권(BucketOwnerEnforced)에서 ACL 설정 → AccessControlListNotSupported | ✅ 동작 | AccessControlListNotSupported: The bucket does not allow ACLs |
 | API | PutBucketEncryption(SSE-S3) | ✅ |  |
 | 동작 | 기본 암호화 SSE-S3 → HeadObject ServerSideEncryption=AES256 | ✅ 동작 | AES256 |
 | API | PutObject(SSE-KMS) | ✅ |  |
-| 동작 | SSE-KMS 객체 HeadObject에 aws:kms·키 ID | ✅ 동작 | aws:kms 009f89e4-9c14-4cd4-8fb2-def7036d440c |
+| 동작 | SSE-KMS 객체 HeadObject에 aws:kms·키 ID | ✅ 동작 | aws:kms 5b58816d-2ee6-482e-8522-f82901412abf |
 | 동작 | KMS 키를 비활성화하면 SSE-KMS 객체 읽기 실패 | ⚠️ 다름 | 읽힘 — S3가 KMS 키 상태를 확인하지 않음 |
 | API | PutBucketEncryption(SSE-KMS, BucketKey) | ✅ |  |
 | API | PutObject(SSE-C) | ✅ |  |
@@ -585,7 +590,7 @@ CURRICULUM.md 5장의 **예상 등급과 관찰이 다른 실습**만 모았다.
 | API | GetBucketWebsite | ✅ |  |
 | API | CreateBucket(ObjectLockEnabledForBucket) | ✅ |  |
 | API | PutObjectLockConfiguration(GOVERNANCE 1일) | ✅ |  |
-| 동작 | 기본 보존 기간이 객체에 적용됨 | ✅ 동작 | GOVERNANCE 2026-11-13 11:00:21+00:00 |
+| 동작 | 기본 보존 기간이 객체에 적용됨 | ✅ 동작 | GOVERNANCE 2026-11-13 11:45:04+00:00 |
 | 동작 | 보존 중인 객체 버전 삭제 → AccessDenied | ✅ 동작 | AccessDenied: Access Denied because object protected by object lock. |
 | API | PutObject(StorageClass=GLACIER) | ✅ |  |
 | 동작 | StorageClass=GLACIER 저장 | ✅ 동작 | GLACIER |
@@ -604,7 +609,7 @@ CURRICULUM.md 5장의 **예상 등급과 관찰이 다른 실습**만 모았다.
 |---|---|---|---|
 | API | CreateFileSystem(generalPurpose, Encrypted) | ✅ |  |
 | 동작 | 파일 시스템 creating→available | ✅ 동작 | 생성 직후 creating |
-| 동작 | 같은 CreationToken 재사용 → FileSystemAlreadyExists(멱등성) | ✅ 동작 | FileSystemAlreadyExists: File system 'fs-e220a8397b1dcdaf1' already exists with creation token 'todayorder-probe-efs-9432c427' |
+| 동작 | 같은 CreationToken 재사용 → FileSystemAlreadyExists(멱등성) | ✅ 동작 | FileSystemAlreadyExists: File system 'fs-e220a8397b1dcdaf1' already exists with creation token 'todayorder-probe-efs-abaf7654' |
 | API | CreateMountTarget | ✅ |  |
 | API | CreateMountTarget | ✅ |  |
 | 동작 | AZ별 마운트 타깃 IP가 해당 서브넷(10.30.x.x) 안에 있음 | ⚠️ 다름 | [('us-east-1a', '10.0.0.4', 'creating'), ('us-east-1b', '10.0.1.4', 'creating')] |
@@ -628,13 +633,13 @@ CURRICULUM.md 5장의 **예상 등급과 관찰이 다른 실습**만 모았다.
 | API | ModifyDBParameterGroup(log_min_duration_statement) | ✅ |  |
 | API | CreateDBInstance(postgres, MultiAZ) | ✅ |  |
 | 동작 | DB 인스턴스 creating→available | ✅ 동작 | creating → available |
-| 동작 | Endpoint 주소·포트 반환 | ✅ 동작 | 127.0.0.1:36417 |
+| 동작 | Endpoint 주소·포트 반환 | ✅ 동작 | 127.0.0.1:37367 |
 | 동작 | MultiAZ·SecondaryAvailabilityZone 표시 | ✅ 동작 | MultiAZ=True AZ=us-east-1a Secondary=None |
 | 동작 | Endpoint 포트에 실제 DB가 떠 있음(컨테이너 안 TCP) | ✅ 동작 | 컨테이너 안: OPEN |
 | 동작 | Endpoint가 PostgreSQL 프로토콜로 응답(SSLRequest → 'S'/'N') | ✅ 동작 | 응답 'S' |
 | 동작 | 호스트(macOS)에서 Endpoint 포트로 TCP 연결 | ⚠️ 다름 | 연결 불가(포트가 컨테이너 밖에 게시되지 않음) |
 | API | CreateDBInstanceReadReplica | ✅ |  |
-| 동작 | 읽기 복제본이 원본을 가리킴 | ✅ 동작 | Source=todayorder-probe-db-9432c427; 원본 Replicas=['todayorder-probe-db-rr-9432c427'] |
+| 동작 | 읽기 복제본이 원본을 가리킴 | ✅ 동작 | Source=todayorder-probe-db-abaf7654; 원본 Replicas=['todayorder-probe-db-rr-abaf7654'] |
 | API | CreateDBSnapshot | ✅ |  |
 | 동작 | 스냅샷 creating→available | ✅ 동작 | 생성 직후 creating |
 | API | RestoreDBInstanceFromDBSnapshot | ✅ |  |
@@ -646,9 +651,9 @@ CURRICULUM.md 5장의 **예상 등급과 관찰이 다른 실습**만 모았다.
 | 동작 | 같은 식별자 → DBInstanceAlreadyExists | ✅ 동작 | DBInstanceAlreadyExists: DB instance already exists |
 | API | CreateDBInstance(mysql) | ✅ |  |
 | API | CreateDBCluster(aurora-postgresql) | ✅ |  |
-| 동작 | Aurora 클러스터 엔드포인트(쓰기)·리더 엔드포인트 | ✅ 동작 | 127.0.0.1 / todayorder-probe-aurora-9432c427.cluster-ro-00000000000v.us-east-1.rds.amazonaws.com |
+| 동작 | Aurora 클러스터 엔드포인트(쓰기)·리더 엔드포인트 | ✅ 동작 | 127.0.0.1 / todayorder-probe-aurora-abaf7654.cluster-ro-00000000000v.us-east-1.rds.amazonaws.com |
 | API | CreateDBInstance(Aurora 클러스터 인스턴스) | ✅ |  |
-| 동작 | 클러스터 멤버(쓰기 인스턴스)로 조회됨 | ✅ 동작 | [{'DBInstanceIdentifier': 'todayorder-probe-aurora-1-9432c427', 'IsClusterWriter': True, 'DBClusterParameterGroupStatus' |
+| 동작 | 클러스터 멤버(쓰기 인스턴스)로 조회됨 | ✅ 동작 | [{'DBInstanceIdentifier': 'todayorder-probe-aurora-1-abaf7654', 'IsClusterWriter': True, 'DBClusterParameterGroupStatus' |
 | API | CreateDBProxy | ✅ |  |
 
 <a id="svc-dynamodb"></a>
@@ -683,7 +688,7 @@ CURRICULUM.md 5장의 **예상 등급과 관찰이 다른 실습**만 모았다.
 | API | DescribeTimeToLive | ✅ |  |
 | 동작 | TTL 상태 ENABLED(또는 ENABLING) | ✅ 동작 | {'TimeToLiveStatus': 'ENABLING', 'AttributeName': 'expires_at'} |
 | 동작 | 만료 시각이 지난 항목이 5초 안에 삭제됨(AWS는 보통 수일 내, 즉시 아님) | ✅ 동작 | 삭제됨 |
-| 동작 | Streams 켜면 LatestStreamArn 발급 | ✅ 동작 | -9432c427/stream/2026-11-12T10:57:13.937 |
+| 동작 | Streams 켜면 LatestStreamArn 발급 | ✅ 동작 | -abaf7654/stream/2026-11-12T11:41:54.667 |
 | API | DescribeStream | ✅ |  |
 | API | GetShardIterator(TRIM_HORIZON) | ✅ |  |
 | API | GetRecords | ✅ |  |
@@ -719,11 +724,11 @@ CURRICULUM.md 5장의 **예상 등급과 관찰이 다른 실습**만 모았다.
 | API | CreateCacheSubnetGroup | ✅ |  |
 | API | CreateReplicationGroup(valkey, 복제본 1, Multi-AZ) | ✅ |  |
 | 동작 | 복제 그룹 creating→available | ✅ 동작 | creating → available |
-| 동작 | 기본(쓰기)·리더 엔드포인트 반환 | ✅ 동작 | Primary=master.to-rg-9432c427.000001.us-east-1.cache.amazonaws.com:6379 Reader=replica.to-rg-9432c427.000001.us-east-1.cache.amazonaws.com members=2 |
+| 동작 | 기본(쓰기)·리더 엔드포인트 반환 | ✅ 동작 | Primary=master.to-rg-abaf7654.000001.us-east-1.cache.amazonaws.com:6379 Reader=replica.to-rg-abaf7654.000001.us-east-1.cache.amazonaws.com members=2 |
 | 동작 | 엔드포인트 포트에 실제 캐시 서버가 떠 있음(컨테이너 안 TCP) | ⚠️ 다름 | 컨테이너 안: CLOSED |
 | API | TestFailover | ✅ |  |
 | API | CreateCacheCluster(memcached 2노드) | ✅ |  |
-| 동작 | Memcached 클러스터 available + 구성 엔드포인트 | ✅ 동작 | available {'Address': 'to-mc-9432c427.000004.cfg.us-east-1.cache.amazonaws.com', 'Port': 11211} |
+| 동작 | Memcached 클러스터 available + 구성 엔드포인트 | ✅ 동작 | available {'Address': 'to-mc-abaf7654.000004.cfg.us-east-1.cache.amazonaws.com', 'Port': 11211} |
 | API | CreateServerlessCache(valkey) | ✅ |  |
 
 <a id="svc-sqs"></a>
@@ -746,7 +751,7 @@ CURRICULUM.md 5장의 **예상 등급과 관찰이 다른 실습**만 모았다.
 | 동작 | ChangeMessageVisibility(0) 직후 다시 보임 | ✅ 동작 | 1건 |
 | API | DeleteMessage | ✅ |  |
 | 동작 | DeleteMessage 후 다시 오지 않음 | ✅ 동작 | 0건 |
-| 동작 | 롱 폴링: 빈 큐에서 WaitTimeSeconds=2 만큼 대기 | ✅ 동작 | 2.0s 대기 |
+| 동작 | 롱 폴링: 빈 큐에서 WaitTimeSeconds=2 만큼 대기 | ✅ 동작 | 2.1s 대기 |
 | API | SendMessage(DelaySeconds=3) | ✅ |  |
 | 동작 | DelaySeconds=3: 처음엔 안 보이고 나중에 도착 | ✅ 동작 | 즉시 0건, 이후 1건 |
 | API | SendMessageBatch | ✅ |  |
@@ -797,7 +802,7 @@ CURRICULUM.md 5장의 **예상 등급과 관찰이 다른 실습**만 모았다.
 | API | PublishBatch | ✅ |  |
 | 동작 | PublishBatch 2건이 구독 큐에 도착 | ✅ 동작 | 2건 |
 | API | Subscribe(email) | ✅ |  |
-| 동작 | email 구독은 확인 대기 상태 | ✅ 동작 | 427:c8203a8a-841d-4106-904e-41a02582654e |
+| 동작 | email 구독은 확인 대기 상태 | ✅ 동작 | 654:584289af-bca4-4ad3-96b2-98fd4c3c48f6 |
 | API | Subscribe(https) | ✅ |  |
 | API | ListSubscriptionsByTopic | ✅ |  |
 | 동작 | 구독 목록 조회 | ✅ 동작 | 7개 |
@@ -828,7 +833,7 @@ CURRICULUM.md 5장의 **예상 등급과 관찰이 다른 실습**만 모았다.
 | API | CreateQueue(pipesrc) | ✅ |  |
 | API | CreateQueue(pipedst) | ✅ |  |
 | API | Pipes CreatePipe(신뢰 정책이 틀린 역할) | ✅ |  |
-| 동작 | Pipes: 역할 신뢰 정책에 pipes.amazonaws.com 이 없으면 CREATE_FAILED | ✅ 동작 | CREATE_FAILED: Pipes cannot assume the execution role arn:aws:iam::000000000000:role/todayorder-probe-pipebad-9432c427: its trust polic |
+| 동작 | Pipes: 역할 신뢰 정책에 pipes.amazonaws.com 이 없으면 CREATE_FAILED | ✅ 동작 | CREATE_FAILED: Pipes cannot assume the execution role arn:aws:iam::000000000000:role/todayorder-probe-pipebad-abaf7654: its trust polic |
 | API | Pipes CreatePipe(SQS→SQS) | ✅ |  |
 | 동작 | Pipes: 원본 큐 메시지가 대상 큐로 전달 | ✅ 동작 | 1건 |
 
@@ -848,7 +853,7 @@ CURRICULUM.md 5장의 **예상 등급과 관찰이 다른 실습**만 모았다.
 | 동작 | Fail 상태 → 실행 FAILED, error 전달 | ✅ 동작 | status=FAILED error=PaymentFailed |
 | API | CreateQueue(sfntarget) | ✅ |  |
 | API | CreateStateMachine(Task: sqs:sendMessage, 권한 없는 역할) | ✅ |  |
-| 동작 | 실행 역할에 sqs:SendMessage 가 없으면 Task가 AccessDenied로 FAILED (IAM 평가됨) | ✅ 동작 | status=FAILED error=SQS.AmazonSQSException cause=User: arn:aws:iam::000000000000:role/todayorder-probe-sfnrole-9432c427 is not authorized t |
+| 동작 | 실행 역할에 sqs:SendMessage 가 없으면 Task가 AccessDenied로 FAILED (IAM 평가됨) | ✅ 동작 | status=FAILED error=SQS.AmazonSQSException cause=User: arn:aws:iam::000000000000:role/todayorder-probe-sfnrole-abaf7654 is not authorized t |
 | API | CreateStateMachine(Task: sqs:sendMessage, sqs:SendMessage 허용 역할) | ✅ |  |
 | 동작 | Task(sqs:sendMessage) 서비스 통합이 실제로 메시지를 보냄 | ✅ 동작 | status=SUCCEEDED 수신 1건 |
 | API | CreateStateMachine(EXPRESS) | ✅ |  |
@@ -907,13 +912,13 @@ CURRICULUM.md 5장의 **예상 등급과 관찰이 다른 실습**만 모았다.
 | 동작 | Invoke가 핸들러를 실제로 실행해 결과 반환 | ✅ 동작 | StatusCode=200 FunctionError=None payload={"statusCode": 200, "body": "{\"echo\": {\"orderId\": \"o-1\"}, \"env\": \"prod\"}"} |
 | API | CreateFunction(예외를 던지는 핸들러) | ✅ |  |
 | API | Invoke(예외) | ✅ |  |
-| 동작 | 핸들러 예외 → FunctionError=Unhandled, errorType 반환 | ✅ 동작 | FunctionError=Unhandled payload={"errorMessage":"boom","errorType":"ValueError","requestId":"d0f84de0-a989-4a09-947f-7f6160fc44e7"," |
-| 동작 | Invoke 후 /aws/lambda/<함수> 로그 그룹이 생김(CloudWatch Logs 연동) | ✅ 동작 |  |
+| 동작 | 핸들러 예외 → FunctionError=Unhandled, errorType 반환 | ✅ 동작 | FunctionError=Unhandled payload={"errorMessage":"boom","errorType":"ValueError","requestId":"5e20e73e-198b-4181-b9f5-dccafc1a167d"," |
+| 동작 | Invoke 후 /aws/lambda/<함수> 로그 그룹이 생김(실행 역할에 logs:* 권한이 있을 때) | ✅ 동작 |  |
 | API | Invoke(DryRun) | ✅ |  |
 | 동작 | DryRun은 204 반환(실행 없이 권한·파라미터만 검사) | ✅ 동작 | StatusCode=204 |
 | API | Invoke(Event, 비동기) | ✅ |  |
 | 동작 | 비동기 Invoke는 202 반환 | ✅ 동작 | StatusCode=202 |
-| 동작 | 없는 함수 Invoke → ResourceNotFoundException | ✅ 동작 | ResourceNotFoundException: Function not found: arn:aws:lambda:us-east-1:000000000000:function:todayorder-probe-nope-9432c427:$LATEST |
+| 동작 | 없는 함수 Invoke → ResourceNotFoundException | ✅ 동작 | ResourceNotFoundException: Function not found: arn:aws:lambda:us-east-1:000000000000:function:todayorder-probe-nope-abaf7654:$LATEST |
 | 동작 | 큐 가시성 타임아웃이 함수 타임아웃보다 짧으면 매핑 거부 | ✅ 동작 | InvalidParameterValueException: Queue visibility timeout: 60 seconds is less than Function timeout: 900 seconds |
 | API | CreateEventSourceMapping(SQS) | ✅ |  |
 | 동작 | 이벤트 소스 매핑 상태 Creating → Enabled | ✅ 동작 | Enabled |
@@ -925,7 +930,7 @@ CURRICULUM.md 5장의 **예상 등급과 관찰이 다른 실습**만 모았다.
 | API | PublishLayerVersion | ✅ |  |
 | API | UpdateFunctionConfiguration(Layers) | ✅ |  |
 | API | CreateFunctionUrlConfig(AuthType=NONE) | ✅ |  |
-| 동작 | 함수 URL 발급 | ✅ 동작 | https://93f4459c355d493f9901762f49394499.lambda-url.us-east-1.on.aws/ |
+| 동작 | 함수 URL 발급 | ✅ 동작 | https://0e61738bf7ac4bf5997f684120a522f9.lambda-url.us-east-1.on.aws/ |
 | API | PutFunctionEventInvokeConfig(OnFailure → SQS) | ✅ |  |
 | API | ListFunctions | ✅ |  |
 
@@ -969,6 +974,7 @@ CURRICULUM.md 5장의 **예상 등급과 관찰이 다른 실습**만 모았다.
 | API | CreateApi(HTTP, Lambda 프록시) | ✅ |  |
 | API | CreateIntegration(AWS_PROXY → Lambda, 2.0) | ✅ |  |
 | 동작 | HTTP API → Lambda 프록시를 HTTPS로 호출하면 함수가 실행되어 응답 (AddPermission 없이도 성공) | ✅ 동작 | https://127.0.0.1:9297/_aws/execute-api/e77k44w5b0/orders → 200 {"echo": {"version": "2.0", "routeKey": "GET /orders", "rawPath": "/orders", "rawQueryStri |
+| 동작 | 실행 역할에 logs 권한이 없으면 /aws/lambda/<함수> 로그 그룹이 생기지 않음(AWS와 동일) | ✅ 동작 | 생기지 않음 |
 | API | CreateApi(WEBSOCKET) | ✅ |  |
 | API | CreateRoute($connect) | ✅ |  |
 
@@ -979,7 +985,7 @@ CURRICULUM.md 5장의 **예상 등급과 관찰이 다른 실습**만 모았다.
 | 종류 | 오퍼레이션/동작 | 결과 | 상세 |
 |---|---|---|---|
 | API | CreateRepository(scanOnPush, IMMUTABLE) | ✅ |  |
-| 동작 | 저장소 URI 발급 | ✅ 동작 | 000000000000.dkr.ecr.us-east-1.amazonaws.com/todayorder-probe-api-9432c427 |
+| 동작 | 저장소 URI 발급 | ✅ 동작 | 000000000000.dkr.ecr.us-east-1.amazonaws.com/todayorder-probe-api-abaf7654 |
 | API | PutLifecyclePolicy | ✅ |  |
 | API | GetLifecyclePolicy | ✅ |  |
 | API | PutImageScanningConfiguration | ✅ |  |
@@ -1033,7 +1039,7 @@ CURRICULUM.md 5장의 **예상 등급과 관찰이 다른 실습**만 모았다.
 | 종류 | 오퍼레이션/동작 | 결과 | 상세 |
 |---|---|---|---|
 | API | CreateHostedZone(퍼블릭) | ✅ |  |
-| 동작 | 퍼블릭 호스팅 영역에 NS/SOA 기본 레코드와 위임 세트 | ✅ 동작 | NameServers=['ns-46.awsdns-61.com', 'ns-936.awsdns-00.net'] |
+| 동작 | 퍼블릭 호스팅 영역에 NS/SOA 기본 레코드와 위임 세트 | ✅ 동작 | NameServers=['ns-1575.awsdns-10.com', 'ns-1386.awsdns-19.net'] |
 | API | CreateHostedZone(프라이빗, VPC 연결) | ✅ |  |
 | 동작 | 프라이빗 호스팅 영역 PrivateZone=True | ✅ 동작 |  |
 | API | ChangeResourceRecordSets(A, CNAME) | ✅ |  |
@@ -1047,11 +1053,11 @@ CURRICULUM.md 5장의 **예상 등급과 관찰이 다른 실습**만 모았다.
 | API | ChangeResourceRecordSets(지리적 위치) | ✅ |  |
 | API | ChangeResourceRecordSets(다중값 응답) | ✅ |  |
 | API | ChangeResourceRecordSets(Alias → S3 웹 사이트) | ✅ |  |
-| 동작 | 영역 apex에 CNAME을 만들면 InvalidChangeBatch로 거부 | ✅ 동작 | InvalidChangeBatch: [RRSet of type CNAME with DNS name 9432c427.todayorder.example. is not permitted at apex in zone 9432c427.todayorder.example.] |
+| 동작 | 영역 apex에 CNAME을 만들면 InvalidChangeBatch로 거부 | ✅ 동작 | InvalidChangeBatch: [RRSet of type CNAME with DNS name abaf7654.todayorder.example. is not permitted at apex in zone abaf7654.todayorder.example.] |
 | API | ListResourceRecordSets | ✅ |  |
 | 동작 | 레코드 목록에 생성한 레코드가 모두 보임 | ✅ 동작 | 15개, 유형 ['A', 'CNAME', 'NS', 'SOA'] |
 | API | TestDNSAnswer(가중치) | ✅ |  |
-| 동작 | TestDNSAnswer가 가중치 레코드 중 하나를 응답 | ✅ 동작 | RecordData=['192.0.2.2'] ResponseCode=NOERROR |
+| 동작 | TestDNSAnswer가 가중치 레코드 중 하나를 응답 | ✅ 동작 | RecordData=['192.0.2.1'] ResponseCode=NOERROR |
 | 동작 | 실제 DNS 질의(dig) | ⏭️ | 에뮬레이터는 HTTPS API 포트 하나만 노출한다. 컨테이너에서 DNS(53) 포트를 내보내지 않으므로 dig로 확인 불가 |
 
 <a id="svc-cloudfront"></a>
@@ -1063,7 +1069,7 @@ CURRICULUM.md 5장의 **예상 등급과 관찰이 다른 실습**만 모았다.
 | API | CreateOriginAccessControl | ✅ |  |
 | API | CreateCachePolicy | ✅ |  |
 | API | CreateDistribution(S3 오리진 + OAC) | ✅ |  |
-| 동작 | 배포 도메인 이름(*.cloudfront.net) 발급 | ⚠️ 다름 | DomainName=127.0.0.1:41079 Status=InProgress — 에뮬레이터는 컨테이너 안의 로컬 포트를 준다 |
+| 동작 | 배포 도메인 이름(*.cloudfront.net) 발급 | ⚠️ 다름 | DomainName=127.0.0.1:40875 Status=InProgress — 에뮬레이터는 컨테이너 안의 로컬 포트를 준다 |
 | 동작 | 배포 상태 InProgress → Deployed | ✅ 동작 | 처음 InProgress, 이후 Deployed |
 | 동작 | 버킷 정책 없이 배포로 GET → 403 (OAC가 허용되지 않음) | ✅ 동작 | HTTP 403 |
 | 동작 | OAC용 버킷 정책 추가 후 배포 주소로 GET → 객체 반환 (컨테이너 안에서 curl) | ✅ 동작 | HTTP 200 'hello-cloudfront' |
@@ -1130,11 +1136,11 @@ CURRICULUM.md 5장의 **예상 등급과 관찰이 다른 실습**만 모았다.
 | 동작 | 변조된 메시지의 서명 검증 실패 | ✅ 동작 | KMSInvalidSignatureException:  |
 | API | GetPublicKey | ✅ |  |
 | API | CreateKey(MultiRegion=True) | ✅ |  |
-| 동작 | 다중 리전 키 ID는 mrk- 접두사 | ✅ 동작 | mrk-747a |
+| 동작 | 다중 리전 키 ID는 mrk- 접두사 | ✅ 동작 | mrk-3154 |
 | API | ReplicateKey(us-west-2) | ✅ |  |
 | API | ScheduleKeyDeletion(7일) | ✅ |  |
 | 동작 | 삭제 예약 후 KeyState=PendingDeletion | ✅ 동작 | PendingDeletion |
-| 동작 | 삭제 대기 중인 키로 Encrypt하면 KMSInvalidStateException | ✅ 동작 | KMSInvalidStateException: arn:aws:kms:us-east-1:000000000000:key/a787b306-0b47-4e97-8fb4-5d7ae209b682 is pending deletion. |
+| 동작 | 삭제 대기 중인 키로 Encrypt하면 KMSInvalidStateException | ✅ 동작 | KMSInvalidStateException: arn:aws:kms:us-east-1:000000000000:key/3d533cd1-80d5-42be-83e3-e1048852bf63 is pending deletion. |
 | API | CancelKeyDeletion | ✅ |  |
 | 동작 | 삭제 대기 기간 7일 미만은 거부 | ✅ 동작 | ValidationException:  |
 
@@ -1145,10 +1151,10 @@ CURRICULUM.md 5장의 **예상 등급과 관찰이 다른 실습**만 모았다.
 | 종류 | 오퍼레이션/동작 | 결과 | 상세 |
 |---|---|---|---|
 | API | CreateSecret | ✅ |  |
-| 동작 | ARN 끝에 무작위 6자 접미사 | ✅ 동작 | todayorder-probe-db-9432c427/password-TMjVb8 |
+| 동작 | ARN 끝에 무작위 6자 접미사 | ✅ 동작 | todayorder-probe-db-abaf7654/password-MYc9FE |
 | API | GetSecretValue | ✅ |  |
 | API | PutSecretValue | ✅ |  |
-| 동작 | 새 값 저장 시 AWSCURRENT → 새 버전, AWSPREVIOUS → 이전 버전 | ✅ 동작 | {'7383af34-c57e-4365-bfdc-45c024bdf349': ['AWSCURRENT'], '285efc56-4df5-4b94-9733-52717c3fb2b2': ['AWSPREVIOUS']} |
+| 동작 | 새 값 저장 시 AWSCURRENT → 새 버전, AWSPREVIOUS → 이전 버전 | ✅ 동작 | {'28f3c2e2-527a-4b62-8b35-a2d8506a39b9': ['AWSPREVIOUS'], '2b256c79-72cb-4c61-bf4e-93d9e70e5d66': ['AWSCURRENT']} |
 | 동작 | VersionStage=AWSPREVIOUS로 이전 값 조회 | ✅ 동작 |  |
 | API | UpdateSecretVersionStage(롤백) | ✅ |  |
 | 동작 | 스테이지 이동으로 AWSCURRENT 롤백 | ✅ 동작 | {"username": "app", "password": "v1"} |
@@ -1172,7 +1178,7 @@ CURRICULUM.md 5장의 **예상 등급과 관찰이 다른 실습**만 모았다.
 | API | PutParameter(SecureString, 고객 관리형 키) | ✅ |  |
 | API | PutParameter(SecureString, 기본 aws/ssm 키) | ✅ |  |
 | API | GetParameter(SecureString, 복호화 없이) | ✅ |  |
-| 동작 | WithDecryption 없이 조회하면 암호문이 반환됨 | ✅ 동작 | ASQ0ZTgzNmM2ZC01NDg5LTQ0NjYtOWRmMS05OTM2 |
+| 동작 | WithDecryption 없이 조회하면 암호문이 반환됨 | ✅ 동작 | ASQ2ZWNjMzY0Yy00NTY5LTRiYzktYTkwNi1hNTEx |
 | API | GetParameter(WithDecryption) | ✅ |  |
 | 동작 | WithDecryption=True면 평문 | ✅ 동작 |  |
 | API | GetParametersByPath(Recursive) | ✅ |  |
@@ -1201,7 +1207,7 @@ CURRICULUM.md 5장의 **예상 등급과 관찰이 다른 실습**만 모았다.
 |---|---|---|---|
 | API | RequestCertificate(DNS 검증) | ✅ |  |
 | API | DescribeCertificate | ✅ |  |
-| 동작 | DNS 검증용 CNAME 레코드(ResourceRecord) 제공 | ✅ 동작 | Status=PENDING_VALIDATION RR={'Name': '_6eca97262d29f1a33d6ee4f0d7f8ad6f.api.9432c427.todayorder.example.', 'Type': 'CNAME', 'Value': '_361347f6482673ca9a968c7e9dcf1347.d1ea0a3e04.acm-validations.aws. |
+| 동작 | DNS 검증용 CNAME 레코드(ResourceRecord) 제공 | ✅ 동작 | Status=PENDING_VALIDATION RR={'Name': '_07c06476d5e74dc4070b261267bf8313.api.abaf7654.todayorder.example.', 'Type': 'CNAME', 'Value': '_6fd1dc9b5998c98e88dfee8aba8bad1a.b069271fe3.acm-validations.aws. |
 | 동작 | 검증 레코드가 없으면 ISSUED가 되지 않음 | ✅ 동작 | FAILED ADDITIONAL_VERIFICATION_REQUIRED — .example 등 예약 도메인은 수 초 만에 FAILED(ADDITIONAL_VERIFICATION_REQUIRED) |
 | API | RequestCertificate(Route 53 영역 도메인) | ✅ |  |
 | 동작 | Route 53에 검증 CNAME을 만들면 ISSUED로 전환(20초 대기) | ⚠️ 다름 | PENDING_VALIDATION |
@@ -1232,7 +1238,7 @@ CURRICULUM.md 5장의 **예상 등급과 관찰이 다른 실습**만 모았다.
 | 종류 | 오퍼레이션/동작 | 결과 | 상세 |
 |---|---|---|---|
 | API | PutConfigurationRecorder | ✅ |  |
-| 동작 | Config 전달 채널: 버킷 정책이 없으면 거부(버킷 정책을 평가함) | ✅ 동작 | InsufficientDeliveryPolicyException: Insufficient delivery policy to s3 bucket: todayorder-probe-nopolicy-9432c427, unable to get s3 bucket acl. |
+| 동작 | Config 전달 채널: 버킷 정책이 없으면 거부(버킷 정책을 평가함) | ✅ 동작 | InsufficientDeliveryPolicyException: Insufficient delivery policy to s3 bucket: todayorder-probe-nopolicy-abaf7654, unable to get s3 bucket acl. |
 | API | PutDeliveryChannel | ✅ |  |
 | API | StartConfigurationRecorder | ✅ |  |
 | API | DescribeConfigurationRecorderStatus | ✅ |  |
@@ -1270,7 +1276,7 @@ CURRICULUM.md 5장의 **예상 등급과 관찰이 다른 실습**만 모았다.
 | API | ListMetrics(네임스페이스) | ✅ |  |
 | 동작 | 게시한 지표가 ListMetrics에 보임 | ✅ 동작 | 1개 |
 | API | GetMetricStatistics | ✅ |  |
-| 동작 | 데이터 포인트 집계(평균 200, 표본 3, 최댓값 300) | ✅ 동작 | [{'Timestamp': datetime.datetime(2026, 11, 12, 19, 58, tzinfo=tzlocal()), 'SampleCount': 3.0, 'Average': 200.0, 'Maximum': 300.0, 'Unit': 'Millisecond |
+| 동작 | 데이터 포인트 집계(평균 200, 표본 3, 최댓값 300) | ✅ 동작 | [{'Timestamp': datetime.datetime(2026, 11, 12, 20, 43, tzinfo=tzlocal()), 'SampleCount': 3.0, 'Average': 200.0, 'Maximum': 300.0, 'Unit': 'Millisecond |
 | API | GetMetricData | ✅ |  |
 | 동작 | GetMetricData 합계 600 | ✅ 동작 | [600.0] |
 | API | ListMetrics(AWS/EC2) | ✅ |  |
@@ -1279,7 +1285,7 @@ CURRICULUM.md 5장의 **예상 등급과 관찰이 다른 실습**만 모았다.
 | 동작 | 임계값 초과 데이터만으로 알람이 스스로 ALARM이 됨(25초 대기, Period=10) | ✅ 동작 | 처음 INSUFFICIENT_DATA → ALARM |
 | API | DescribeAlarmHistory | ✅ |  |
 | 동작 | 알람 상태 변경 이력이 기록됨 | ✅ 동작 | 1건 |
-| 동작 | 알람 액션: SNS → 구독한 SQS 큐로 알림 도착 | ✅ 동작 | 1건 {"Version":"1.0","AlarmName":"todayorder-probe-latency-high-9432c427","AWSAccountId":"000000000000", |
+| 동작 | 알람 액션: SNS → 구독한 SQS 큐로 알림 도착 | ✅ 동작 | 1건 {"Version":"1.0","AlarmName":"todayorder-probe-latency-high-abaf7654","AWSAccountId":"000000000000", |
 | API | PutCompositeAlarm | ✅ |  |
 | 동작 | 복합 알람이 하위 알람 상태를 따라 ALARM | ✅ 동작 | ALARM |
 | API | PutDashboard | ✅ |  |
@@ -1301,7 +1307,7 @@ CURRICULUM.md 5장의 **예상 등급과 관찰이 다른 실습**만 모았다.
 | API | FilterLogEvents(패턴 ERROR) | ✅ |  |
 | 동작 | FilterLogEvents가 패턴으로 2건만 반환 | ✅ 동작 | 2건 |
 | 동작 | FilterLogEvents 구문 패턴("payment failed") 1건 | ✅ 동작 | 1건 |
-| 동작 | 지표 필터: ERROR 로그 2건 → CloudWatch 지표 ErrorCount 합계 2 | ✅ 동작 | [{'Timestamp': datetime.datetime(2026, 11, 12, 19, 58, tzinfo=tzlocal()), 'Sum': 2.0, 'Unit': 'None'}] |
+| 동작 | 지표 필터: ERROR 로그 2건 → CloudWatch 지표 ErrorCount 합계 2 | ✅ 동작 | [{'Timestamp': datetime.datetime(2026, 11, 12, 20, 43, tzinfo=tzlocal()), 'Sum': 2.0, 'Unit': 'None'}] |
 | API | PutSubscriptionFilter(→ Kinesis) | ✅ |  |
 | API | StartQuery(Logs Insights) | ✅ |  |
 | 동작 | Logs Insights 쿼리가 완료되고 결과 n=2 | ✅ 동작 | status=Complete [[{'field': 'n', 'value': '2'}]] |
@@ -1349,7 +1355,7 @@ CURRICULUM.md 5장의 **예상 등급과 관찰이 다른 실습**만 모았다.
 | 동작 | 전송 스트림 ACTIVE | ✅ 동작 |  |
 | API | PutRecord | ✅ |  |
 | API | PutRecordBatch | ✅ |  |
-| 동작 | 버퍼 시간(60초) 안팎에 S3 객체가 실제로 생김 | ✅ 동작 | 3s 대기, 객체 ['orders/2026/11/12/10/todayorder-probe-orders-9432c427-1-2026-11-12-10-58-27-0-73fdd9cc-5ef3-432c-9a58-9c88b72d233e'] |
+| 동작 | 버퍼 시간(60초) 안팎에 S3 객체가 실제로 생김 | ✅ 동작 | 3s 대기, 객체 ['orders/2026/11/12/11/todayorder-probe-orders-abaf7654-1-2026-11-12-11-43-08-0-4afabccc-9f6f-4bdc-a711-233fe70b60fa'] |
 
 <a id="svc-glue"></a>
 
@@ -1394,7 +1400,7 @@ CURRICULUM.md 5장의 **예상 등급과 관찰이 다른 실습**만 모았다.
 | API | CreateBackupPlan(일일 + 복사 액션) | ✅ |  |
 | API | CreateBackupSelection(태그 기준) | ✅ |  |
 | API | StartBackupJob(DynamoDB 테이블) | ✅ |  |
-| 동작 | 백업 작업이 COMPLETED, 복구 지점 생성 | ✅ 동작 | State=COMPLETED RecoveryPoint=int:18e74719-2f65-8ddd-0000-000000000007 |
+| 동작 | 백업 작업이 COMPLETED, 복구 지점 생성 | ✅ 동작 | State=COMPLETED RecoveryPoint=int:18e74989-a096-0bfb-0000-000000000007 |
 | 동작 | 볼트에 복구 지점이 보임 | ✅ 동작 | 1개 |
 | API | ListCopyJobs | ⛔ 501 | HTTP 501 NotImplemented: operation ListCopyJobs is scaffolded but not implemented in this emulator |
 

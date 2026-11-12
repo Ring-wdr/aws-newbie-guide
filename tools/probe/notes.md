@@ -4,7 +4,7 @@
 
 에뮬레이터 1.0.322(2026-11-10 릴리스)는 **설계 시점의 예상(CURRICULUM.md)보다 훨씬 많이 "실제로" 동작한다.** 가장 큰 차이 다섯 가지:
 
-1. **Lambda `Invoke`가 함수 코드를 실제로 실행한다** (CURRICULUM은 501로 예상). 동기 호출은 핸들러의 반환값을, 예외는 `FunctionError=Unhandled`를 돌려주고, `/aws/lambda/<함수>` 로그 그룹도 생긴다. SQS→Lambda 이벤트 소스 매핑은 큐의 메시지를 실제로 소비하고, API Gateway(HTTP API)→Lambda 프록시도 실행된다.
+1. **Lambda `Invoke`가 함수 코드를 실제로 실행한다** (CURRICULUM은 501로 예상). 동기 호출은 핸들러의 반환값을, 예외는 `FunctionError=Unhandled`를 돌려준다. `/aws/lambda/<함수>` 로그 그룹은 **실행 역할에 logs 권한이 있을 때만** 생긴다(AWS와 같음). SQS→Lambda 이벤트 소스 매핑은 큐의 메시지를 실제로 소비하고, API Gateway(HTTP API)→Lambda 프록시도 실행된다.
 2. **서비스 간 전달이 실제로 일어난다.** SNS→SQS(필터 정책 포함), S3 이벤트→SQS, EventBridge 규칙→SQS, Pipes, Step Functions 실행(SQS 서비스 통합 포함), CloudWatch 경보→SNS→SQS, S3 복제, Firehose→S3가 모두 관찰됐다.
 3. **IAM 정책은 "평가하지 않는다"가 아니라 "서비스마다 다르다".** 사용자에게 붙인 정책을 IAM·EC2·KMS·STS(신뢰 정책)는 평가해 거부하고(명시적 Deny 우선도 재현), S3·SQS·DynamoDB는 평가하지 않는다. 반면 S3 **버킷 정책**의 명시적 Deny, **KMS 키 정책**의 Deny, CloudFront OAC↔버킷 정책, 서비스 역할의 신뢰 정책(Step Functions·Pipes·Glue·Backup·Cognito 자격 증명 풀)은 집행된다. `iam simulate-custom-policy`/`simulate-principal-policy`도 올바르게 판정한다.
 4. **VPC·EC2 컨트롤 플레인은 🟢 수준이다.** 서브넷이 AZ·CIDR과 함께 저장되고(/24 → 사용 가능 IP 251), CIDR 범위·중복 오류, NAT 게이트웨이 pending→available, 게이트웨이 엔드포인트의 prefix-list 경로, TGW가 AWS처럼 동작한다. EC2 인스턴스는 pending→running→stopped→terminated로 상태가 바뀐다(부팅은 안 함).
@@ -21,7 +21,7 @@
 | client-config | 🟢 | 127.0.0.1 필수·S3 Control 도달 불가·호스트 접두사 문제가 문서대로 재현됨 |
 | iam | 🟢 | CRUD·정책 버전·시뮬레이터 완전. IAM API 자체는 권한도 평가. 단 S3·SQS·DynamoDB에 대한 사용자 정책은 무시됨 |
 | sts | 🟢 | AssumeRole 임시 자격 증명·신뢰 정책 거부까지 재현 (키 접두사만 ASIA가 아니라 EMULATOR) |
-| organizations | 🟡 | 조직·루트·OU만. SCP 생성·연결, 계정 생성·목록은 501 |
+| organizations | 🟡 | 조직·루트·OU만. SCP 활성화·생성·목록·연결(EnablePolicyType·CreatePolicy·ListPolicies·AttachPolicy), 계정 생성·목록은 501 |
 | ec2-vpc | 🟢 | VPC·서브넷·라우팅·IGW·NAT·SG·NACL·엔드포인트·TGW 🟢. 피어링 수락·Egress-only IGW·VPN 501. 트래픽은 흐르지 않음 |
 | ec2-instances | 🟡 | 상태 전이는 실제처럼 관찰되지만 부팅·사용자 데이터 실행 없음. DescribeInstanceStatus·ModifyInstanceAttribute·DescribeTags 501 |
 | ebs-ami | 🟡 | 볼륨·스냅샷·시작 템플릿(버전 포함) OK. CreateImage·RegisterImage 501, 스냅샷에서 볼륨 복원 실패 |
@@ -38,7 +38,7 @@
 | stepfunctions | 🟢 | 실행이 SUCCEEDED/FAILED까지, 이력, SQS 서비스 통합, EXPRESS 동기 실행 |
 | kinesis | 🟢 | 상태 전이·파티션 키→샤드·GetRecords 순서·리샤딩 |
 | firehose | 🟢 | S3에 실제 객체가 생김. 단 버퍼 시간을 무시하고 수 초 만에 씀 |
-| lambda | 🟢 | 생성·버전·별칭·동시성·Invoke(실제 실행)·이벤트 소스 매핑 소비·함수 URL 발급 |
+| lambda | 🟢 | 생성·버전·별칭·동시성·Invoke(실제 실행)·이벤트 소스 매핑 소비·함수 URL 발급. 로그 그룹은 역할에 logs 권한이 있을 때만 생김 |
 | apigateway | 🟢 | REST API MOCK 통합을 `https://127.0.0.1:<포트>/_aws/execute-api/<id>/<stage>/<경로>` 로 실제 호출 |
 | apigatewayv2 | 🟢 | HTTP API → Lambda 프록시 실제 실행. Lambda 리소스 정책(AddPermission) 없이도 통과함은 AWS와 다름 |
 | ecr | 🟢 | 저장소·수명 주기 정책·인증 토큰 (이미지 푸시는 시험 안 함) |
@@ -102,7 +102,7 @@ CURRICULUM.md 5장의 **예상 등급과 관찰이 다른 실습**만 모았다.
 
 | 모듈 | 실습 (예상) | 관찰 | 제안·우회 |
 |---|---|---|---|
-| M01 | Organizations OU·SCP (🟢/🟡) | 조직은 처음부터 존재(`CreateOrganization` 불필요, FeatureSet=ALL). OU 생성 OK. **`EnablePolicyType`·`CreatePolicy`(SCP)·`CreateAccount`·`ListAccounts` 모두 501** | OU 🟢 / SCP 🔴. SCP는 JSON 문서를 쓰고 `iam simulate-custom-policy`로 "SCP+IAM 교집합"을 손으로 판정하는 워크시트로 대체 |
+| M01 | Organizations OU·SCP (🟢/🟡) | 조직은 처음부터 존재(`CreateOrganization` 불필요, FeatureSet=ALL). OU 생성 OK. **`EnablePolicyType`·`CreatePolicy`(SCP)·`ListPolicies`·`AttachPolicy`(기본 `FullAWSAccess`도)·`CreateAccount`·`ListAccounts` 모두 501** | OU 🟢 / SCP 🔴. SCP는 JSON 문서를 쓰고 `iam simulate-custom-policy`로 "SCP+IAM 교집합"을 손으로 판정하는 워크시트로 대체 |
 | M02 | NAT GW vs Egress-only IGW (레슨 3) | `CreateEgressOnlyInternetGateway` **501** (2026-10-22 보고 그대로) | 🔴. 개념·다이어그램 |
 | M02 | Peering (🟡) | 생성 → `pending-acceptance`까지. **`AcceptVpcPeeringConnection` 501** → active가 안 됨, 피어링 경로 실습 불가 | 🟡(요청까지) / 수락·라우팅은 🔴. TGW로 연결 실습을 대신하면 🟢 |
 | M02 | Site-to-Site VPN (레슨 6) | `CreateVpnConnection` 501 | 🔴 |
@@ -132,7 +132,8 @@ CURRICULUM.md 5장의 **예상 등급과 관찰이 다른 실습**만 모았다.
 
 - **큐·버킷·역할 정책을 실제처럼 써야 한다.** SNS→SQS(큐 정책), S3→SQS 알림(큐 정책), Step Functions·Pipes·Glue·Backup(역할 신뢰 정책·권한), CloudFront OAC(버킷 정책), Config 전달 채널(버킷 정책)은 정책이 없으면 실패하거나 **조용히 아무 일도 일어나지 않는다**. 실습 스크립트가 "전달됐다"를 단언하기 전에 정책부터 만든다.
 - **리소스 엔드포인트(RDS, ALB, CloudFront)는 컨테이너 안에만 있다.** 호스트에서 접속하는 실습을 설계하지 말 것.
-- **비동기 상태는 기다린다.** DynamoDB 테이블은 boto3로 만들면 즉시 ACTIVE, CLI 응답에는 CREATING이 보이는 등 타이밍이 실제와 다르다. waiter/폴링으로 쓰고, "몇 초 뒤"를 단언하지 말 것.
+- **비동기 상태는 기다린다.** 예: DynamoDB `CreateTable` 응답은 (CLI·boto3 모두) `CREATING`이고, 에뮬레이터는 1초 안에 `ACTIVE`가 되는 경우가 많아 직후 `DescribeTable` 결과는 실행마다 다르다(경쟁 상태). 생성 응답의 상태를 보여 주거나 waiter/폴링 뒤의 상태를 보여 주고, "직후 상태"나 "몇 초 뒤"를 단언하지 말 것.
 - **시간 기반 동작은 빠르거나 없다.** TTL 삭제는 수 초(실제는 최대 수일), Firehose 버퍼 무시, CloudTrail 로그 즉시, S3 수명 주기 전환은 일어나지 않음.
-- **페이지네이션 토큰을 `--output text`로 받지 말 것** (`None`이 섞임 — M00 레슨 5).
+- **페이지네이션되는 목록 명령의 결과를 `--query ... --output text`로 변수에 담지 말 것.** CLI가 페이지마다 쿼리를 적용해 `None` 줄이 섞일 수 있다(S3 `list-objects-v2`, API Gateway `get-resources` 등에서 실제로 겪음). `--output json`으로 받아 가공하거나 `--no-paginate`를 쓴다 (M00 레슨 5).
+- **모든 boto3 예제는 클라이언트를 만들기 전에 `from emulator_guard import require_emulator; require_emulator()`** 를 호출한다. env.sh 없이 실행하면 네트워크 호출 전에 종료한다. 학습자가 자기 AWS 계정에서 돌릴 때만 `TODAYORDER_ALLOW_REAL_AWS=1`(기본 꺼짐). verify.sh에 "env.sh 없이 실행하면 거부되는지" 확인을 넣는 방법은 `curriculum/m00-orientation/labs/verify.sh`의 `guard_refuses` 참고.
 - `misc-optional`의 "한눈에" 서비스(Elastic Beanstalk, Lightsail, Batch, Storage Gateway, DataSync, FSx, Redshift, OpenSearch, EMR, MSK, MQ, AppFlow, Transfer, Service Catalog, RAM, Directory Service, Service Quotas, Compute Optimizer, Control Tower, Lake Formation, Comprehend, Translate, Rekognition, Polly, Well-Architected, License Manager)는 대부분 호출이 된다. 필요하면 "설정값을 읽는" 짧은 실습을 붙일 수 있다. QuickSight `ListDashboards`, SageMaker `ListNotebookInstances`는 501.
