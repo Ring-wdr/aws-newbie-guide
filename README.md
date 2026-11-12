@@ -15,6 +15,20 @@ AWS 계정도, 요금도 필요 없다. 내 노트북에서 도는 [aws-emulator
 2. 모듈을 순서대로 진행한다. 레슨마다 `개념 → 직접 해 보기 → 실제 AWS에서는 → 시험 포인트`.
 3. 모듈 끝의 퀴즈를 풀고, 마지막에 캡스톤과 모의고사로 마무리한다.
 
+## 빠른 시작
+
+macOS + [Homebrew](https://brew.sh) 기준 (Linux·WSL은 [M00 레슨 3](./curriculum/m00-orientation/03-environment-setup.md) 참고).
+
+```bash
+git clone https://github.com/Ring-wdr/aws-newbie-guide.git && cd aws-newbie-guide
+scripts/install.sh            # Colima·docker·AWS CLI·uv 확인/설치, 에뮬레이터 이미지 빌드, boto3 설치
+scripts/emulator-up.sh        # 에뮬레이터 시작 (https://127.0.0.1:9297)
+source scripts/env.sh         # 이 셸을 에뮬레이터에 연결 (실제 AWS로 나가면 멈추는 안전 장치 포함)
+aws sts get-caller-identity   # "Account": "000000000000" 이면 준비 완료
+```
+
+끝나면 `scripts/emulator-down.sh`. 에뮬레이터가 무엇을 재현하고 무엇을 못 하는지는 [docs/FIDELITY.md](./docs/FIDELITY.md).
+
 ## 로드맵
 
 | 모듈 | 주제 | 시험 도메인 |
