@@ -76,10 +76,10 @@ flowchart LR
 
 ```
 == 1. 네트워크: VPC 10.40.0.0/16, 프라이빗 서브넷 2개(us-east-1a, 1b), NFS 보안 그룹
-VPC=vpc-000000000000000a2  subnets=subnet-000000000000000aa,subnet-000000000000000ac  efs-sg=sg-000000000000000b0
+VPC=vpc-000000000000000ba  subnets=subnet-000000000000000c2,subnet-000000000000000c4  efs-sg=sg-000000000000000c8
 == 2. 파일 시스템 생성 (리전형=여러 AZ, 암호화, General Purpose, Elastic 처리량)
 {
-    "Id": "fs-8621a03fe0bbdb7b7",
+    "Id": "fs-ee521d7a0f4d38726",
     "State": "creating",
     "Perf": "generalPurpose",
     "Throughput": "elastic",
@@ -87,10 +87,10 @@ VPC=vpc-000000000000000a2  subnets=subnet-000000000000000aa,subnet-0000000000000
 }
 → available
 == 3. 같은 CreationToken 으로 또 만들기 → FileSystemAlreadyExists (생성 요청의 멱등성 키)
-aws: [ERROR]: An error occurred (FileSystemAlreadyExists) when calling the CreateFileSystem operation: File system 'fs-8621a03fe0bbdb7b7' already exists with creation token 'todayorder-m04-shared-uploads'
+aws: [ERROR]: An error occurred (FileSystemAlreadyExists) when calling the CreateFileSystem operation: File system 'fs-ee521d7a0f4d38726' already exists with creation token 'todayorder-m04-shared-uploads'
 Additional error details:
 ErrorCode: FileSystemAlreadyExists
-FileSystemId: fs-8621a03fe0bbdb7b7
+FileSystemId: fs-ee521d7a0f4d38726
 ```
 
 방금 본 것: `CreationToken`은 "같은 요청을 재시도해도 파일 시스템이 두 개 생기지 않게" 하는 멱등성 키다. 네트워크 오류로 재시도할 때 중복 생성을 막는다.
@@ -100,30 +100,33 @@ FileSystemId: fs-8621a03fe0bbdb7b7
 ```
 == 4. AZ마다 마운트 타깃 하나씩
 {
-    "Id": "fsmt-8e1f7555983aa92f8",
-    "Subnet": "subnet-000000000000000aa",
+    "Id": "fsmt-f16952ee72f3454f2",
+    "Subnet": "subnet-000000000000000c2",
     "State": "creating"
 }
 {
-    "Id": "fsmt-84bb3f97971d80abd",
-    "Subnet": "subnet-000000000000000ac",
+    "Id": "fsmt-0c7de8064963bab0c",
+    "Subnet": "subnet-000000000000000c4",
     "State": "creating"
 }
--- us-east-1a 에 두 번째 마운트 타깃 → MountTargetConflict (AZ당 하나)
-aws: [ERROR]: An error occurred (MountTargetConflict) when calling the CreateMountTarget operation: File system fs-8621a03fe0bbdb7b7 already has mount target fsmt-8e1f7555983aa92f8 in Availability Zone us-east-1e
+→ 마운트 타깃 2개 available
+-- 같은 서브넷(us-east-1a)에 두 번째 마운트 타깃 → MountTargetConflict (AZ당 하나)
+aws: [ERROR]: An error occurred (MountTargetConflict) when calling the CreateMountTarget operation: File system fs-ee521d7a0f4d38726 already has mount target fsmt-f16952ee72f3454f2 in Availability Zone us-east-1c
 Additional error details:
 ErrorCode: MountTargetConflict
 마운트 타깃 수: 2
 ```
 
-> ⚠️ **에뮬레이터 한계**: 오류 메시지의 AZ가 `us-east-1a`가 아니라 `us-east-1e`다. 에뮬레이터 1.0.322는 마운트 타깃의 AZ와 IP를 **서브넷에서 가져오지 않고**, 에뮬레이터가 켜진 뒤 만든 순서대로 `us-east-1a, 1b, 1c…`와 `10.0.x.4`를 매긴다. 그래서 lab10은 AZ를 출력하지 않고, "같은 AZ의 다른 서브넷"이 아니라 **같은 서브넷**으로 충돌을 재현한다. 실제 AWS에서는 마운트 타깃이 지정한 서브넷의 AZ와 IP 대역을 따른다.
+> ⚠️ **에뮬레이터 한계** (1.0.322에서 관찰한 사실만):
+> - 같은 AZ의 **다른 서브넷**에 두 번째 마운트 타깃을 만들면 충돌하지 않고 **만들어진다**(실제 AWS는 `MountTargetConflict`). 충돌은 **같은 서브넷**으로 다시 만들 때만 난다. 그래서 lab10은 같은 서브넷으로 충돌을 재현한다.
+> - 마운트 타깃의 AZ 표시가 서브넷의 AZ와 다를 수 있다(위 오류 메시지의 AZ가 `us-east-1a`가 아니다). 그래서 lab10은 AZ를 출력하지 않는다. 실제 AWS에서는 마운트 타깃이 지정한 서브넷의 AZ와 IP 대역을 따른다.
 
 **3) 액세스 포인트·수명 주기·백업·정책**
 
 ```
 == 5. 액세스 포인트: 앱은 /uploads 를 루트로, UID/GID 1000 으로만 본다
 {
-    "Id": "fsap-c3cf17102b7f7f86a",
+    "Id": "fsap-d254741f599dc6f79",
     "Path": "/uploads",
     "Uid": 1000
 }
@@ -143,9 +146,9 @@ ErrorCode: MountTargetConflict
 }
 == 7. 자동 백업(AWS Backup) 켜기, TLS 아닌 마운트 거부 정책
 ENABLING
-fs-8621a03fe0bbdb7b7
+fs-ee521d7a0f4d38726
 == 8. 마운트 타깃이 남은 파일 시스템 삭제 → FileSystemInUse
-aws: [ERROR]: An error occurred (FileSystemInUse) when calling the DeleteFileSystem operation: File system 'fs-8621a03fe0bbdb7b7' still has 2 mount target(s); delete them first
+aws: [ERROR]: An error occurred (FileSystemInUse) when calling the DeleteFileSystem operation: File system 'fs-ee521d7a0f4d38726' still has 2 mount target(s); delete them first
 Additional error details:
 ErrorCode: FileSystemInUse
 == 9. 정리 (액세스 포인트 → 마운트 타깃 → 파일 시스템 → 네트워크)
@@ -153,7 +156,7 @@ ErrorCode: FileSystemInUse
 LAB10 OK
 ```
 
-방금 본 것: 파일 시스템 정책은 처음에 `Action: "*"`를 Deny하도록 썼더니 에뮬레이터가 `InvalidPolicyException: This policy would prevent future FileSystemPolicy updates`로 거부했다(정책 잠금 방지 검사 — 실제 AWS와 같은 안전장치). 그래서 lab10은 클라이언트 동작(`ClientMount`·`ClientWrite`·`ClientRootAccess`)만 Deny한다. 삭제는 생성의 역순으로 한다.
+방금 본 것: 마운트 타깃은 `creating`으로 시작하므로 lab10은 `available`이 될 때까지 기다린 뒤 다음 단계로 간다. 파일 시스템 정책은 처음에 `Action: "*"`를 Deny하도록 썼더니 에뮬레이터가 `InvalidPolicyException: This policy would prevent future FileSystemPolicy updates`로 거부했다(정책 잠금 방지 검사 — 실제 AWS와 같은 안전장치). 그래서 lab10은 클라이언트 동작(`ClientMount`·`ClientWrite`·`ClientRootAccess`)만 Deny한다. 삭제는 생성의 역순으로 한다.
 
 ## 실제 AWS에서는
 

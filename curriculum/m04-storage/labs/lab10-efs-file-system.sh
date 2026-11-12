@@ -57,6 +57,8 @@ cleanup
 echo "== 1. 네트워크: VPC 10.40.0.0/16, 프라이빗 서브넷 2개(us-east-1a, 1b), NFS 보안 그룹"
 VPC="$(aws ec2 create-vpc --cidr-block 10.40.0.0/16 \
   --tag-specifications "ResourceType=vpc,Tags=[{Key=Name,Value=$TAG}]" --query Vpc.VpcId --output text)"
+# CreateVpc 응답은 pending 이다. 서브넷을 만들기 전에 available 을 기다린다.
+aws ec2 wait vpc-available --vpc-ids "$VPC"
 SN_A="$(aws ec2 create-subnet --vpc-id "$VPC" --cidr-block 10.40.1.0/24 --availability-zone us-east-1a --query Subnet.SubnetId --output text)"
 SN_B="$(aws ec2 create-subnet --vpc-id "$VPC" --cidr-block 10.40.2.0/24 --availability-zone us-east-1b --query Subnet.SubnetId --output text)"
 APP_SG="$(aws ec2 create-security-group --group-name todayorder-m04-app --description 'app servers' --vpc-id "$VPC" --query GroupId --output text)"
@@ -72,7 +74,8 @@ FS="$(aws efs create-file-system --creation-token "$TOKEN" --performance-mode ge
   --query FileSystemId --output text)"
 aws efs describe-file-systems --file-system-id "$FS" \
   --query 'FileSystems[0].{Id: FileSystemId, State: LifeCycleState, Perf: PerformanceMode, Throughput: ThroughputMode, Encrypted: Encrypted}' --output json
-poll "파일 시스템 available" 120 bash -c "[ \"\$(aws efs describe-file-systems --file-system-id $FS --query 'FileSystems[0].LifeCycleState' --output text)\" = available ]"
+poll "파일 시스템 available" 120 bash -c "[ \"\$(aws efs describe-file-systems --file-system-id $FS --query 'FileSystems[0].LifeCycleState' --output text)\" = available ]" || {
+  echo "마지막 상태: $(aws efs describe-file-systems --file-system-id "$FS" --query 'FileSystems[0].LifeCycleState' --output text)"; exit 1; }
 echo "→ available"
 
 echo "== 3. 같은 CreationToken 으로 또 만들기 → FileSystemAlreadyExists (생성 요청의 멱등성 키)"
@@ -86,9 +89,14 @@ aws efs create-mount-target --file-system-id "$FS" --subnet-id "$SN_A" --securit
   --query '{Id: MountTargetId, Subnet: SubnetId, State: LifeCycleState}' --output json
 aws efs create-mount-target --file-system-id "$FS" --subnet-id "$SN_B" --security-groups "$EFS_SG" \
   --query '{Id: MountTargetId, Subnet: SubnetId, State: LifeCycleState}' --output json
-echo "-- us-east-1a 에 두 번째 마운트 타깃 → MountTargetConflict (AZ당 하나)"
-# 주의: 에뮬레이터 1.0.322 는 마운트 타깃의 AZ·IP를 서브넷에서 가져오지 않고 생성 순서대로 매긴다
-# (us-east-1a, 1b, 1c, 1d… / 10.0.x.4). 그래서 AZ는 출력하지 않고, 충돌은 같은 서브넷으로 재현한다.
+# 마운트 타깃은 creating 으로 시작한다. 다음 단계(충돌 시험·삭제) 전에 available 을 기다린다.
+poll "마운트 타깃 2개 available" 120 bash -c "[ \"\$(aws efs describe-mount-targets --file-system-id $FS --output json | jq '[.MountTargets[] | select(.LifeCycleState == \"available\")] | length')\" = 2 ]" || {
+  aws efs describe-mount-targets --file-system-id "$FS" --query 'MountTargets[].[MountTargetId, LifeCycleState]' --output text; exit 1; }
+echo "→ 마운트 타깃 2개 available"
+echo "-- 같은 서브넷(us-east-1a)에 두 번째 마운트 타깃 → MountTargetConflict (AZ당 하나)"
+# 주의: 에뮬레이터 1.0.322 는 같은 AZ의 "다른" 서브넷에는 두 번째 마운트 타깃을 만들어 버리고
+# (AWS는 MountTargetConflict), 같은 서브넷일 때만 충돌을 낸다. 그래서 같은 서브넷으로 재현한다.
+# 마운트 타깃의 AZ 표시도 서브넷의 AZ와 다를 수 있어 AZ는 출력하지 않는다.
 set +e
 conflict="$(aws efs create-mount-target --file-system-id "$FS" --subnet-id "$SN_A" --security-groups "$EFS_SG" 2>&1 >/dev/null)"
 set -e

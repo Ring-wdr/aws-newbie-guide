@@ -38,7 +38,7 @@ flowchart TD
 | **SSE-S3** (`AES256`) | S3가 전부 | 없음 | 기본값(2023년 1월부터 모든 새 객체), 추가 비용 없음 |
 | **SSE-KMS** (`aws:kms`) | KMS 키(AWS 관리형 `aws/s3` 또는 고객 관리형) | **CloudTrail에 키 사용 기록**, 키 정책으로 누가 복호화할지 통제, 키 교체 | "키 사용 감사", "키 권한 분리", "직접 키 교체 통제". 요청마다 KMS 호출 → 할당량·비용 → **S3 버킷 키**로 줄임 |
 | DSSE-KMS | KMS, 두 겹 암호화 | SSE-KMS와 같음 | 규정상 "이중 암호화" 요구 |
-| **SSE-C** | **고객**이 요청마다 키를 보냄, AWS는 키를 저장 안 함 | 고객 책임 | "키를 AWS에 맡기면 안 된다 + 서버 측 암호화". 키를 잃으면 데이터도 잃음. 2026년 4월부터 **새 버킷은 SSE-C가 기본 차단** |
+| **SSE-C** | **고객**이 요청마다 키를 보냄, AWS는 키를 저장 안 함 | 고객 책임 | "키를 AWS에 맡기면 안 된다 + 서버 측 암호화". 키를 잃으면 데이터도 잃음. 2026년 4월부터 **새 범용 버킷은 SSE-C가 기본 차단**(중동 바레인·UAE 리전 제외. 기존 버킷은 계정에 SSE-C 객체가 하나도 없을 때만 함께 차단됨) |
 | 클라이언트 측 암호화 | 고객 앱이 올리기 전에 암호화 | 고객 책임 | "S3에 평문이 한 번도 닿으면 안 된다" |
 
 전송 중 암호화는 HTTPS다. 버킷 정책에서 `aws:SecureTransport: false`를 Deny하면 HTTP 요청을 막을 수 있다.
@@ -116,6 +116,7 @@ aws: [ERROR]: An error occurred (AccessDenied) when calling the PutObjectAcl ope
 **3) 버킷 정책으로 규칙 강제** — 정책 전문은 lab05 5단계. 세 문장 모두 `Effect: Deny`다.
 
 ```
+...
 == 5. 버킷 정책: (1) SSE-KMS 가 아닌 업로드 거부 (2) receipts/ 삭제 거부 (3) HTTPS 아닌 요청 거부
 ["DenyNonKmsUploads","DenyReceiptDelete","DenyInsecureTransport"]
 -- 암호화 헤더 없이 업로드 → 명시적 Deny
@@ -225,14 +226,17 @@ SDK receipt_upload_service OK
 
 ```
 == 1. S3 Control: 액세스 포인트 만들기 → 호스트명에 계정 ID 가 붙어 에뮬레이터에 닿지 않는다
-aws: [ERROR]: Could not connect to the endpoint URL: "https://000000000000.127.0.0.1:9304/v20180820/accesspoint/todayorder-analytics"
+aws: [ERROR]: Could not connect to the endpoint URL: "https://000000000000.127.0.0.1:<포트>/v20180820/accesspoint/todayorder-analytics"
 == 2. S3 Control: 계정 수준 퍼블릭 액세스 차단 조회 → 같은 이유로 실패
-aws: [ERROR]: Could not connect to the endpoint URL: "https://000000000000.127.0.0.1:9304/v20180820/configuration/publicAccessBlock"
+aws: [ERROR]: Could not connect to the endpoint URL: "https://000000000000.127.0.0.1:<포트>/v20180820/configuration/publicAccessBlock"
 ```
+
+`<포트>` 자리에는 내 `EMULATOR_PORT`(학습자 기본값 9297)가 찍힌다.
 
 대체 실습으로 버킷 수준 BPA를 쓰고, 액세스 포인트 설계를 JSON으로 적는다. 액세스 포인트를 쓰는 표준 패턴은 이렇다. **버킷 정책은 "이 계정의 액세스 포인트를 거쳐 온 요청이면 허용"으로 권한을 위임하고, 실제 세부 권한은 각 액세스 포인트 정책에 둔다.**
 
 ```
+...
 == 4. 대체 실습 (b): 액세스 포인트 설계를 JSON 으로 — 분석팀 전용 액세스 포인트(읽기, analytics/ 만)
 -- 버킷 정책: '이 계정의 액세스 포인트를 거쳐 온 요청'에 권한을 위임 (s3:DataAccessPointAccount)
 {"Sid":"AnalyticsReadOnly","Resource":"arn:aws:s3:us-east-1:000000000000:accesspoint/todayorder-analytics/object/analytics/*"}
@@ -255,11 +259,12 @@ flowchart LR
 
 ## 실제 AWS에서는
 
-- 에뮬레이터는 버킷 정책의 명시적 Deny와 조건 키를 집행했지만, 공식 문서는 에뮬레이터를 "보안 테스트에 쓰지 말라"고 한다. 버전에 따라 바뀔 수 있다. 또 **IAM 사용자 정책은 S3에서 평가되지 않는다**(M01). 실제 AWS에서는 IAM 정책과 버킷 정책을 **함께** 평가한다.
+- 에뮬레이터는 버킷 정책의 명시적 Deny와 조건 키를 집행했지만, 공식 문서는 에뮬레이터를 "보안 테스트에 쓰지 말라"고 한다. 버전에 따라 바뀔 수 있다.
+- **에뮬레이터는 S3에 대한 IAM 사용자 정책을 일부만 평가한다**(M01 README "에뮬레이터 제약"과 같은 결과를 이 포트에서 다시 확인). 정책이 없는 사용자의 객체·버킷 단위 데이터 요청(`GetObject`·`PutObject`·`ListObjectsV2`)은 `AccessDenied ... because no identity-based policy allows ...`로 거부하고, `s3:*` 허용에 `s3:GetObject` 명시적 Deny를 더하면 `GetObject`만 `... with an explicit deny in an identity-based policy`로 거부한다. 반면 계정·관리 수준 요청(`ListBuckets`·`CreateBucket`·`DeleteBucket`·`PutBucketVersioning`)은 정책이 없어도 통과시킨다. **실제 AWS는 모든 S3 요청에서** IAM 정책과 버킷 정책을 함께 평가한다(같은 계정이면 둘 중 하나의 Allow로 충분하고, 어디든 명시적 Deny가 있으면 거부).
 - 퍼블릭 정책을 걸어도(BPA를 끈 경우) 에뮬레이터는 익명 GET을 허용하지 않았다(403). 실제 AWS에서는 퍼블릭 읽기 정책 + BPA 해제면 **누구나** 읽는다. 그래서 실제 계정에서는 이 실험을 하지 않는다.
 - SSE-C 차단(`BlockedEncryptionTypes`)과 KMS 키 상태는 실제 AWS에서만 효과가 있다(위 ⚠️).
 - **실제 AWS에서 해 보려면 (lab07)**: 액세스 포인트(`aws s3control create-access-point --account-id <내 계정> --name <이름> --bucket <버킷>`)와 계정 수준 BPA 조회(`aws s3control get-public-access-block --account-id <내 계정>`)는 무료다. 계정 수준 BPA는 **켜 두는 것이 권장값**이다. 끄지 말고 조회만 한다. 정리: `aws s3control delete-access-point --account-id <내 계정> --name <이름>`.
-- presigned URL·버킷 정책·SSE-S3는 프리 티어 범위 안에서 실습할 수 있다. 고객 관리형 KMS 키는 **키당 월 요금**이 있으니 실습 뒤 `schedule-key-deletion`(7~30일 대기)을 잊지 않는다.
+- presigned URL·버킷 정책·SSE-S3는 소량이면 요금이 거의 없다(프리 티어 적용 여부와 한도는 계정 생성 시기에 따라 다르니 AWS 프리 티어 페이지에서 확인). 고객 관리형 KMS 키는 **키당 월 요금**이 있으니 실습 뒤 `schedule-key-deletion`(7~30일 대기)을 잊지 않는다.
 
 ## 시험 포인트
 
@@ -273,13 +278,13 @@ flowchart LR
 
 ## 스스로 확인
 
-1. 버킷 정책에 `"Effect": "Allow", "Principal": "*", "Action": "s3:GetObject"`를 넣었는데 `AccessDenied`가 났다. 정책 문법은 맞다. 무엇 때문인가?
+1. 버킷 정책 `"Effect": "Allow", "Principal": "*", "Action": "s3:GetObject"`를 **저장하려는** `put-bucket-policy` 호출이 `AccessDenied`로 실패했다(GET은 아직 해 보지도 않았다). 정책 문법은 맞다. 무엇 때문인가?
 2. 운영자가 "영수증은 절대 삭제 불가"를 원한다. 버킷 정책 Deny(lab05)와 객체 잠금(레슨 3) 중 무엇이 더 강한가?
 3. EC2의 역할(임시 자격 증명)로 7일짜리 presigned URL을 만들었는데 몇 시간 만에 403이 났다. 왜인가?
 
 <details><summary>답</summary>
 
-1. 버킷 수준 BPA의 `BlockPublicPolicy`가 퍼블릭 정책 설정 자체를 막았다(lab05 2단계). 계정 수준 BPA가 켜져 있어도 마찬가지다.
+1. 버킷 수준 BPA의 `BlockPublicPolicy`가 퍼블릭 정책을 **저장하는 것 자체**를 막았다(lab05 2단계, 오류 메시지 끝의 `because public policies are prevented by the BlockPublicPolicy setting`). 계정 수준 BPA가 켜져 있어도 마찬가지다. 반대로 정책은 저장됐는데 익명 GET이 거부된다면, 원인은 `RestrictPublicBuckets`(또는 계정 수준 BPA)다.
 2. 객체 잠금(규정 준수 모드)이 더 강하다. 버킷 정책은 정책을 바꿀 권한이 있는 사람이 Deny를 지우면 끝이다. 규정 준수 모드 객체 잠금은 루트 사용자도 보존 기간 동안 지울 수 없다.
 3. 임시 자격 증명으로 만든 presigned URL은 그 자격 증명(역할 세션)이 만료되면 함께 무효가 된다. 길게 써야 한다면 URL을 그때그때 새로 발급하는 설계(API가 요청마다 발급)가 맞다.
 

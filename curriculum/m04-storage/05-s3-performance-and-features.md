@@ -30,7 +30,7 @@ sequenceDiagram
 | 파트 크기 | 5 MiB ~ 5 GiB (**마지막 파트는 5 MiB 미만 가능**) |
 | 파트 수 | 최대 10,000 |
 | 단일 PUT | 최대 5 GB (그보다 크면 멀티파트 필수) |
-| 객체 최대 | 50 TB |
+| 객체 최대 | 50 TB (발표 기준. 사용 설명서의 멀티파트 표는 10,000 × 5 GiB = 48.8 TiB) |
 | 권장 | 100 MB 이상이면 멀티파트를 고려 |
 
 완료하지도 중단하지도 않은 업로드의 파트는 **보이지 않게 남아 저장 요금이 나간다.** 그래서 수명 주기 규칙 `AbortIncompleteMultipartUpload`(레슨 2)를 거의 모든 버킷에 건다. 다운로드 쪽은 `Range` 헤더로 **바이트 범위 GET**을 병렬로 보내 빠르게 받는다.
@@ -123,6 +123,7 @@ LAB08 OK
 [lab09-event-notifications.sh](./labs/lab09-event-notifications.sh)
 
 ```
+...
 == 1. 큐 정책 없이 알림 설정 → S3가 목적지를 검증하다 실패
 aws: [ERROR]: An error occurred (InvalidArgument) when calling the PutBucketNotificationConfiguration operation: Unable to validate the following destination configurations
 == 2. 큐 정책: s3.amazonaws.com 이 '내 버킷에서 온 경우에만' SendMessage 가능
@@ -197,7 +198,7 @@ LAB09 OK
 - 이벤트 알림은 보통 수 초 안에 오지만 **가끔 1분 이상 걸릴 수 있고, 드물게 중복 전달**될 수 있다. 순서도 보장되지 않는다(같은 키의 이벤트 순서는 `sequencer` 값으로 판단). 워커는 **멱등**하게 만든다. lab09는 마지막에 올린 P-004의 도착을 "수집 끝" 신호로 썼는데, 이건 에뮬레이터가 순서대로 보내기 때문에 통하는 실습용 단순화다.
 - 정적 웹 사이트 엔드포인트(`http://<버킷>.s3-website-<리전>.amazonaws.com`), Transfer Acceleration 엔드포인트(`<버킷>.s3-accelerate.amazonaws.com`)는 에뮬레이터에 없다. 설정이 저장되는 것만 확인했다.
 - 요청자 지불 버킷에 다른 계정이 요청할 때 `--request-payer requester`를 빼면 403이 난다. 에뮬레이터는 계정을 분리하지 않아 재현할 수 없다.
-- 실제로 해 보려면: 멀티파트·이벤트 알림(SQS)은 프리 티어 범위 안의 소량으로 가능하다(SQS 월 100만 요청 무료). Transfer Acceleration은 **GB당 추가 요금**이 있으니 테스트 파일만 쓴다. 정리: `aws s3api put-bucket-notification-configuration --bucket <버킷> --notification-configuration '{}'` → `aws sqs delete-queue` → `aws s3 rb --force`. 미완료 멀티파트 업로드가 남지 않았는지 `aws s3api list-multipart-uploads`로 확인한다.
+- 실제로 해 보려면: 멀티파트·이벤트 알림(SQS)은 소량이면 요금이 거의 없다(프리 티어 적용 여부와 한도는 계정 생성 시기에 따라 다르니 AWS 프리 티어 페이지에서 확인). Transfer Acceleration은 **GB당 추가 요금**이 있으니 테스트 파일만 쓴다. 정리: `aws s3api put-bucket-notification-configuration --bucket <버킷> --notification-configuration '{}'` → `aws sqs delete-queue` → `aws s3 rb --force`. 미완료 멀티파트 업로드가 남지 않았는지 `aws s3api list-multipart-uploads`로 확인한다.
 
 ## 시험 포인트
 
