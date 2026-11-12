@@ -32,7 +32,8 @@ flowchart LR
   C -. PR .-> V
   D -. PR .-> V
   V -- PASS --> M[(main)]
-  V -- CHANGES_REQUESTED --> C
+  V -- CHANGES_REQUESTED --> W[해당 PR 작성자가 수정 후 재검증]
+  W -.-> V
 ```
 
 ## 병렬 작업 규칙
