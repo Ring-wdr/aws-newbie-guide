@@ -211,44 +211,48 @@ LAB02 OK
 
 ### 5) 봉투 암호화 — [labs/lab03-envelope-encryption.sh](./labs/lab03-envelope-encryption.sh)
 
-로컬 AES는 `openssl enc -aes-256-cbc`가 맡는다(macOS·Linux 기본 포함).
+로컬 암호화는 짧은 파이썬(`cryptography` 패키지의 **AES-256-GCM**)이 맡는다. 셸 실습인데 왜 파이썬인가? 처음에는 `openssl enc -aes-256-cbc -K <16진 키>`를 썼는데, 그 방식에는 운영에서 쓰면 안 되는 약점이 셋 있었다. ① CBC에는 무결성 검사(MAC)가 없어 암호문 바꿔치기를 알 수 없고, ② `-K <키>`가 명령줄 인자라 실행되는 동안 같은 컴퓨터의 다른 사용자가 `ps`로 키를 볼 수 있고, ③ 평문 키를 잠깐 파일로 써야 했다. 지금 lab03은 이렇게 한다.
+
+- `aws kms generate-data-key … --output json` 의 출력(평문 키가 든 JSON)을 **파이프(표준 입력)로만** 파이썬에 넘긴다. 평문 키는 명령줄 인자·셸 변수·디스크 어디에도 나타나지 않고 파이썬 프로세스 메모리에만 잠깐 있다.
+- AES-256-GCM, 메시지마다 새 **96비트 nonce**, KMS 암호화 컨텍스트를 GCM의 **AAD**(추가 인증 데이터)로 묶는다. 저장 형식은 `nonce(12바이트) || 암호문 || 태그(16바이트)`.
 
 ```
 == 0. 암호화할 데이터: 주문 1,000건 내보내기 (KMS Encrypt 한도 4096바이트보다 크다)
 orders.jsonl: 64893바이트
-== 1. GenerateDataKey — 평문 데이터 키와 암호화된 데이터 키를 한 번에 받는다
-KeyId: arn:aws:kms:us-east-1:000000000000:key/d85d0d8c-94e7-469e-94f8-ad9d74d5ffe1
-평문 데이터 키 32바이트(=256비트) · 암호화된 데이터 키 98바이트
-== 2. 평문 데이터 키로 로컬에서 AES-256 암호화 → 평문 키는 즉시 삭제
-암호문 64896바이트 · 평문 키 파일 남았나? 아니오
-== 3. S3 에 '암호문 + 암호화된 데이터 키 + IV' 를 함께 저장
+== 1·2. GenerateDataKey → (파이프로) 로컬 AES-256-GCM 암호화. 평문 키는 파일·변수·명령줄에 남지 않는다
+KeyId: arn:aws:kms:us-east-1:000000000000:key/62602660-56e0-4989-bb8e-0b98b4d95bde
+암호문 64921바이트(= nonce 12 + 평문 + GCM 태그 16) · 암호화된 데이터 키 98바이트
+  작업 폴더: orders.jsonl
+  작업 폴더: orders.jsonl.enc
+  작업 폴더: orders.jsonl.enc.key
+== 3. S3 에 '암호문(nonce 포함) + 암호화된 데이터 키 + 컨텍스트' 를 함께 저장
 {
-    "Size": 64896,
+    "Size": 64921,
     "Metadata": [
-        "x-ctx-file",
+        "x-alg",
         "x-datakey",
-        "x-iv"
+        "x-ctx"
     ]
 }
-== 4. 복호화: 메타데이터의 암호화된 키 → KMS Decrypt → 로컬 AES 복호화
+== 4. 복호화: 메타데이터의 암호화된 키 → KMS Decrypt →(파이프)→ 로컬 AES-GCM 복호화(태그 검증)
 {"orderId":"A-0001","total":1000,"card":"4111-****-****-0001"}
 {"orderId":"A-0002","total":2000,"card":"4111-****-****-0002"}
-원본과 동일 (1000줄)
-== 5. KMS 키를 비활성화하면 → 데이터 키를 못 풀어 파일도 못 연다 (= 키 하나로 모든 파일을 잠근다)
-aws: [ERROR]: An error occurred (DisabledException) when calling the Decrypt operation: arn:aws:kms:us-east-1:000000000000:key/d85d0d8c-94e7-469e-94f8-ad9d74d5ffe1 is disabled.
-== 6. GenerateDataKeyWithoutPlaintext — 지금 당장은 암호화하지 않을 쪽(예: 나중에 쓸 워커)에 넘길 키
+원본과 동일: 예 (1000줄)
+== 5. 암호문 1바이트 변조 → GCM 태그 검증 실패 (CBC 와 달리 바꿔치기를 알아챈다)
+InvalidTag: 암호문·nonce·AAD 중 하나가 바뀌었다 (GCM 태그 검증 실패)
+== 6. KMS 키를 비활성화하면 → 데이터 키를 못 풀어 파일도 못 연다 (= 키 하나로 모든 파일을 잠근다)
+aws: [ERROR]: An error occurred (DisabledException) when calling the Decrypt operation: arn:aws:kms:us-east-1:000000000000:key/62602660-56e0-4989-bb8e-0b98b4d95bde is disabled.
+== 7. GenerateDataKeyWithoutPlaintext — 지금 당장은 암호화하지 않을 쪽(예: 나중에 쓸 워커)에 넘길 키
 CiphertextBlob	KeyId	KeyMaterialId
 LAB03 OK
 ```
 
-방금 본 것: 64 KB 파일을 암호화하는 데 KMS에는 32바이트 키만 오갔다. S3에는 암호문과 **암호화된** 데이터 키만 있으므로 버킷이 통째로 유출돼도 KMS 권한 없이는 못 연다.
+방금 본 것:
+- 64 KB 파일을 암호화하는 데 KMS에는 32바이트 데이터 키만 오갔다. 작업 폴더에는 원본·암호문·**암호화된** 데이터 키만 있고 평문 키 파일은 없다. S3에도 암호문과 암호화된 데이터 키만 있으므로 버킷이 통째로 유출돼도 KMS 권한 없이는 못 연다.
+- 암호문이 평문보다 정확히 28바이트(nonce 12 + 태그 16) 길다.
+- **1바이트만 바꿔도 `InvalidTag`** — 인증 암호화(GCM)는 변조를 알아챈다. CBC만 쓰면 이 단계가 조용히 깨진 데이터를 돌려준다.
 
-> ⚠️ **이 셸 실습은 흐름을 보여 주기 위한 것이고, 그대로 운영에 쓰면 안 된다.** 약점 세 가지:
-> 1. **무결성 검사(MAC)가 없다.** AES-256-CBC만으로는 누가 암호문을 바꿔치기해도 알 수 없다(sdk 예제는 태그로 변조를 잡는다).
-> 2. **키가 명령줄에 보인다.** `openssl enc -K <16진 키>`는 실행되는 동안 같은 컴퓨터의 다른 사용자가 `ps`로 키를 볼 수 있다.
-> 3. **평문 키가 잠깐 디스크에 쓰인다.** 권한 700인 임시 폴더 안이고 바로 지우지만, 디스크에 한 번 쓰인 것은 완전히 지워진다고 보장할 수 없다.
->
-> 실서비스에서는 인증 암호화(AES-GCM)를 메모리 안에서 쓰고, 직접 조립하기보다 **AWS Encryption SDK**나 S3 SSE-KMS를 쓴다.
+> 이것도 교육용 조립이다. 실서비스에서는 nonce 관리·키 캐시·형식 버전 관리까지 해 주는 **AWS Encryption SDK**나, 서버 쪽에서 같은 일을 해 주는 **S3 SSE-KMS**를 먼저 고려한다.
 
 ### 6) boto3 판 — [sdk/envelope_encryption.py](./sdk/envelope_encryption.py)
 
@@ -257,18 +261,24 @@ uv run python curriculum/m09-security-encryption/sdk/envelope_encryption.py
 ```
 
 ```
-로컬 암호: 교육용 대체 암호: HMAC-SHA256-CTR + HMAC 태그 (표준 라이브러리, AES 아님)
+로컬 암호: AES-256-GCM (cryptography), nonce 96비트, 암호화 컨텍스트 = AAD
 영수증 평문 9,232바이트 (KMS Encrypt 한도 4,096바이트 초과 → 봉투 암호화)
-저장: s3://todayorder-m09-sdk-receipts/receipts/2026/11/A-1001.receipt.enc.json (12,648바이트) 필드=['alg', 'context', 'ct', 'encrypted_data_key', 'nonce', 'tag']
+저장: s3://todayorder-m09-sdk-receipts/receipts/2026/11/A-1001.receipt.enc.json (12,607바이트) 필드=['alg', 'context', 'ct', 'encrypted_data_key', 'nonce']
 복호화: 9,232바이트, 원본과 같음=True
-변조된 암호문 → 거부 (무결성 검사)
-다른 암호화 컨텍스트 → InvalidCiphertextException
+같은 평문을 다시 암호화: nonce 다름=True, 암호문 다름=True
+변조된 암호문 → InvalidTag (GCM 태그 검증 실패)
+다른 암호화 컨텍스트 → InvalidCiphertextException (KMS 단계에서 거부)
 KMS 키 비활성화 → DisabledException
 정리 완료 (KMS 키는 별칭과 함께 다음 실행에 재사용)
 SDK envelope_encryption OK
 ```
 
-**로컬 암호에 대해 솔직하게**: 이 저장소는 boto3와 표준 라이브러리만 의존하고, 표준 라이브러리에는 AES가 없다. 그래서 예제는 `cryptography` 패키지가 있으면 **AES-256-GCM**을, 없으면 표준 라이브러리로 만든 **교육용 대체 암호**(HMAC-SHA256 카운터 모드 + HMAC 태그)를 쓴다. 출력 첫 줄이 어느 쪽인지 알려 준다. 대체 암호는 AES가 아니고 검증된 구현도 아니므로 실서비스에 쓰면 안 된다. 봉투 암호화의 흐름 — `GenerateDataKey` → 로컬 암호화 → 평문 키 폐기 → 암호화된 데이터 키 보관 → `Decrypt` — 은 두 경우가 똑같다.
+방금 본 것:
+- 같은 평문을 두 번 암호화해도 nonce가 달라 암호문이 다르다(같은 키로 nonce를 재사용하면 GCM은 안전성을 잃는다 — 그래서 매번 `os.urandom(12)`).
+- 변조는 로컬 단계에서 `InvalidTag`, 다른 컨텍스트는 KMS 단계에서 `InvalidCiphertextException`(데이터 키부터 안 풀린다), 키 비활성화는 `DisabledException`으로 막힌다.
+- 파이썬은 메모리의 `bytes`를 덮어쓸 수 없고 언제 지워질지(GC)도 보장하지 않는다. 예제가 할 수 있는 것은 평문 데이터 키를 함수 밖으로 돌려주지 않고, 저장·로그하지 않는 것뿐이다(코드 주석 참고).
+
+`cryptography`는 이 저장소의 프로젝트 의존성이다. `ModuleNotFoundError: No module named 'cryptography'`가 나오면 저장소 루트에서 `uv sync`를 다시 실행한다(의존성이 추가되기 전에 설치한 환경일 때).
 
 ## 실제 AWS에서는
 

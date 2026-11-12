@@ -29,7 +29,7 @@
 |---|---|---|---|
 | KMS 키·별칭·Encrypt/Decrypt·암호화 컨텍스트·**비활성화 시 Decrypt 실패**·4 KiB 한도·교체·삭제 예약(`KMSInvalidStateException`)·다중 리전 키 | [labs/lab01-kms-basics.sh](./labs/lab01-kms-basics.sh) | 1 | 🟢 |
 | 키 정책 vs IAM 정책, 키 정책 명시적 Deny(암호화 컨텍스트 조건) | [labs/lab02-kms-key-policy.sh](./labs/lab02-kms-key-policy.sh) | 1 | 🟢 |
-| 봉투 암호화: GenerateDataKey + openssl AES-256, S3 저장, 키 비활성화로 잠김 | [labs/lab03-envelope-encryption.sh](./labs/lab03-envelope-encryption.sh) | 1 | 🟢 |
+| 봉투 암호화: GenerateDataKey + 로컬 AES-256-GCM(평문 키는 파이프로만), 변조 탐지, 키 비활성화로 잠김 | [labs/lab03-envelope-encryption.sh](./labs/lab03-envelope-encryption.sh) | 1 | 🟢 |
 | Secrets Manager 버전 스테이지·롤백·**Lambda 자동 교체**·삭제 복구 | [labs/lab04-secrets-manager.sh](./labs/lab04-secrets-manager.sh) | 2 | 🟢 |
 | Parameter Store 계층·SecureString·KMS 연동·버전·레이블·티어·Secrets Manager 참조 | [labs/lab05-parameter-store.sh](./labs/lab05-parameter-store.sh) | 2 | 🟢 |
 | ACM 자체 서명 인증서 가져오기(ISSUED) / DNS 검증 요청(PENDING_VALIDATION) | [labs/lab06-acm-certificates.sh](./labs/lab06-acm-certificates.sh) | 3 | 🟢 가져오기 · 🟡 요청·검증 레코드 · 🔴 발급 |
@@ -37,7 +37,7 @@
 | Config 기록기·전달 채널·관리형 규칙 NON_COMPLIANT → COMPLIANT·**자동 수정** | [labs/lab08-config-rule.sh](./labs/lab08-config-rule.sh) | 4 | 🟢 |
 | GuardDuty 탐지기·샘플 결과, Macie·Security Hub·Inspector·Detective 상태 | [labs/lab09-guardduty-findings.sh](./labs/lab09-guardduty-findings.sh) | 5 | 🟡 |
 | Network Firewall 아웃바운드 도메인 허용 목록 규칙 그룹·정책 | [labs/lab10-network-firewall.sh](./labs/lab10-network-firewall.sh) | 6 | 🟡 (구성만) |
-| boto3: 봉투 암호화(KMS 데이터 키 + 로컬 암호) | [sdk/envelope_encryption.py](./sdk/envelope_encryption.py) | 1 | 🟢 (로컬 암호는 아래 참고) |
+| boto3: 봉투 암호화(KMS 데이터 키 + 로컬 AES-256-GCM) | [sdk/envelope_encryption.py](./sdk/envelope_encryption.py) | 1 | 🟢 |
 | boto3: 앱 설정 로더(Parameter Store + Secrets Manager, TTL 캐시) | [sdk/app_config_loader.py](./sdk/app_config_loader.py) | 2 | 🟢 |
 
 전부 한 번에 검증:
@@ -47,15 +47,17 @@ export EMULATOR_PORT=9297          # 대화형 터미널이면 생략 가능
 curriculum/m09-security-encryption/labs/verify.sh
 ```
 
-`verify.sh`는 에뮬레이터를 재시작해 깨끗한 상태로 만든 뒤 sdk 예제의 안전 장치를 확인하고, 모든 lab을 **두 번씩**(멱등성) 실행하고 sdk 예제를 실행한다. 마지막 줄이 `MODULE m09 OK`면 통과. `labs/_lib.sh`는 lab 공용 도우미(단언, 폴링, JSON 가공, KMS 별칭·IAM 정리)이며 단독으로 실행하지 않는다. lab03·lab06은 `openssl`(macOS·Linux 기본 포함)을 쓴다.
+`verify.sh`는 에뮬레이터를 재시작해 깨끗한 상태로 만든 뒤 sdk 예제의 안전 장치를 확인하고, 모든 lab을 **두 번씩**(멱등성) 실행하고 sdk 예제를 실행한다. 마지막 줄이 `MODULE m09 OK`면 통과. `labs/_lib.sh`는 lab 공용 도우미(단언, 폴링, JSON 가공, KMS 별칭·IAM 정리)이며 단독으로 실행하지 않는다. lab06은 자체 서명 인증서를 만들려고 `openssl`(macOS·Linux 기본 포함)을 쓴다. lab03과 sdk의 로컬 암호화는 `cryptography`(프로젝트 의존성)를 쓴다 — import 오류가 나면 `uv sync`.
 
 **KMS 키는 바로 지울 수 없다.** 각 lab은 다시 실행할 때 옛 키를 7일 삭제 대기로 예약하고 새 키를 만든다. 에뮬레이터를 재시작하면 모두 사라진다.
 
 정리 자료: [cheatsheet.md](./cheatsheet.md) · [quiz.md](./quiz.md)
 
-## sdk/envelope_encryption.py 의 로컬 암호
+## 봉투 암호화의 로컬 암호 (lab03, sdk/envelope_encryption.py)
 
-이 저장소의 Python 의존성은 boto3뿐이고 표준 라이브러리에는 AES가 없다. 예제는 `cryptography` 패키지가 있으면 **AES-256-GCM**을, 없으면(기본) 표준 라이브러리로 만든 **교육용 대체 암호**(HMAC-SHA256 카운터 모드 + HMAC 태그)를 쓴다. 대체 암호는 AES가 아니며 실서비스용이 아니다. 실행하면 첫 줄에 어느 쪽인지 출력한다. 봉투 암호화 흐름(GenerateDataKey → 로컬 암호화 → 평문 키 폐기 → Decrypt)은 두 경우가 같다. 셸 판(lab03)은 openssl의 진짜 AES-256을 쓴다. → 공용 도구 PR에서 `cryptography`를 프로젝트 의존성(`[project].dependencies`)으로 추가하는 중이다. 추가되면 이 예제는 AES-256-GCM만 쓰도록 바뀐다.
+둘 다 프로젝트 의존성 `cryptography`의 **AES-256-GCM**을 쓴다(메시지마다 96비트 무작위 nonce, KMS 암호화 컨텍스트를 AAD로 묶음, 변조 시 `InvalidTag`). 대체 구현은 없다 — `import cryptography`가 실패하면 저장소 루트에서 **`uv sync`를 다시 실행**한다(의존성이 추가되기 전에 만든 환경이면 필요하다).
+
+lab03은 셸 실습이지만 로컬 암호화만 짧은 파이썬으로 한다. 평문 데이터 키를 `aws kms generate-data-key` 출력에서 **파이프로만** 넘겨 명령줄(`ps`)·셸 변수·디스크에 남기지 않기 위해서다. 예전 판의 `openssl enc -aes-256-cbc -K <키>`는 무결성 검사가 없고 키가 `ps`에 보여 바꿨다(레슨 1에 이유를 적었다).
 
 ## 에뮬레이터 제약
 
@@ -63,7 +65,7 @@ curriculum/m09-security-encryption/labs/verify.sh
 
 | 오퍼레이션 / 동작 | 증상 | 실습에서의 처리 |
 |---|---|---|
-| KMS `Decrypt`(비활성화된 키) — **저자 확인 항목** | `DisabledException ... is disabled.` 로 실패, `enable-key` 후 성공 (실제 AWS와 같음) | 🟢 lab01 4단계, lab03 5단계에서 단언 |
+| KMS `Decrypt`(비활성화된 키) — **저자 확인 항목** | `DisabledException ... is disabled.` 로 실패, `enable-key` 후 성공 (실제 AWS와 같음) | 🟢 lab01 4단계, lab03 6단계에서 단언 |
 | S3 SSE-KMS 객체 읽기(키 비활성화) | 읽힌다(M04에서 관찰, FIDELITY) | "키를 끄면 못 읽는다"는 KMS 직접 호출로 시연 |
 | SSM SecureString 복호화(고객 관리형 키 **비활성화**) | 복호화된다 — SSM이 키 상태를 확인하지 않음(AWS와 다름). 키 정책 **Deny**는 집행됨 | lab05는 키 정책 Deny로 시연하고 비활성화 결과는 참고로 출력 |
 | SSM 공개 파라미터 `/aws/service/global-infrastructure/...` | 비어 있음 | 사용 안 함 |
@@ -84,4 +86,3 @@ CURRICULUM.md의 M09 실습을 모두 구현했고, 확인 결과에 따라 등�
 - **Config 🟢 + 자동 수정 추가**: 자동 수정(SSM Automation)이 실제로 실행되어 lab08에 넣었다.
 - **CloudTrail 🟡, GuardDuty 🟡, ACM DNS 검증 🟡/🔴**: 그대로.
 - 추가: 레슨 6용 lab10(Network Firewall, 🟡). CURRICULUM의 레슨 6에는 실습이 지정되지 않았지만 심층 방어의 빠진 계층을 손으로 만들어 보게 했다.
-- 봉투 암호화 boto3 예제의 로컬 암호는 위 "로컬 암호" 절의 사유로 표준 라이브러리 대체 암호를 기본으로 한다(`cryptography`가 있으면 AES-GCM).
