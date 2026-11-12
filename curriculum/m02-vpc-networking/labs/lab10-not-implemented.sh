@@ -13,10 +13,10 @@ cleanup() {
     for v in $(aws ec2 describe-vpn-gateways --vpn-gateway-ids "$id" --query 'VpnGateways[0].VpcAttachments[?State==`attached`].VpcId' --output text); do
       aws ec2 detach-vpn-gateway --vpn-gateway-id "$id" --vpc-id "$v" >/dev/null || true
     done
-    aws ec2 delete-vpn-gateway --vpn-gateway-id "$id" || true
+    aws ec2 delete-vpn-gateway --vpn-gateway-id "$id" >/dev/null 2>&1 || true
   done
   for id in $(aws ec2 describe-customer-gateways --filters "Name=tag:Name,Values=todayorder-501-cgw" --query 'CustomerGateways[?State!=`deleted`].CustomerGatewayId' --output text); do
-    aws ec2 delete-customer-gateway --customer-gateway-id "$id" || true
+    aws ec2 delete-customer-gateway --customer-gateway-id "$id" >/dev/null 2>&1 || true
   done
   for id in $(aws ec2 describe-transit-gateways --filters "Name=tag:Name,Values=todayorder-501-tgw" "Name=state,Values=pending,available" --query 'TransitGateways[].TransitGatewayId' --output text); do
     for r in $(aws ec2 describe-transit-gateway-route-tables --filters "Name=transit-gateway-id,Values=$id" --query 'TransitGatewayRouteTables[?State!=`deleted`].TransitGatewayRouteTableId' --output text); do

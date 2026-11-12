@@ -17,7 +17,7 @@ for id in $old; do
   rules="$(aws ec2 describe-security-group-rules --filters "Name=group-id,Values=$id" --query 'SecurityGroupRules[?!IsEgress].SecurityGroupRuleId' --output text)"
   [ -n "$rules" ] && aws ec2 revoke-security-group-ingress --group-id "$id" --security-group-rule-ids $rules >/dev/null
 done
-for id in $old; do aws ec2 delete-security-group --group-id "$id"; done
+for id in $old; do aws ec2 delete-security-group --group-id "$id" >/dev/null; done
 
 mk_sg() {
   aws ec2 create-security-group --vpc-id "$VPC" --group-name "$1" --description "$2" \

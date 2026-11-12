@@ -101,7 +101,7 @@ ensure_route() { # 같은 목적지 경로가 이미 이 TGW를 가리키면 그
   local rt="$1" dst="$2" cur
   cur="$(aws ec2 describe-route-tables --route-table-ids "$rt" --query "RouteTables[0].Routes[?DestinationCidrBlock=='$dst'].TransitGatewayId | [0]" --output text)"
   [ "$cur" = "$TGW" ] && return 0
-  [ "$cur" != "None" ] && aws ec2 delete-route --route-table-id "$rt" --destination-cidr-block "$dst"
+  [ "$cur" != "None" ] && aws ec2 delete-route --route-table-id "$rt" --destination-cidr-block "$dst" >/dev/null
   aws ec2 create-route --route-table-id "$rt" --destination-cidr-block "$dst" --transit-gateway-id "$TGW" >/dev/null
 }
 for rt in todayorder-app-rt-a todayorder-app-rt-b; do ensure_route "$(rtb_id "$rt")" 10.20.0.0/16; done

@@ -19,7 +19,7 @@ if [ -n "$ids" ]; then
   poll_until "0" 180 bash -c "aws ec2 describe-vpc-endpoints --filters Name=vpc-id,Values=$VPC Name=tag:Name,Values=todayorder-s3-gw,todayorder-sqs-if --query 'length(VpcEndpoints[?State!=\`deleted\`])' --output text"
 fi
 old_sg="$(sg_id "$VPC" todayorder-endpoint-sg)"
-[ -n "$old_sg" ] && aws ec2 delete-security-group --group-id "$old_sg"
+[ -n "$old_sg" ] && aws ec2 delete-security-group --group-id "$old_sg" >/dev/null
 
 echo "== 0. 엔드포인트가 없을 때: app-a 에서 S3(의 공인 IP)로 가는 길은 NAT 게이트웨이"
 S3_PL="$(aws ec2 describe-prefix-lists --filters Name=prefix-list-name,Values=com.amazonaws.us-east-1.s3 --query 'PrefixLists[0].PrefixListId' --output text)"
@@ -56,6 +56,7 @@ e_gw="$(expect_error aws ec2 create-vpc-endpoint --vpc-id "$VPC" --vpc-endpoint-
 echo "$e_gw"
 
 echo "== 5. SQS 인터페이스 엔드포인트: 앱 서브넷마다 ENI 하나, 보안 그룹은 VPC 안에서 오는 443만 허용"
+routes_before_if="$(aws ec2 describe-route-tables --route-table-ids "$APP_RT_A" --query 'length(RouteTables[0].Routes)' --output text)"
 EP_SG="$(aws ec2 create-security-group --vpc-id "$VPC" --group-name todayorder-endpoint-sg \
   --description "Interface endpoints - 443 from VPC" --tag-specifications "$(tags security-group todayorder-endpoint-sg)" \
   --query GroupId --output text)"
@@ -76,7 +77,9 @@ echo "$eni_subnets" | sed 's/^/   /'
 
 echo "== 6. 라우팅 테이블은? 인터페이스 엔드포인트는 경로를 추가하지 않는다 (DNS가 ENI의 사설 IP를 돌려준다)"
 n_routes="$(aws ec2 describe-route-tables --route-table-ids "$APP_RT_A" --query 'length(RouteTables[0].Routes)' --output text)"
-echo "   app-rt-a 경로 수: $n_routes (local, 0.0.0.0/0→NAT, S3 prefix list→게이트웨이 엔드포인트)"
+n_vpce="$(aws ec2 describe-route-tables --route-table-ids "$APP_RT_A" --query "length(RouteTables[0].Routes[?starts_with(GatewayId || '', 'vpce-')])" --output text)"
+echo "   app-rt-a 경로 수: 인터페이스 엔드포인트 생성 전 $routes_before_if → 후 $n_routes (변화 없음)"
+echo "   그중 vpce-* 를 가리키는 경로: $n_vpce 개 (S3 게이트웨이 엔드포인트의 prefix list 경로 하나뿐)"
 
 # ---- 단언
 case "$before" in nat-*) ;; *) die "엔드포인트 전 다음 홉이 NAT가 아님: $before" ;; esac
@@ -85,5 +88,6 @@ case "$other" in nat-*) ;; *) die "S3 외 목적지가 NAT가 아님: $other" ;;
 assert_eq "db-rt 의 S3 경로" "DROP(경로 없음)" "$db_s3"
 case "$e_gw" in *InvalidServiceName*) ;; *) die "SQS 게이트웨이 엔드포인트가 거부되지 않음: $e_gw" ;; esac
 assert_eq "인터페이스 엔드포인트 ENI 수(서브넷 2개)" 2 "$n_eni"
-assert_eq "app-rt-a 경로 수" 3 "$n_routes"
+assert_eq "인터페이스 엔드포인트 생성 전후 app-rt-a 경로 수" "$routes_before_if" "$n_routes"
+assert_eq "app-rt-a 에서 vpce-* 를 가리키는 경로 수" 1 "$n_vpce"
 echo "LAB06 OK"

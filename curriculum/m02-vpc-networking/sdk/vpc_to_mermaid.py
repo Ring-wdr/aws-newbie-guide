@@ -150,7 +150,7 @@ def to_mermaid(topo: Topology) -> str:
             if t == "local" or t == "?":
                 continue
             dest = r.get("DestinationCidrBlock") or r.get("DestinationPrefixListId", "")
-            edge = f'  {node_id(s["SubnetId"])} -->|{dest}| {node_id(t)}'
+            edge = f'  {node_id(s["SubnetId"])} -->|\"{dest}\"| {node_id(t)}'
             if edge not in seen:
                 seen.add(edge)
                 out.append(edge)
@@ -167,10 +167,10 @@ def to_mermaid(topo: Topology) -> str:
             for pair in perm.get("UserIdGroupPairs", []):
                 src = pair["GroupId"]
                 if src != g["GroupId"] and src in sg_names:
-                    chain.append(f'  {node_id(src)}["{sg_names[src]}"] ==>|tcp {port}| {node_id(g["GroupId"])}["{g["GroupName"]}"]')
+                    chain.append(f'  {node_id(src)}["{sg_names[src]}"] ==>|\"tcp {port}\"| {node_id(g["GroupId"])}["{g["GroupName"]}"]')
             for rng in perm.get("IpRanges", []):
                 if rng.get("CidrIp") == "0.0.0.0/0":
-                    chain.append(f'  anywhere(("0.0.0.0/0")) ==>|tcp {port}| {node_id(g["GroupId"])}["{g["GroupName"]}"]')
+                    chain.append(f'  anywhere(("0.0.0.0/0")) ==>|\"tcp {port}\"| {node_id(g["GroupId"])}["{g["GroupName"]}"]')
     if chain:
         out.append('  subgraph sgchain["보안 그룹 체이닝"]')
         out.extend("  " + c for c in chain)

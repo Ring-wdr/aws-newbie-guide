@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # M02 모듈 검증: $EMULATOR_PORT 의 에뮬레이터를 재시작(깨끗한 상태)한 뒤
-# 모든 lab 을 두 번씩(멱등성 확인) 실행하고 sdk 예제를 실행한다.
+# 모든 lab 을 두 번 실행한다 — 1회차는 번호 순(01→10), 2회차는 역순(10→01) — 그 뒤 sdk 예제를 실행한다.
+# 두 번째 실행은 같은 리소스가 남아 있는 상태에서, 그리고 다른 lab 들이 VPC를 바꿔 놓은 뒤에
+# 돌기 때문에 멱등성과 순서 독립성을 함께 확인한다.
 #
 #   export EMULATOR_PORT=9297     # 학습자는 생략 가능(대화형 터미널이면 9297)
 #   curriculum/m02-vpc-networking/labs/verify.sh
@@ -56,10 +58,14 @@ cd "$ROOT"
 for py in "$MOD_DIR"/sdk/*.py; do
   run "안전 장치: env.sh 없이 sdk/$(basename "$py") 실행 → 네트워크 호출 전 거부" guard_refuses "$py"
 done
-for round in 1 2; do
-  for lab in "$MOD_DIR"/labs/lab*.sh; do
-    run "$(basename "$lab") (실행 $round)" bash "$lab"
-  done
+# 1회차는 번호 순(01→10), 2회차는 역순(10→01). 같은 에뮬레이터에서 두 번 실행해도,
+# 다른 lab 뒤에 어떤 순서로 실행해도 통과하는지(멱등성·순서 독립성) 확인한다.
+labs=("$MOD_DIR"/labs/lab*.sh)
+for lab in "${labs[@]}"; do
+  run "$(basename "$lab") (1회차, 순서대로)" bash "$lab"
+done
+for ((i = ${#labs[@]} - 1; i >= 0; i--)); do
+  run "$(basename "${labs[$i]}") (2회차, 역순)" bash "${labs[$i]}"
 done
 for py in "$MOD_DIR"/sdk/*.py; do
   run "sdk/$(basename "$py")" uv run --quiet python "$py"
