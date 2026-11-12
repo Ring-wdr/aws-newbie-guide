@@ -58,11 +58,12 @@ health_ok() {
 # 상태를 지우는 스크립트(emulator-reset.sh, 모듈 verify.sh)용 포트 결정.
 # - 인자로 포트를 주면 그 포트
 # - 아니면 EMULATOR_PORT
-# - 둘 다 없으면: 대화형 터미널(학습자)에서는 기본 9297, 비대화형(에이전트·CI)에서는 거부
+# - 둘 다 없으면: 대화형 터미널(표준 입력이 터미널 — 학습자가 직접 친 명령)에서는 기본 9297,
+#   비대화형(에이전트·CI·스크립트 파이프)에서는 거부. env.sh 도 같은 규칙을 쓴다.
 #   → 병렬 에이전트가 export 를 잊어 다른 사람의 9297 을 지우는 사고를 막는다.
 resolve_destructive_port() {
   if [ -n "${1:-}" ]; then printf '%s' "$1"; return 0; fi
   if [ -n "${EMULATOR_PORT:-}" ]; then printf '%s' "$EMULATOR_PORT"; return 0; fi
-  if [ -t 0 ] && [ -t 1 ]; then printf '9297'; return 0; fi
+  if [ -t 0 ]; then printf '9297'; return 0; fi
   die "EMULATOR_PORT 가 설정되지 않았습니다. 비대화형 실행에서는 상태를 지우는 작업의 기본 포트를 쓰지 않습니다. 'export EMULATOR_PORT=<포트>' 후 다시 실행하세요."
 }

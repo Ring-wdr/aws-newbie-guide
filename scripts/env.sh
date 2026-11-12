@@ -1,7 +1,11 @@
 # shellcheck shell=bash
 # 사용법 (bash, zsh 공통):
-#   source scripts/env.sh                       # 기본 포트 9297
+#   source scripts/env.sh                       # 터미널에서 직접: 기본 포트 9297
 #   EMULATOR_PORT=9301 source scripts/env.sh    # 다른 포트
+#
+# 포트 규칙: EMULATOR_PORT 가 있으면 그 포트. 없으면 표준 입력이 터미널일 때(학습자가 터미널에서
+# 직접 source 하거나 lab 스크립트를 실행할 때)만 9297 을 쓰고, 비대화형(AI 에이전트·CI 등)에서는
+# 거부한다 — 다른 사람의 9297 에뮬레이터를 건드리지 않기 위해서다.
 #
 # 현재 셸의 AWS CLI·boto3가 로컬 aws-emulator만 바라보도록 환경 변수를 설정한다.
 # 마지막에 안전 장치를 실행해, 요청이 에뮬레이터(계정 000000000000)로 가는 것이
@@ -15,6 +19,11 @@ _emu_env_fail() {
 }
 
 _emu_env_main() {
+  if [ -z "${EMULATOR_PORT:-}" ] && [ ! -t 0 ]; then
+    _emu_env_fail "EMULATOR_PORT 가 설정되지 않았습니다. 비대화형 실행에서는 기본 포트(9297)를 쓰지 않습니다." \
+      "'export EMULATOR_PORT=<포트>' 후 다시 실행하세요. (터미널에서 직접 실행하면 9297 을 씁니다)"
+    return 1
+  fi
   local port="${EMULATOR_PORT:-9297}"
   case "$port" in
     '' | *[!0-9]*) _emu_env_fail "EMULATOR_PORT 값이 숫자가 아닙니다: '$port'"; return 1 ;;

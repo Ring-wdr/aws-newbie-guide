@@ -2,6 +2,9 @@
 # 사용법: scripts/emulator-down.sh [포트 | --all]
 # 포트: 인자 > EMULATOR_PORT > (대화형 터미널일 때만) 9297. 비대화형 셸에서 둘 다 없으면 거부한다.
 #
+# ⚠️ --all 은 이 저장소 스크립트로 띄운 **모든** 에뮬레이터를 끈다 — 다른 worktree·다른 에이전트의
+#    에뮬레이터도 포함된다. 병렬 작업 중인 에이전트는 절대 쓰지 말고 자기 포트만 내린다.
+#
 # 해당 포트의 에뮬레이터 컨테이너를 정상 종료(SIGTERM)하고 지운다.
 # 그리고 ~/.aws/emulator/<포트>/ 의 자격 증명·인증서 파일을 지운다 (이 디렉터리만 건드린다).
 # 모든 리소스는 메모리에만 있으므로 함께 사라진다.
@@ -26,6 +29,7 @@ stop_one() {
 }
 
 if [ "${1:-}" = "--all" ]; then
+  c_ylw "주의: --all 은 다른 worktree·에이전트가 띄운 에뮬레이터까지 모두 끕니다."
   ports="$(docker ps -a --filter "label=$EMULATOR_LABEL=1" \
     --format "{{.Label \"$EMULATOR_LABEL.port\"}}")"
   if [ -z "$ports" ]; then
