@@ -69,7 +69,7 @@ API: https://127.0.0.1:9306/_aws/execute-api/y6abp5yu9r   (실제 AWS: https://y
 [ERROR] AccessDeniedException: An error occurred (AccessDeniedException) when calling the PutItem operation: User: arn:aws:sts::000000000000:assumed-role/todayorder-order-api-role/todayorder-order-api is not authorized to perform: dynamodb:PutItem on resource:
 ```
 
-방금 본 것: Lambda 안의 boto3 호출이 **실행 역할을 맡은 세션**(`assumed-role/todayorder-order-api-role/todayorder-order-api`)으로 DynamoDB에 갔고, 역할에 권한이 없어 거부됐다. 함수는 이 오류를 숨기지 않고 다시 던졌으므로 클라이언트는 500, 원인은 함수 로그에 남았다. **"API가 500인데 이유를 모르겠다" → 함수 로그 → 실행 역할**이 디버깅 순서다.
+방금 본 것: Lambda 안의 boto3 호출이 **실행 역할을 맡은 세션**(`assumed-role/todayorder-order-api-role/todayorder-order-api`)으로 DynamoDB에 갔고, 역할에 권한이 없어 거부됐다. 함수는 이 오류를 숨기지 않고 다시 던졌으므로 클라이언트는 500, 원인은 함수 로그에 남았다. **"API가 500인데 이유를 모르겠다" → 함수 로그 → 실행 역할**이 디버깅 순서다. (출력의 포트 9306은 저자 환경이다. 학습자 화면에는 내 `EMULATOR_PORT`, 기본 9297이 찍힌다.)
 
 ```
 == 5. 최소 권한 정책: 이 표에 PutItem·GetItem 만

@@ -33,9 +33,7 @@ flowchart LR
 | 요청 검증·본문 변환·MOCK 통합 | ✓ | ✗ (파라미터 매핑만) | – |
 | 배포 | 배포를 만들어 스테이지에 연결 | **자동 배포**(`$default` 스테이지) 가능 | 배포/스테이지 |
 
-(비교 출처: [REST API와 HTTP API 중 선택](https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-vs-rest.html), WAF 연결 대상: [AWS WAF 개요](https://docs.aws.amazon.com/waf/latest/developerguide/waf-chapter.html) — API Gateway 중에는 REST API만 목록에 있다.) HTTP API·WebSocket API를 WAF로 보호하려면 앞에 **CloudFront 배포를 두고 그 배포에 WAF 웹 ACL을 연결**한다.
-
- — 시험 요령: **"API 키·사용량 계획·캐싱·WAF·프라이빗 API·요청 검증"이 나오면 REST**, **"가장 저렴·낮은 지연·JWT/OIDC"면 HTTP API**, **"양방향·서버 푸시"면 WebSocket**.
+(비교 출처: [REST API와 HTTP API 중 선택](https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-vs-rest.html), WAF 연결 대상: [AWS WAF 개요](https://docs.aws.amazon.com/waf/latest/developerguide/waf-chapter.html) — API Gateway 중에는 REST API만 목록에 있다.) HTTP API·WebSocket API를 WAF로 보호하려면 앞에 **CloudFront 배포를 두고 그 배포에 WAF 웹 ACL을 연결**한다. 시험 요령: **"API 키·사용량 계획·캐싱·WAF·프라이빗 API·요청 검증"이 나오면 REST**, **"가장 저렴·낮은 지연·JWT/OIDC"면 HTTP API**, **"양방향·서버 푸시"면 WebSocket**.
 
 ### 스테이지, 스로틀링, 캐싱
 
@@ -75,7 +73,7 @@ REST 기본 주소: https://127.0.0.1:9306/_aws/execute-api/srmuqurh02/dev   (�
 [HTTP 200]
 ```
 
-방금 본 것: REST API는 리소스(`/health`) → 메서드(`GET`) → 통합(MOCK) → 메서드 응답·통합 응답을 하나씩 만들고 **배포**해야 호출된다. 백엔드 없이 고정 응답을 내는 MOCK은 헬스 체크나 프런트엔드 개발용 가짜 API로 쓴다.
+방금 본 것: REST API는 리소스(`/health`) → 메서드(`GET`) → 통합(MOCK) → 메서드 응답·통합 응답을 하나씩 만들고 **배포**해야 호출된다. 백엔드 없이 고정 응답을 내는 MOCK은 헬스 체크나 프런트엔드 개발용 가짜 API로 쓴다. (출력의 포트 9306은 저자 환경이다. 학습자 화면에는 내 `EMULATOR_PORT`, 기본 9297이 찍힌다.)
 
 **2) REST API — Lambda 프록시와 권한**
 
