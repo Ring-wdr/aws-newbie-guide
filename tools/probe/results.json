@@ -1,6 +1,6 @@
 {
  "meta": {
-  "generated_at": "2026-11-12 11:45 UTC",
+  "generated_at": "2026-11-12 21:05 UTC",
   "emulator": {
    "version": "1.0.322",
    "release_date": "2026.11.10",
@@ -18,7 +18,7 @@
    "name": "SSM GetParameter(/aws/service/ami-amazon-linux-latest/al2023…)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 3
+   "elapsed_ms": 4
   },
   {
    "service": "ec2-instances",
@@ -34,14 +34,14 @@
    "name": "CreateKeyPair",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 192
+   "elapsed_ms": 49
   },
   {
    "service": "ec2-instances",
    "kind": "behavior",
    "name": "CreateKeyPair가 개인 키(KeyMaterial)를 반환",
    "status": "BEHAVIOR_OK",
-   "detail": "71:e9:a4:83:47:8c:ea:09:7f:14:de:0e:3b:c",
+   "detail": "e3:39:1b:0d:dc:5e:e3:38:1f:62:1b:3f:55:7",
    "elapsed_ms": 0
   },
   {
@@ -50,7 +50,7 @@
    "name": "RunInstances(t3.micro, UserData)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 3
   },
   {
    "service": "ec2-instances",
@@ -74,7 +74,7 @@
    "name": "DescribeInstanceAttribute(userData)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 4
+   "elapsed_ms": 2
   },
   {
    "service": "ec2-instances",
@@ -90,7 +90,7 @@
    "name": "DescribeInstanceStatus",
    "status": "NOT_IMPL",
    "detail": "HTTP 501 NotImplemented: operation DescribeInstanceStatus is scaffolded but not implemented in this emulator",
-   "elapsed_ms": 13
+   "elapsed_ms": 6
   },
   {
    "service": "ec2-instances",
@@ -122,7 +122,7 @@
    "name": "DescribeTags",
    "status": "NOT_IMPL",
    "detail": "HTTP 501 NotImplemented: operation DescribeTags is scaffolded but not implemented in this emulator",
-   "elapsed_ms": 2
+   "elapsed_ms": 1
   },
   {
    "service": "ec2-instances",
@@ -130,7 +130,7 @@
    "name": "StopInstances",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 1
   },
   {
    "service": "ec2-instances",
@@ -146,7 +146,7 @@
    "name": "ModifyInstanceAttribute(InstanceType=t3.small, 중지 상태)",
    "status": "NOT_IMPL",
    "detail": "HTTP 501 NotImplemented: operation ModifyInstanceAttribute is scaffolded but not implemented in this emulator",
-   "elapsed_ms": 3
+   "elapsed_ms": 1
   },
   {
    "service": "ec2-instances",
@@ -154,7 +154,7 @@
    "name": "StartInstances",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 1
   },
   {
    "service": "ec2-instances",
@@ -170,7 +170,7 @@
    "name": "RebootInstances",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 4
+   "elapsed_ms": 1
   },
   {
    "service": "ec2-instances",
@@ -178,7 +178,7 @@
    "name": "MonitorInstances(세부 모니터링)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 3
+   "elapsed_ms": 1
   },
   {
    "service": "ec2-instances",
@@ -186,7 +186,7 @@
    "name": "RunInstances(스팟: InstanceMarketOptions)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 3
+   "elapsed_ms": 1
   },
   {
    "service": "ec2-instances",
@@ -194,7 +194,7 @@
    "name": "DescribeSpotPriceHistory",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 3
+   "elapsed_ms": 2
   },
   {
    "service": "ec2-instances",
@@ -202,7 +202,7 @@
    "name": "DescribeInstanceTypes(t3.micro)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 3
+   "elapsed_ms": 2
   },
   {
    "service": "ec2-instances",
@@ -210,7 +210,7 @@
    "name": "CreatePlacementGroup(cluster)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 1
   },
   {
    "service": "ec2-instances",
@@ -218,7 +218,7 @@
    "name": "TerminateInstances",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 1
   },
   {
    "service": "ec2-instances",
@@ -242,7 +242,7 @@
    "name": "CreateVolume(gp3 10GiB)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 1
   },
   {
    "service": "ebs-ami",
@@ -274,7 +274,7 @@
    "name": "RunInstances(볼륨 연결용)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 3
+   "elapsed_ms": 1
   },
   {
    "service": "ebs-ami",
@@ -282,7 +282,7 @@
    "name": "AttachVolume",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 4
+   "elapsed_ms": 1
   },
   {
    "service": "ebs-ami",
@@ -298,7 +298,7 @@
    "name": "DetachVolume",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 1
   },
   {
    "service": "ebs-ami",
@@ -314,7 +314,7 @@
    "name": "ModifyVolume(gp3 → 20GiB)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 3
+   "elapsed_ms": 1
   },
   {
    "service": "ebs-ami",
@@ -322,7 +322,7 @@
    "name": "CreateSnapshot",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 1
   },
   {
    "service": "ebs-ami",
@@ -338,7 +338,7 @@
    "name": "CopySnapshot(Encrypted)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 4
+   "elapsed_ms": 2
   },
   {
    "service": "ebs-ami",
@@ -354,7 +354,7 @@
    "name": "CreateVolume(SnapshotId=… 스냅샷에서 복원)",
    "status": "ERROR",
    "detail": "HTTP 400 InvalidSnapshot.NotFound: The snapshot 'snap-0000000000000009e' does not exist.",
-   "elapsed_ms": 2
+   "elapsed_ms": 1
   },
   {
    "service": "ebs-ami",
@@ -362,7 +362,7 @@
    "name": "RegisterImage(스냅샷 기반)",
    "status": "NOT_IMPL",
    "detail": "HTTP 501 NotImplemented: operation RegisterImage is scaffolded but not implemented in this emulator",
-   "elapsed_ms": 2
+   "elapsed_ms": 1
   },
   {
    "service": "ebs-ami",
@@ -370,7 +370,7 @@
    "name": "CreateImage(인스턴스에서 AMI)",
    "status": "NOT_IMPL",
    "detail": "HTTP 501 NotImplemented: operation CreateImage is scaffolded but not implemented in this emulator",
-   "elapsed_ms": 2
+   "elapsed_ms": 1
   },
   {
    "service": "ebs-ami",
@@ -378,7 +378,7 @@
    "name": "EnableEbsEncryptionByDefault",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 1
   },
   {
    "service": "ebs-ami",
@@ -386,7 +386,7 @@
    "name": "GetEbsEncryptionByDefault",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 1
   },
   {
    "service": "ebs-ami",
@@ -410,7 +410,7 @@
    "name": "CreateLaunchTemplate",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 1
   },
   {
    "service": "ebs-ami",
@@ -434,7 +434,7 @@
    "name": "ModifyLaunchTemplate(DefaultVersion=2)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 1
   },
   {
    "service": "ebs-ami",
@@ -442,7 +442,7 @@
    "name": "RunInstances(LaunchTemplate)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 1
   },
   {
    "service": "ebs-ami",
@@ -458,14 +458,14 @@
    "name": "CreateLoadBalancer(ALB)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 7
+   "elapsed_ms": 9
   },
   {
    "service": "elbv2",
    "kind": "behavior",
    "name": "ALB DNSName 발급",
    "status": "BEHAVIOR_OK",
-   "detail": "127.0.0.1:42025",
+   "detail": "127.0.0.1:33057",
    "elapsed_ms": 0
   },
   {
@@ -482,7 +482,7 @@
    "name": "CreateLoadBalancer(NLB)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 5
+   "elapsed_ms": 2
   },
   {
    "service": "elbv2",
@@ -490,7 +490,7 @@
    "name": "CreateTargetGroup(instance, /health)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 4
+   "elapsed_ms": 2
   },
   {
    "service": "elbv2",
@@ -498,7 +498,7 @@
    "name": "SSM GetParameter(/aws/service/ami-amazon-linux-latest/al2023…)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 1
   },
   {
    "service": "elbv2",
@@ -506,7 +506,7 @@
    "name": "RegisterTargets",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 4
+   "elapsed_ms": 2
   },
   {
    "service": "elbv2",
@@ -514,7 +514,7 @@
    "name": "DescribeTargetHealth",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 11
+   "elapsed_ms": 2
   },
   {
    "service": "elbv2",
@@ -530,7 +530,7 @@
    "name": "ModifyTargetGroupAttributes(stickiness)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 5
+   "elapsed_ms": 1
   },
   {
    "service": "elbv2",
@@ -546,7 +546,7 @@
    "name": "CreateListener(HTTP:80 → TG)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 4
+   "elapsed_ms": 1
   },
   {
    "service": "elbv2",
@@ -554,7 +554,7 @@
    "name": "CreateRule(path /api/*)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 3
+   "elapsed_ms": 1
   },
   {
    "service": "elbv2",
@@ -562,7 +562,7 @@
    "name": "CreateRule(fixed-response)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 3
+   "elapsed_ms": 1
   },
   {
    "service": "elbv2",
@@ -585,7 +585,7 @@
    "kind": "behavior",
    "name": "ALB 리스너가 실제로 HTTP를 처리(컨테이너 안에서 fixed-response 규칙 확인)",
    "status": "BEHAVIOR_OK",
-   "detail": "DNSName=127.0.0.1:42025 → hello-from-alb HTTP200",
+   "detail": "DNSName=127.0.0.1:33057 → hello-from-alb HTTP200",
    "elapsed_ms": 0
   },
   {
@@ -618,7 +618,7 @@
    "name": "CreateAutoScalingGroup(min1 max4 desired2)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 44
   },
   {
    "service": "autoscaling",
@@ -650,7 +650,7 @@
    "name": "PutScalingPolicy(TargetTracking CPU 50%)",
    "status": "NOT_IMPL",
    "detail": "HTTP 501 NotImplemented: operation PutScalingPolicy is scaffolded but not implemented in this emulator",
-   "elapsed_ms": 1
+   "elapsed_ms": 2
   },
   {
    "service": "autoscaling",
@@ -697,7 +697,7 @@
    "kind": "behavior",
    "name": "Max 초과 Desired → ValidationError",
    "status": "BEHAVIOR_OK",
-   "detail": "ValidationError: New SetDesiredCapacity value 10 is above max value 4 for the AutoScalingGroup: todayorder-probe-asg-abaf7654",
+   "detail": "ValidationError: New SetDesiredCapacity value 10 is above max value 4 for the AutoScalingGroup: todayorder-probe-asg-f88a1260",
    "elapsed_ms": 0
   },
   {
@@ -717,12 +717,700 @@
    "elapsed_ms": 0
   },
   {
+   "service": "compute-gaps",
+   "kind": "api",
+   "name": "SSM GetParameter(/aws/service/ami-amazon-linux-latest/al2023…)",
+   "status": "OK",
+   "detail": "",
+   "elapsed_ms": 44
+  },
+  {
+   "service": "compute-gaps",
+   "kind": "api",
+   "name": "DeleteKeyPair",
+   "status": "NOT_IMPL",
+   "detail": "HTTP 501 NotImplemented: operation DeleteKeyPair is scaffolded but not implemented in this emulator",
+   "elapsed_ms": 1
+  },
+  {
+   "service": "compute-gaps",
+   "kind": "api",
+   "name": "CreateVolume(gp3 10 GiB, 20000 IOPS — AWS: 비율 초과로 거부)",
+   "status": "OK",
+   "detail": "",
+   "elapsed_ms": 1
+  },
+  {
+   "service": "compute-gaps",
+   "kind": "behavior",
+   "name": "gp3 10 GiB 에 20,000 IOPS 요청이 거부됨(IOPS:GiB 비율 검사)",
+   "status": "BEHAVIOR_DIFF",
+   "detail": "받아 줌 — 비율 미검사",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "compute-gaps",
+   "kind": "behavior",
+   "name": "인스턴스 종료 시 DeleteOnTermination 루트 볼륨이 삭제됨",
+   "status": "BEHAVIOR_DIFF",
+   "detail": "남은 볼륨 상태 ['in-use']",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "compute-gaps",
+   "kind": "api",
+   "name": "CreateRule(host-header api.todayorder.example → 'host')",
+   "status": "OK",
+   "detail": "",
+   "elapsed_ms": 1
+  },
+  {
+   "service": "compute-gaps",
+   "kind": "behavior",
+   "name": "ALB host-header 조건 규칙이 매칭됨(컨테이너 안 요청)",
+   "status": "BEHAVIOR_DIFF",
+   "detail": "응답 본문 'default'",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "compute-gaps",
+   "kind": "api",
+   "name": "CreateAutoScalingGroup(--target-group-arns, desired 2)",
+   "status": "OK",
+   "detail": "",
+   "elapsed_ms": 2
+  },
+  {
+   "service": "compute-gaps",
+   "kind": "behavior",
+   "name": "ASG(--target-group-arns) 인스턴스가 대상 그룹에 자동 등록됨",
+   "status": "BEHAVIOR_DIFF",
+   "detail": "ASG 인스턴스 2개, 대상 그룹 등록 0개",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "compute-gaps",
+   "kind": "api",
+   "name": "DescribePolicies",
+   "status": "NOT_IMPL",
+   "detail": "HTTP 501 NotImplemented: operation DescribePolicies is scaffolded but not implemented in this emulator",
+   "elapsed_ms": 1
+  },
+  {
+   "service": "compute-gaps",
+   "kind": "api",
+   "name": "DescribeLifecycleHooks",
+   "status": "NOT_IMPL",
+   "detail": "HTTP 501 NotImplemented: operation DescribeLifecycleHooks is scaffolded but not implemented in this emulator",
+   "elapsed_ms": 1
+  },
+  {
+   "service": "compute-gaps",
+   "kind": "api",
+   "name": "DescribeScheduledActions",
+   "status": "NOT_IMPL",
+   "detail": "HTTP 501 NotImplemented: operation DescribeScheduledActions is scaffolded but not implemented in this emulator",
+   "elapsed_ms": 1
+  },
+  {
+   "service": "compute-gaps",
+   "kind": "api",
+   "name": "SetInstanceHealth",
+   "status": "NOT_IMPL",
+   "detail": "HTTP 501 NotImplemented: operation SetInstanceHealth is scaffolded but not implemented in this emulator",
+   "elapsed_ms": 1
+  },
+  {
+   "service": "compute-gaps",
+   "kind": "api",
+   "name": "StartInstanceRefresh",
+   "status": "OK",
+   "detail": "",
+   "elapsed_ms": 1
+  },
+  {
+   "service": "compute-gaps",
+   "kind": "behavior",
+   "name": "인스턴스 새로 고침이 Successful 까지 진행(인스턴스 교체)",
+   "status": "BEHAVIOR_OK",
+   "detail": "Status=Successful, 교체 전후 겹치는 인스턴스 0개",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "lambda-runtime",
+   "kind": "api",
+   "name": "CreateFunction(rtfn)",
+   "status": "OK",
+   "detail": "",
+   "elapsed_ms": 5
+  },
+  {
+   "service": "lambda-runtime",
+   "kind": "behavior",
+   "name": "Lambda python3.12 런타임이 CPython",
+   "status": "BEHAVIOR_DIFF",
+   "detail": "sys.version=3.14.0.alpha (heads/unknown-branch:0000000, Nov 10 2026, 20:50:33) [RustPython 0.6.0 with ",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "lambda-runtime",
+   "kind": "behavior",
+   "name": "실행 역할에 dynamodb 권한이 없으면 함수 안 PutItem 이 AccessDenied (역할 정책 집행)",
+   "status": "BEHAVIOR_OK",
+   "detail": "{\"ok\": false, \"err\": \"An error occurred (AccessDeniedException) when calling the PutItem operation: User: arn:aws:sts::000000000000:assumed-role/todayorder-prob",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "lambda-runtime",
+   "kind": "behavior",
+   "name": "dynamodb:PutItem 을 허용하면 함수 안 PutItem 성공",
+   "status": "BEHAVIOR_OK",
+   "detail": "{\"ok\": true}",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "lambda-runtime",
+   "kind": "api",
+   "name": "PutFunctionEventInvokeConfig(재시도 0, OnFailure → SQS)",
+   "status": "OK",
+   "detail": "",
+   "elapsed_ms": 2
+  },
+  {
+   "service": "lambda-runtime",
+   "kind": "api",
+   "name": "Invoke(Event, 실패하는 핸들러)",
+   "status": "OK",
+   "detail": "",
+   "elapsed_ms": 1
+  },
+  {
+   "service": "lambda-runtime",
+   "kind": "behavior",
+   "name": "비동기 실패가 OnFailure 대상(SQS)에 전달됨",
+   "status": "BEHAVIOR_DIFF",
+   "detail": "35초 안에 0건",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "lambda-runtime",
+   "kind": "behavior",
+   "name": "MaximumRetryAttempts=0 이면 비동기 실패 함수가 1번만 실행됨",
+   "status": "BEHAVIOR_DIFF",
+   "detail": "실행 3번",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "lambda-runtime",
+   "kind": "behavior",
+   "name": "동기 Invoke 를 반복해도 에뮬레이터 메모리가 늘지 않음",
+   "status": "BEHAVIOR_DIFF",
+   "detail": "256 → 367 MiB, 호출당 약 7.4 MiB 증가(회수되지 않음)",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "lambda-permissions",
+   "kind": "api",
+   "name": "CreateFunction(permfn)",
+   "status": "OK",
+   "detail": "",
+   "elapsed_ms": 2
+  },
+  {
+   "service": "lambda-permissions",
+   "kind": "behavior",
+   "name": "REST API(AWS_PROXY) → Lambda: 리소스 정책(add-permission) 없으면 실패(500)",
+   "status": "BEHAVIOR_OK",
+   "detail": "HTTP 500 {\"message\":\"Internal server error\"}",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "lambda-permissions",
+   "kind": "api",
+   "name": "AddPermission(apigateway.amazonaws.com)",
+   "status": "OK",
+   "detail": "",
+   "elapsed_ms": 1
+  },
+  {
+   "service": "lambda-permissions",
+   "kind": "behavior",
+   "name": "REST API: add-permission 후 200",
+   "status": "BEHAVIOR_OK",
+   "detail": "HTTP 200",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "lambda-permissions",
+   "kind": "api",
+   "name": "Subscribe(lambda, add-permission 없음)",
+   "status": "OK",
+   "detail": "",
+   "elapsed_ms": 1
+  },
+  {
+   "service": "lambda-permissions",
+   "kind": "behavior",
+   "name": "SNS → Lambda: 리소스 정책 없으면 함수가 실행되지 않음",
+   "status": "BEHAVIOR_OK",
+   "detail": "10초 뒤 항목 0개 (AWS도 실행하지 않지만 전달 실패를 지표·로그로 남긴다)",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "lambda-permissions",
+   "kind": "behavior",
+   "name": "SNS → Lambda: add-permission 후 함수 실행",
+   "status": "BEHAVIOR_OK",
+   "detail": "",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "lambda-permissions",
+   "kind": "behavior",
+   "name": "S3 → Lambda 알림: 리소스 정책 없으면 구성 거부(InvalidArgument)",
+   "status": "BEHAVIOR_OK",
+   "detail": "InvalidArgument: Unable to validate the following destination configurations",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "s3-gaps",
+   "kind": "api",
+   "name": "PutBucketVersioning(MFADelete=Enabled, 임의 MFA 코드)",
+   "status": "OK",
+   "detail": "",
+   "elapsed_ms": 1
+  },
+  {
+   "service": "s3-gaps",
+   "kind": "behavior",
+   "name": "존재하지 않는 MFA 장치·임의 코드로 MFA Delete 를 켤 수 없음",
+   "status": "BEHAVIOR_DIFF",
+   "detail": "받아 줌",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "s3-gaps",
+   "kind": "behavior",
+   "name": "MFA Delete 켠 버킷에서 MFA 없이 버전 영구 삭제 → 거부",
+   "status": "BEHAVIOR_DIFF",
+   "detail": "기대 AccessDenied, 실제로는 성공했다",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "s3-gaps",
+   "kind": "behavior",
+   "name": "객체 잠금 버킷의 버전 관리 일시 중지 → 거부",
+   "status": "BEHAVIOR_DIFF",
+   "detail": "기대 InvalidBucketState, 실제로는 성공했다",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "s3-gaps",
+   "kind": "behavior",
+   "name": "버전 관리 없는 대상 버킷으로 복제 구성 → 거부",
+   "status": "BEHAVIOR_DIFF",
+   "detail": "기대 InvalidRequest, 실제로는 성공했다",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "s3-gaps",
+   "kind": "behavior",
+   "name": "존재하지 않는 대상 버킷으로 복제 구성 → 거부",
+   "status": "BEHAVIOR_DIFF",
+   "detail": "기대 InvalidRequest, 실제로는 성공했다",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "s3-gaps",
+   "kind": "behavior",
+   "name": "기본 암호화 설정이 SSE-C 를 차단하면 SSE-C 업로드 거부",
+   "status": "BEHAVIOR_DIFF",
+   "detail": "BlockedEncryptionTypes 에 SSE-C 있음, 업로드 성공",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "s3-gaps",
+   "kind": "behavior",
+   "name": "퍼블릭 정책(BPA 해제) 버킷의 객체를 익명 GET 하면 200",
+   "status": "BEHAVIOR_DIFF",
+   "detail": "IsPublic=True, 익명 GET HTTP 403",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "s3-gaps",
+   "kind": "api",
+   "name": "CreateLocationS3(원본)",
+   "status": "OK",
+   "detail": "",
+   "elapsed_ms": 3
+  },
+  {
+   "service": "s3-gaps",
+   "kind": "api",
+   "name": "CreateLocationS3(대상)",
+   "status": "OK",
+   "detail": "",
+   "elapsed_ms": 1
+  },
+  {
+   "service": "s3-gaps",
+   "kind": "api",
+   "name": "CreateTask",
+   "status": "OK",
+   "detail": "",
+   "elapsed_ms": 1
+  },
+  {
+   "service": "s3-gaps",
+   "kind": "behavior",
+   "name": "DataSync 작업 상태(생성 직후 → 대기 후)",
+   "status": "BEHAVIOR_OK",
+   "detail": "CREATING → AVAILABLE (AWS도 CREATING 을 거친다)",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "s3-gaps",
+   "kind": "api",
+   "name": "StartTaskExecution",
+   "status": "OK",
+   "detail": "",
+   "elapsed_ms": 1
+  },
+  {
+   "service": "s3-gaps",
+   "kind": "behavior",
+   "name": "DataSync S3→S3 작업이 파일을 실제로 복사",
+   "status": "BEHAVIOR_DIFF",
+   "detail": "처음 상태 LAUNCHING → SUCCESS, FilesTransferred=0, 대상 객체 0개",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "s3-gaps",
+   "kind": "api",
+   "name": "CreateLocationNfs",
+   "status": "NOT_IMPL",
+   "detail": "HTTP 501 NotImplemented: operation CreateLocationNfs is scaffolded but not implemented in this emulator",
+   "elapsed_ms": 2
+  },
+  {
+   "service": "s3-gaps",
+   "kind": "api",
+   "name": "ActivateGateway(임의 활성화 키, FILE_S3)",
+   "status": "OK",
+   "detail": "",
+   "elapsed_ms": 4
+  },
+  {
+   "service": "s3-gaps",
+   "kind": "api",
+   "name": "CreateSMBFileShare",
+   "status": "NOT_IMPL",
+   "detail": "HTTP 501 NotImplemented: operation CreateSMBFileShare is scaffolded but not implemented in this emulator",
+   "elapsed_ms": 2
+  },
+  {
+   "service": "s3-gaps",
+   "kind": "api",
+   "name": "ListTapes",
+   "status": "NOT_IMPL",
+   "detail": "HTTP 501 NotImplemented: operation ListTapes is scaffolded but not implemented in this emulator",
+   "elapsed_ms": 1
+  },
+  {
+   "service": "cfn-timing",
+   "kind": "behavior",
+   "name": "CLI 웨이터처럼 30초 간격으로만 조회해도 NAT·경로가 있는 VPC 스택이 CREATE_COMPLETE",
+   "status": "BEHAVIOR_DIFF",
+   "detail": "관찰 CREATE_IN_PROGRESS → ROLLBACK_IN_PROGRESS → ROLLBACK_COMPLETE AWS::EC2::Route todayorder-probe-cfnwaiter-3485e0a5-PrivateDefault-08C679170DA7 was still CREATE_IN_PROGRESS when the wa",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "cfn-timing",
+   "kind": "behavior",
+   "name": "2초 간격 조회로 같은 스택이 CREATE_COMPLETE",
+   "status": "BEHAVIOR_OK",
+   "detail": "CREATE_COMPLETE (2초)",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "cfn-timing",
+   "kind": "api",
+   "name": "DetectStackDrift",
+   "status": "OK",
+   "detail": "",
+   "elapsed_ms": 2
+  },
+  {
+   "service": "cfn-timing",
+   "kind": "behavior",
+   "name": "드리프트: 손대지 않은 IGW·경로·NAT·EIP·라우팅 테이블은 IN_SYNC",
+   "status": "BEHAVIOR_DIFF",
+   "detail": "{\"Igw\": \"DELETED\", \"IgwAttach\": \"DELETED\", \"PublicDefault\": \"DELETED\", \"PrivateDefault\": \"DELETED\", \"Nat\": \"DELETED\", \"NatEip\": \"DELETED\", \"PublicRt\": \"DELETED\"}",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "cfn-timing",
+   "kind": "behavior",
+   "name": "드리프트: 스택 밖에서 SG 인바운드 규칙을 추가하면 MODIFIED",
+   "status": "BEHAVIOR_DIFF",
+   "detail": "WebSg=IN_SYNC",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "analytics-gaps",
+   "kind": "behavior",
+   "name": "Athena: 등록된 파티션(dt=2026-11-01) 데이터만 읽음 (2건)",
+   "status": "BEHAVIOR_DIFF",
+   "detail": "SUCCEEDED [['3']]",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "analytics-gaps",
+   "kind": "behavior",
+   "name": "Athena: 파티션 열 dt 로 WHERE 필터",
+   "status": "BEHAVIOR_DIFF",
+   "detail": "FAILED no such column: dt in SELECT count(*) FROM \"todayorder_probe_db_9ce6ea84.orders\" WHERE dt = '2026-11-01' at offset 65",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "analytics-gaps",
+   "kind": "behavior",
+   "name": "Athena: Trino 함수 date_trunc·from_iso8601_timestamp",
+   "status": "BEHAVIOR_DIFF",
+   "detail": "FAILED no such function: date_trunc in SELECT date_trunc('day', from_iso8601_timestamp('2026-11-01T10:00:00Z')) at offset 7",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "analytics-gaps",
+   "kind": "api",
+   "name": "ListWorkGroups",
+   "status": "NOT_IMPL",
+   "detail": "HTTP 501 NotImplemented: operation ListWorkGroups is scaffolded but not implemented in this emulator",
+   "elapsed_ms": 1
+  },
+  {
+   "service": "analytics-gaps",
+   "kind": "api",
+   "name": "ListNamedQueries",
+   "status": "NOT_IMPL",
+   "detail": "HTTP 501 NotImplemented: operation ListNamedQueries is scaffolded but not implemented in this emulator",
+   "elapsed_ms": 1
+  },
+  {
+   "service": "analytics-gaps",
+   "kind": "api",
+   "name": "DeleteWorkGroup",
+   "status": "NOT_IMPL",
+   "detail": "HTTP 501 NotImplemented: operation DeleteWorkGroup is scaffolded but not implemented in this emulator",
+   "elapsed_ms": 1
+  },
+  {
+   "service": "analytics-gaps",
+   "kind": "api",
+   "name": "CreateJob(pythonshell)",
+   "status": "OK",
+   "detail": "",
+   "elapsed_ms": 1
+  },
+  {
+   "service": "analytics-gaps",
+   "kind": "behavior",
+   "name": "Glue Python shell 작업이 스크립트를 실제로 실행(S3 객체 생성)",
+   "status": "BEHAVIOR_OK",
+   "detail": "JobRunState=SUCCEEDED, glue-out 객체 1개",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "analytics-gaps",
+   "kind": "api",
+   "name": "CreateDeliveryStream(S3 권한 없는 역할)",
+   "status": "OK",
+   "detail": "",
+   "elapsed_ms": 50
+  },
+  {
+   "service": "analytics-gaps",
+   "kind": "behavior",
+   "name": "Firehose: 역할에 S3 권한이 없으면 배달하지 못함",
+   "status": "BEHAVIOR_DIFF",
+   "detail": "배달됨(권한 정책 미검사)",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "security-better",
+   "kind": "behavior",
+   "name": "비활성화된 KMS 키로 Decrypt → DisabledException",
+   "status": "BEHAVIOR_OK",
+   "detail": "DisabledException: arn:aws:kms:us-east-1:000000000000:key/440af025-f1e6-4f80-a19e-e903316b7ab0 is disabled.",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "security-better",
+   "kind": "behavior",
+   "name": "CMK 를 비활성화하면 SecureString 복호화(WithDecryption) 실패",
+   "status": "BEHAVIOR_DIFF",
+   "detail": "복호화됨(True)",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "security-better",
+   "kind": "api",
+   "name": "CreateFunction(rotfn)",
+   "status": "OK",
+   "detail": "",
+   "elapsed_ms": 3
+  },
+  {
+   "service": "security-better",
+   "kind": "api",
+   "name": "RotateSecret(add-permission 후)",
+   "status": "OK",
+   "detail": "",
+   "elapsed_ms": 1
+  },
+  {
+   "service": "security-better",
+   "kind": "behavior",
+   "name": "Secrets Manager 교체가 Lambda 를 실제로 호출해 AWSCURRENT 값을 바꿈",
+   "status": "BEHAVIOR_OK",
+   "detail": "AWSCURRENT=rotated-a7b1b93c",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "security-better",
+   "kind": "api",
+   "name": "PutRemediationConfigurations(Automatic, AWS-ConfigureS3BucketVersioning)",
+   "status": "OK",
+   "detail": "",
+   "elapsed_ms": 2
+  },
+  {
+   "service": "security-better",
+   "kind": "behavior",
+   "name": "Config 자동 수정(SSM Automation)이 실제로 실행되어 버전 관리를 켬",
+   "status": "BEHAVIOR_OK",
+   "detail": "Status=Enabled",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "security-better",
+   "kind": "api",
+   "name": "auditmanager GetAccountStatus",
+   "status": "NOT_IMPL",
+   "detail": "HTTP 501 NotImplemented: operation GetAccountStatus is scaffolded but not implemented in this emulator",
+   "elapsed_ms": 3
+  },
+  {
+   "service": "security-better",
+   "kind": "behavior",
+   "name": "CloudTrail LookupEvents 에 IAM 관리 이벤트가 나타남",
+   "status": "BEHAVIOR_OK",
+   "detail": "",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "security-better",
+   "kind": "behavior",
+   "name": "CloudTrail LookupEvents 에 KMS 관리 이벤트(CreateKey)가 나타남",
+   "status": "BEHAVIOR_DIFF",
+   "detail": "",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "edge-better",
+   "kind": "behavior",
+   "name": "ALB 에 연결한 WAF Web ACL 이 차단 목록 IP 요청을 실제로 403 으로 막음(컨테이너 안에서 확인)",
+   "status": "BEHAVIOR_OK",
+   "detail": "정상 200, 차단 목록 IP 403",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "edge-better",
+   "kind": "behavior",
+   "name": "지연 시간 레코드: 질의자 위치(리졸버 IP)에 따라 다른 답",
+   "status": "BEHAVIOR_DIFF",
+   "detail": "미국 리졸버 ['192.0.2.20'], 서울 리졸버 ['192.0.2.20']",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "edge-better",
+   "kind": "behavior",
+   "name": "같은 이름·유형에 서로 다른 라우팅 정책(가중치+지연 시간) → InvalidChangeBatch",
+   "status": "BEHAVIOR_DIFF",
+   "detail": "기대 InvalidChangeBatch, 실제로는 성공했다",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "edge-better",
+   "kind": "api",
+   "name": "ListCidrCollections",
+   "status": "NOT_IMPL",
+   "detail": "HTTP 501 NotImplemented: operation ListCidrCollections is scaffolded but not implemented in this emulator",
+   "elapsed_ms": 1
+  },
+  {
+   "service": "integration-better",
+   "kind": "api",
+   "name": "CreateFunction(sfnfail)",
+   "status": "OK",
+   "detail": "",
+   "elapsed_ms": 1
+  },
+  {
+   "service": "integration-better",
+   "kind": "behavior",
+   "name": "Step Functions Retry(MaxAttempts 2) → Task 3번 실패 후 Catch(States.ALL)로 SUCCEEDED",
+   "status": "BEHAVIOR_OK",
+   "detail": "실패 이벤트 3건, 실행 SUCCEEDED",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "integration-better",
+   "kind": "behavior",
+   "name": "Cognito 토큰 iss 가 https://cognito-idp.<리전>.amazonaws.com/<풀 ID>",
+   "status": "BEHAVIOR_DIFF",
+   "detail": "https://127.0.0.1:9297/us-east-1_638906793",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "integration-better",
+   "kind": "api",
+   "name": "CreateFunction(jwtfn)",
+   "status": "OK",
+   "detail": "",
+   "elapsed_ms": 1
+  },
+  {
+   "service": "integration-better",
+   "kind": "behavior",
+   "name": "HTTP API JWT 권한 부여자: 토큰 없으면 401, 유효한 IdToken 이면 200",
+   "status": "BEHAVIOR_OK",
+   "detail": "토큰 없음 401, 토큰 200 (Issuer 는 토큰의 iss 를 그대로 사용)",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "integration-better",
+   "kind": "api",
+   "name": "CreateSchedule(at() 10분 뒤)",
+   "status": "OK",
+   "detail": "",
+   "elapsed_ms": 4
+  },
+  {
+   "service": "integration-better",
+   "kind": "behavior",
+   "name": "Scheduler at() 일정은 지정 시각(10분 뒤) 전에는 발화하지 않음",
+   "status": "BEHAVIOR_DIFF",
+   "detail": "11초 만에 전달됨",
+   "elapsed_ms": 0
+  },
+  {
    "service": "rds",
    "kind": "api",
    "name": "DescribeDBEngineVersions(postgres)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 5
+   "elapsed_ms": 4
   },
   {
    "service": "rds",
@@ -730,7 +1418,7 @@
    "name": "DescribeOrderableDBInstanceOptions(mysql)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 17
+   "elapsed_ms": 19
   },
   {
    "service": "rds",
@@ -738,7 +1426,7 @@
    "name": "CreateDBSubnetGroup",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 1
+   "elapsed_ms": 2
   },
   {
    "service": "rds",
@@ -777,7 +1465,7 @@
    "kind": "behavior",
    "name": "Endpoint 주소·포트 반환",
    "status": "BEHAVIOR_OK",
-   "detail": "127.0.0.1:37367",
+   "detail": "127.0.0.1:44647",
    "elapsed_ms": 0
   },
   {
@@ -818,14 +1506,14 @@
    "name": "CreateDBInstanceReadReplica",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 4
+   "elapsed_ms": 5
   },
   {
    "service": "rds",
    "kind": "behavior",
    "name": "읽기 복제본이 원본을 가리킴",
    "status": "BEHAVIOR_OK",
-   "detail": "Source=todayorder-probe-db-abaf7654; 원본 Replicas=['todayorder-probe-db-rr-abaf7654']",
+   "detail": "Source=todayorder-probe-db-421f2517; 원본 Replicas=['todayorder-probe-db-rr-421f2517']",
    "elapsed_ms": 0
   },
   {
@@ -850,7 +1538,7 @@
    "name": "RestoreDBInstanceFromDBSnapshot",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 8
+   "elapsed_ms": 7
   },
   {
    "service": "rds",
@@ -906,7 +1594,7 @@
    "name": "CreateDBInstance(mysql)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 4
+   "elapsed_ms": 5
   },
   {
    "service": "rds",
@@ -921,7 +1609,7 @@
    "kind": "behavior",
    "name": "Aurora 클러스터 엔드포인트(쓰기)·리더 엔드포인트",
    "status": "BEHAVIOR_OK",
-   "detail": "127.0.0.1 / todayorder-probe-aurora-abaf7654.cluster-ro-00000000000v.us-east-1.rds.amazonaws.com",
+   "detail": "127.0.0.1 / todayorder-probe-aurora-421f2517.cluster-ro-00000000000v.us-east-1.rds.amazonaws.com",
    "elapsed_ms": 0
   },
   {
@@ -937,7 +1625,7 @@
    "kind": "behavior",
    "name": "클러스터 멤버(쓰기 인스턴스)로 조회됨",
    "status": "BEHAVIOR_OK",
-   "detail": "[{'DBInstanceIdentifier': 'todayorder-probe-aurora-1-abaf7654', 'IsClusterWriter': True, 'DBClusterParameterGroupStatus'",
+   "detail": "[{'DBInstanceIdentifier': 'todayorder-probe-aurora-1-421f2517', 'IsClusterWriter': True, 'DBClusterParameterGroupStatus'",
    "elapsed_ms": 0
   },
   {
@@ -1018,7 +1706,7 @@
    "name": "Scan(전체)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 1
   },
   {
    "service": "dynamodb",
@@ -1090,7 +1778,7 @@
    "name": "UpdateTable(GSI 추가: status-index)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 1
+   "elapsed_ms": 5
   },
   {
    "service": "dynamodb",
@@ -1106,7 +1794,7 @@
    "name": "Query(GSI status=PAID)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 3
+   "elapsed_ms": 1
   },
   {
    "service": "dynamodb",
@@ -1130,7 +1818,7 @@
    "name": "UpdateTimeToLive",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 3
+   "elapsed_ms": 1
   },
   {
    "service": "dynamodb",
@@ -1138,7 +1826,7 @@
    "name": "DescribeTimeToLive",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 1
   },
   {
    "service": "dynamodb",
@@ -1161,7 +1849,7 @@
    "kind": "behavior",
    "name": "Streams 켜면 LatestStreamArn 발급",
    "status": "BEHAVIOR_OK",
-   "detail": "-abaf7654/stream/2026-11-12T11:41:54.667",
+   "detail": "-d1e7b9db/stream/2026-11-12T21:02:10.433",
    "elapsed_ms": 0
   },
   {
@@ -1170,7 +1858,7 @@
    "name": "DescribeStream",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 5
+   "elapsed_ms": 2
   },
   {
    "service": "dynamodb",
@@ -1178,7 +1866,7 @@
    "name": "GetShardIterator(TRIM_HORIZON)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 1
   },
   {
    "service": "dynamodb",
@@ -1186,7 +1874,7 @@
    "name": "GetRecords",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 1
   },
   {
    "service": "dynamodb",
@@ -1210,7 +1898,7 @@
    "name": "TransactWriteItems(주문 생성 + 재고 차감)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 1
   },
   {
    "service": "dynamodb",
@@ -1242,7 +1930,7 @@
    "name": "BatchWriteItem(25개)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 1
   },
   {
    "service": "dynamodb",
@@ -1282,7 +1970,7 @@
    "name": "UpdateTable(PROVISIONED → PAY_PER_REQUEST)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 4
+   "elapsed_ms": 2
   },
   {
    "service": "dynamodb",
@@ -1298,7 +1986,7 @@
    "name": "UpdateContinuousBackups(PITR)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 1
   },
   {
    "service": "dynamodb",
@@ -1306,7 +1994,7 @@
    "name": "DescribeContinuousBackups",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 1
   },
   {
    "service": "dynamodb",
@@ -1322,7 +2010,7 @@
    "name": "CreateBackup",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 1
   },
   {
    "service": "dynamodb",
@@ -1338,7 +2026,7 @@
    "name": "RestoreTableFromBackup",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 6
+   "elapsed_ms": 1
   },
   {
    "service": "dynamodb",
@@ -1354,7 +2042,7 @@
    "name": "ExportTableToPointInTime",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 7
+   "elapsed_ms": 2
   },
   {
    "service": "dynamodb",
@@ -1362,7 +2050,7 @@
    "name": "UpdateTable(글로벌 테이블 복제본 us-west-2)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 3
+   "elapsed_ms": 1
   },
   {
    "service": "elasticache",
@@ -1370,7 +2058,7 @@
    "name": "CreateCacheSubnetGroup",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 5
+   "elapsed_ms": 4
   },
   {
    "service": "elasticache",
@@ -1378,7 +2066,7 @@
    "name": "CreateReplicationGroup(valkey, 복제본 1, Multi-AZ)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 1
   },
   {
    "service": "elasticache",
@@ -1393,7 +2081,7 @@
    "kind": "behavior",
    "name": "기본(쓰기)·리더 엔드포인트 반환",
    "status": "BEHAVIOR_OK",
-   "detail": "Primary=master.to-rg-abaf7654.000001.us-east-1.cache.amazonaws.com:6379 Reader=replica.to-rg-abaf7654.000001.us-east-1.cache.amazonaws.com members=2",
+   "detail": "Primary=master.to-rg-8d38e744.000001.us-east-1.cache.amazonaws.com:6379 Reader=replica.to-rg-8d38e744.000001.us-east-1.cache.amazonaws.com members=2",
    "elapsed_ms": 0
   },
   {
@@ -1425,7 +2113,7 @@
    "kind": "behavior",
    "name": "Memcached 클러스터 available + 구성 엔드포인트",
    "status": "BEHAVIOR_OK",
-   "detail": "available {'Address': 'to-mc-abaf7654.000004.cfg.us-east-1.cache.amazonaws.com', 'Port': 11211}",
+   "detail": "available {'Address': 'to-mc-8d38e744.000004.cfg.us-east-1.cache.amazonaws.com', 'Port': 11211}",
    "elapsed_ms": 0
   },
   {
@@ -1434,7 +2122,87 @@
    "name": "CreateServerlessCache(valkey)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 4
+   "elapsed_ms": 2
+  },
+  {
+   "service": "db-gaps",
+   "kind": "api",
+   "name": "RestoreDBInstanceToPointInTime",
+   "status": "NOT_IMPL",
+   "detail": "HTTP 501 NotImplemented: operation RestoreDBInstanceToPointInTime is scaffolded but not implemented in this emulator",
+   "elapsed_ms": 3
+  },
+  {
+   "service": "db-gaps",
+   "kind": "api",
+   "name": "PromoteReadReplica",
+   "status": "NOT_IMPL",
+   "detail": "HTTP 501 NotImplemented: operation PromoteReadReplica is scaffolded but not implemented in this emulator",
+   "elapsed_ms": 1
+  },
+  {
+   "service": "db-gaps",
+   "kind": "api",
+   "name": "CreateDBClusterEndpoint",
+   "status": "NOT_IMPL",
+   "detail": "HTTP 501 NotImplemented: operation CreateDBClusterEndpoint is scaffolded but not implemented in this emulator",
+   "elapsed_ms": 1
+  },
+  {
+   "service": "db-gaps",
+   "kind": "api",
+   "name": "DescribeDBInstanceAutomatedBackups",
+   "status": "NOT_IMPL",
+   "detail": "HTTP 501 NotImplemented: operation DescribeDBInstanceAutomatedBackups is scaffolded but not implemented in this emulator",
+   "elapsed_ms": 1
+  },
+  {
+   "service": "db-gaps",
+   "kind": "api",
+   "name": "DeleteReplicationGroup",
+   "status": "NOT_IMPL",
+   "detail": "HTTP 501 NotImplemented: operation DeleteReplicationGroup is scaffolded but not implemented in this emulator",
+   "elapsed_ms": 1
+  },
+  {
+   "service": "db-gaps",
+   "kind": "behavior",
+   "name": "DAX CreateSubnetGroup(유효한 서브넷) 이 성공",
+   "status": "BEHAVIOR_DIFF",
+   "detail": "InvalidParameterValueException: Some input subnets in :[subnet-0000000000000015b, subnet-0000000000000015d] are invalid.",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "db-gaps",
+   "kind": "api",
+   "name": "UpdateContinuousBackups(PITR on)",
+   "status": "OK",
+   "detail": "",
+   "elapsed_ms": 1
+  },
+  {
+   "service": "db-gaps",
+   "kind": "behavior",
+   "name": "PITR LatestRestorableDateTime 이 시간이 지나면 앞으로 감",
+   "status": "BEHAVIOR_DIFF",
+   "detail": "PITR 켠 직후 2026-11-13 06:02:33.904000+09:00 → 6초 뒤 2026-11-13 06:02:33.904000+09:00",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "db-gaps",
+   "kind": "behavior",
+   "name": "PITR UseLatestRestorableTime 복원 → 최신 데이터(v2)",
+   "status": "BEHAVIOR_OK",
+   "detail": "복원된 값 v2",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "db-gaps",
+   "kind": "behavior",
+   "name": "PITR RestoreDateTime(v1과 v2 사이) 복원 → 그 시점 데이터(v1)",
+   "status": "BEHAVIOR_DIFF",
+   "detail": "복원 결과 오류 InvalidRestoreTimeException: An invalid restore time was specified. RestoreDateTime must be between EarliestR",
+   "elapsed_ms": 0
   },
   {
    "service": "route53",
@@ -1442,14 +2210,14 @@
    "name": "CreateHostedZone(퍼블릭)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 4
+   "elapsed_ms": 2
   },
   {
    "service": "route53",
    "kind": "behavior",
    "name": "퍼블릭 호스팅 영역에 NS/SOA 기본 레코드와 위임 세트",
    "status": "BEHAVIOR_OK",
-   "detail": "NameServers=['ns-1575.awsdns-10.com', 'ns-1386.awsdns-19.net']",
+   "detail": "NameServers=['ns-390.awsdns-38.com', 'ns-1522.awsdns-58.net']",
    "elapsed_ms": 0
   },
   {
@@ -1490,7 +2258,7 @@
    "name": "CreateHealthCheck(HTTPS)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 4
+   "elapsed_ms": 1
   },
   {
    "service": "route53",
@@ -1498,7 +2266,7 @@
    "name": "GetHealthCheckStatus",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 3
+   "elapsed_ms": 1
   },
   {
    "service": "route53",
@@ -1514,7 +2282,7 @@
    "name": "ChangeResourceRecordSets(가중치)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 1
   },
   {
    "service": "route53",
@@ -1522,7 +2290,7 @@
    "name": "ChangeResourceRecordSets(장애 조치)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 1
   },
   {
    "service": "route53",
@@ -1530,7 +2298,7 @@
    "name": "ChangeResourceRecordSets(지연 시간)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 1
   },
   {
    "service": "route53",
@@ -1538,7 +2306,7 @@
    "name": "ChangeResourceRecordSets(지리적 위치)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 1
   },
   {
    "service": "route53",
@@ -1546,7 +2314,7 @@
    "name": "ChangeResourceRecordSets(다중값 응답)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 1
   },
   {
    "service": "route53",
@@ -1561,7 +2329,7 @@
    "kind": "behavior",
    "name": "영역 apex에 CNAME을 만들면 InvalidChangeBatch로 거부",
    "status": "BEHAVIOR_OK",
-   "detail": "InvalidChangeBatch: [RRSet of type CNAME with DNS name abaf7654.todayorder.example. is not permitted at apex in zone abaf7654.todayorder.example.]",
+   "detail": "InvalidChangeBatch: [RRSet of type CNAME with DNS name f85d6cb3.todayorder.example. is not permitted at apex in zone f85d6cb3.todayorder.example.]",
    "elapsed_ms": 0
   },
   {
@@ -1570,7 +2338,7 @@
    "name": "ListResourceRecordSets",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 1
   },
   {
    "service": "route53",
@@ -1610,7 +2378,7 @@
    "name": "CreateOriginAccessControl",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 3
   },
   {
    "service": "cloudfront",
@@ -1633,7 +2401,7 @@
    "kind": "behavior",
    "name": "배포 도메인 이름(*.cloudfront.net) 발급",
    "status": "BEHAVIOR_DIFF",
-   "detail": "DomainName=127.0.0.1:40875 Status=InProgress — 에뮬레이터는 컨테이너 안의 로컬 포트를 준다",
+   "detail": "DomainName=127.0.0.1:33873 Status=InProgress — 에뮬레이터는 컨테이너 안의 로컬 포트를 준다",
    "elapsed_ms": 0
   },
   {
@@ -1666,7 +2434,7 @@
    "name": "CreateInvalidation",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 3
   },
   {
    "service": "cloudfront",
@@ -1682,7 +2450,7 @@
    "name": "CreateFunction(CloudFront Functions)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 1
+   "elapsed_ms": 2
   },
   {
    "service": "cloudfront",
@@ -1698,7 +2466,7 @@
    "name": "CreateAccelerator(us-east-1 클라이언트)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 8
+   "elapsed_ms": 3
   },
   {
    "service": "globalaccelerator",
@@ -1730,7 +2498,7 @@
    "name": "CreateIPSet(REGIONAL)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 3
   },
   {
    "service": "wafv2",
@@ -1789,6 +2557,334 @@
    "elapsed_ms": 1
   },
   {
+   "service": "iam-enforcement",
+   "kind": "behavior",
+   "name": "정책 없는 사용자의 s3:ListAllMyBuckets(ListBuckets) 거부(암묵적 Deny) [계정 수준]",
+   "status": "BEHAVIOR_DIFF",
+   "detail": "허용됨",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "iam-enforcement",
+   "kind": "behavior",
+   "name": "정책 없는 사용자의 s3:CreateBucket 거부(암묵적 Deny) [계정 수준]",
+   "status": "BEHAVIOR_DIFF",
+   "detail": "허용됨",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "iam-enforcement",
+   "kind": "behavior",
+   "name": "정책 없는 사용자의 s3:PutBucketVersioning 거부(암묵적 Deny) [관리 수준]",
+   "status": "BEHAVIOR_DIFF",
+   "detail": "허용됨",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "iam-enforcement",
+   "kind": "behavior",
+   "name": "정책 없는 사용자의 s3:DeleteBucket(관리자가 만든 빈 버킷) 거부(암묵적 Deny) [관리 수준]",
+   "status": "BEHAVIOR_DIFF",
+   "detail": "허용됨",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "iam-enforcement",
+   "kind": "behavior",
+   "name": "정책 없는 사용자의 s3:GetObject 거부(암묵적 Deny) [데이터 수준]",
+   "status": "BEHAVIOR_OK",
+   "detail": "AccessDenied",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "iam-enforcement",
+   "kind": "behavior",
+   "name": "정책 없는 사용자의 s3:PutObject 거부(암묵적 Deny) [데이터 수준]",
+   "status": "BEHAVIOR_OK",
+   "detail": "AccessDenied",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "iam-enforcement",
+   "kind": "behavior",
+   "name": "정책 없는 사용자의 s3:ListBucket(ListObjectsV2) 거부(암묵적 Deny) [데이터 수준]",
+   "status": "BEHAVIOR_OK",
+   "detail": "AccessDenied",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "iam-enforcement",
+   "kind": "behavior",
+   "name": "정책 없는 사용자의 sqs:ListQueues 거부(암묵적 Deny) [계정 수준]",
+   "status": "BEHAVIOR_DIFF",
+   "detail": "허용됨",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "iam-enforcement",
+   "kind": "behavior",
+   "name": "정책 없는 사용자의 sqs:CreateQueue 거부(암묵적 Deny) [계정 수준]",
+   "status": "BEHAVIOR_DIFF",
+   "detail": "허용됨",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "iam-enforcement",
+   "kind": "behavior",
+   "name": "정책 없는 사용자의 sqs:SendMessage 거부(암묵적 Deny) [데이터 수준]",
+   "status": "BEHAVIOR_OK",
+   "detail": "AccessDenied",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "iam-enforcement",
+   "kind": "behavior",
+   "name": "정책 없는 사용자의 sqs:ReceiveMessage 거부(암묵적 Deny) [데이터 수준]",
+   "status": "BEHAVIOR_OK",
+   "detail": "AccessDenied",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "iam-enforcement",
+   "kind": "behavior",
+   "name": "정책 없는 사용자의 dynamodb:ListTables 거부(암묵적 Deny) [계정 수준]",
+   "status": "BEHAVIOR_DIFF",
+   "detail": "허용됨",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "iam-enforcement",
+   "kind": "behavior",
+   "name": "정책 없는 사용자의 dynamodb:CreateTable 거부(암묵적 Deny) [계정 수준]",
+   "status": "BEHAVIOR_DIFF",
+   "detail": "허용됨",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "iam-enforcement",
+   "kind": "behavior",
+   "name": "정책 없는 사용자의 dynamodb:DescribeTable 거부(암묵적 Deny) [관리 수준]",
+   "status": "BEHAVIOR_DIFF",
+   "detail": "허용됨",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "iam-enforcement",
+   "kind": "behavior",
+   "name": "정책 없는 사용자의 dynamodb:PutItem 거부(암묵적 Deny) [데이터 수준]",
+   "status": "BEHAVIOR_OK",
+   "detail": "AccessDeniedException",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "iam-enforcement",
+   "kind": "behavior",
+   "name": "정책 없는 사용자의 dynamodb:Scan 거부(암묵적 Deny) [데이터 수준]",
+   "status": "BEHAVIOR_OK",
+   "detail": "AccessDeniedException",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "iam-enforcement",
+   "kind": "behavior",
+   "name": "정책 없는 사용자의 dynamodb:DeleteTable(관리자가 만든 테이블) 거부(암묵적 Deny) [관리 수준]",
+   "status": "BEHAVIOR_DIFF",
+   "detail": "허용됨",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "iam-enforcement",
+   "kind": "behavior",
+   "name": "Allow * + 명시적 Deny s3:GetObject → GetObject 거부",
+   "status": "BEHAVIOR_OK",
+   "detail": "AccessDenied",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "iam-enforcement",
+   "kind": "behavior",
+   "name": "Allow * + 명시적 Deny s3:ListAllMyBuckets → ListBuckets 거부",
+   "status": "BEHAVIOR_DIFF",
+   "detail": "허용됨",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "iam-enforcement",
+   "kind": "behavior",
+   "name": "호출자 정책에 sts:AssumeRole 명시적 Deny → AssumeRole 거부 (신뢰 정책은 계정 루트)",
+   "status": "BEHAVIOR_DIFF",
+   "detail": "허용됨 — AssumeRole 은 호출자의 자격 증명 정책을 평가하지 않는다",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "iam-enforcement",
+   "kind": "behavior",
+   "name": "정책 없는 사용자의 AssumeRole 거부 (신뢰 정책은 계정 루트)",
+   "status": "BEHAVIOR_DIFF",
+   "detail": "허용됨 — 호출자 정책 미평가",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "iam-enforcement",
+   "kind": "api",
+   "name": "AssumeRole(세션 정책: Deny iam:ListUsers·ec2:DescribeVpcs)",
+   "status": "OK",
+   "detail": "",
+   "elapsed_ms": 3
+  },
+  {
+   "service": "iam-enforcement",
+   "kind": "behavior",
+   "name": "세션 정책의 Deny 가 IAM ListUsers 에 적용",
+   "status": "BEHAVIOR_OK",
+   "detail": "AccessDenied",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "iam-enforcement",
+   "kind": "behavior",
+   "name": "세션 정책의 Deny 가 EC2 DescribeVpcs 에 적용",
+   "status": "BEHAVIOR_DIFF",
+   "detail": "허용됨 — EC2 는 세션 정책을 무시",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "iam-enforcement",
+   "kind": "behavior",
+   "name": "iam:PassRole 명시적 Deny 인 사용자의 run-instances(인스턴스 프로파일) 거부",
+   "status": "BEHAVIOR_DIFF",
+   "detail": "허용됨 — PassRole 미검사",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "iam-enforcement",
+   "kind": "behavior",
+   "name": "비활성(Inactive) 액세스 키로 IAM ListUsers 거부",
+   "status": "BEHAVIOR_OK",
+   "detail": "InvalidClientTokenId",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "iam-enforcement",
+   "kind": "behavior",
+   "name": "비활성(Inactive) 액세스 키로 STS GetCallerIdentity 거부",
+   "status": "BEHAVIOR_DIFF",
+   "detail": "허용됨",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "iam-enforcement",
+   "kind": "behavior",
+   "name": "비활성(Inactive) 액세스 키로 S3 ListBuckets 거부",
+   "status": "BEHAVIOR_DIFF",
+   "detail": "허용됨",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "iam-enforcement",
+   "kind": "behavior",
+   "name": "비활성(Inactive) 액세스 키로 EC2 DescribeVpcs 거부",
+   "status": "BEHAVIOR_DIFF",
+   "detail": "허용됨",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "iam-enforcement",
+   "kind": "behavior",
+   "name": "Deny 조건 aws:RequestedRegion=eu-west-1 은 us-east-1 호출에 적용되지 않음 (ec2:DescribeVpcs 허용)",
+   "status": "BEHAVIOR_DIFF",
+   "detail": "UnauthorizedOperation — 조건이 맞지 않는데도 Deny 적용",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "iam-enforcement",
+   "kind": "behavior",
+   "name": "Deny 조건 aws:RequestedRegion=eu-west-1 은 us-east-1 호출에 적용되지 않음 (iam:ListUsers 허용)",
+   "status": "BEHAVIOR_DIFF",
+   "detail": "AccessDenied — 조건이 맞지 않는데도 Deny 적용",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "iam-enforcement",
+   "kind": "behavior",
+   "name": "Allow 조건 aws:RequestedRegion=us-east-1 이 us-east-1 호출에 적용됨 (ec2:DescribeVpcs 허용)",
+   "status": "BEHAVIOR_DIFF",
+   "detail": "UnauthorizedOperation — 조건이 맞는데도 Allow 미적용",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "iam-enforcement",
+   "kind": "behavior",
+   "name": "Allow 조건 aws:RequestedRegion=us-east-1 이 us-east-1 호출에 적용됨 (iam:ListUsers 허용)",
+   "status": "BEHAVIOR_DIFF",
+   "detail": "AccessDenied — 조건이 맞는데도 Allow 미적용",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "iam-enforcement",
+   "kind": "behavior",
+   "name": "Deny 조건 aws:SecureTransport=false 는 HTTPS 호출에 적용되지 않음 (ec2:DescribeVpcs 허용)",
+   "status": "BEHAVIOR_DIFF",
+   "detail": "UnauthorizedOperation — HTTPS인데도 Deny 적용",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "iam-enforcement",
+   "kind": "behavior",
+   "name": "Deny 조건 aws:SecureTransport=false 는 HTTPS 호출에 적용되지 않음 (iam:ListUsers 허용)",
+   "status": "BEHAVIOR_DIFF",
+   "detail": "AccessDenied — HTTPS인데도 Deny 적용",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "iam-enforcement",
+   "kind": "api",
+   "name": "SimulateCustomPolicy(Deny(RequestedRegion=eu-west-1), 컨텍스트 us-east-1)",
+   "status": "OK",
+   "detail": "",
+   "elapsed_ms": 1
+  },
+  {
+   "service": "iam-enforcement",
+   "kind": "behavior",
+   "name": "시뮬레이터가 조건 키를 올바르게 판정: Deny(RequestedRegion=eu-west-1) → allowed",
+   "status": "BEHAVIOR_OK",
+   "detail": "{'iam:ListUsers': 'allowed', 'ec2:DescribeVpcs': 'allowed'}",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "iam-enforcement",
+   "kind": "api",
+   "name": "SimulateCustomPolicy(Allow(RequestedRegion=us-east-1), 컨텍스트 us-east-1)",
+   "status": "OK",
+   "detail": "",
+   "elapsed_ms": 1
+  },
+  {
+   "service": "iam-enforcement",
+   "kind": "behavior",
+   "name": "시뮬레이터가 조건 키를 올바르게 판정: Allow(RequestedRegion=us-east-1) → allowed",
+   "status": "BEHAVIOR_OK",
+   "detail": "{'iam:ListUsers': 'allowed', 'ec2:DescribeVpcs': 'allowed'}",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "iam-enforcement",
+   "kind": "api",
+   "name": "SimulateCustomPolicy(Deny SecureTransport=false, 컨텍스트 true)",
+   "status": "OK",
+   "detail": "",
+   "elapsed_ms": 1
+  },
+  {
+   "service": "iam-enforcement",
+   "kind": "behavior",
+   "name": "시뮬레이터가 조건 키를 올바르게 판정: Deny(SecureTransport=false) → allowed",
+   "status": "BEHAVIOR_OK",
+   "detail": "{'iam:ListUsers': 'allowed'}",
+   "elapsed_ms": 0
+  },
+  {
    "service": "client-config",
    "kind": "api",
    "name": "CreateBucket(127.0.0.1)",
@@ -1809,7 +2905,7 @@
    "kind": "behavior",
    "name": "가상 호스트 방식(<bucket>.localhost)은 실패해야 함",
    "status": "BEHAVIOR_OK",
-   "detail": "EndpointConnectionError: Could not connect to the endpoint URL: \"https://todayorder-probe-cfgbucket-abaf7654.localhost:9297/\"",
+   "detail": "EndpointConnectionError: Could not connect to the endpoint URL: \"https://todayorder-probe-cfgbucket-71fa5293.localhost:9297/\"",
    "elapsed_ms": 0
   },
   {
@@ -1842,7 +2938,7 @@
    "name": "CreateUser",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 3
+   "elapsed_ms": 1
   },
   {
    "service": "iam",
@@ -1935,6 +3031,62 @@
   {
    "service": "iam",
    "kind": "api",
+   "name": "EnableMFADevice",
+   "status": "NOT_IMPL",
+   "detail": "HTTP 501 NotImplemented: operation EnableMFADevice is scaffolded but not implemented in this emulator",
+   "elapsed_ms": 1
+  },
+  {
+   "service": "iam",
+   "kind": "api",
+   "name": "ListMFADevices",
+   "status": "NOT_IMPL",
+   "detail": "HTTP 501 NotImplemented: operation ListMFADevices is scaffolded but not implemented in this emulator",
+   "elapsed_ms": 1
+  },
+  {
+   "service": "iam",
+   "kind": "api",
+   "name": "DeactivateMFADevice",
+   "status": "NOT_IMPL",
+   "detail": "HTTP 501 NotImplemented: operation DeactivateMFADevice is scaffolded but not implemented in this emulator",
+   "elapsed_ms": 1
+  },
+  {
+   "service": "iam",
+   "kind": "api",
+   "name": "DeleteVirtualMFADevice",
+   "status": "NOT_IMPL",
+   "detail": "HTTP 501 NotImplemented: operation DeleteVirtualMFADevice is scaffolded but not implemented in this emulator",
+   "elapsed_ms": 1
+  },
+  {
+   "service": "iam",
+   "kind": "api",
+   "name": "GetAccountSummary (AWS: 동작 / 에뮬레이터: InvalidAction 예상)",
+   "status": "ERROR",
+   "detail": "HTTP 400 InvalidAction: unknown action: GetAccountSummary",
+   "elapsed_ms": 1
+  },
+  {
+   "service": "iam",
+   "kind": "api",
+   "name": "GetAccountPasswordPolicy (AWS: 동작 / 에뮬레이터: InvalidAction 예상)",
+   "status": "ERROR",
+   "detail": "HTTP 400 InvalidAction: unknown action: GetAccountPasswordPolicy",
+   "elapsed_ms": 1
+  },
+  {
+   "service": "iam",
+   "kind": "behavior",
+   "name": "자격 증명 기반 정책에 Principal → MalformedPolicyDocument",
+   "status": "BEHAVIOR_DIFF",
+   "detail": "기대 MalformedPolicyDocument, 실제로는 성공했다",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "iam",
+   "kind": "api",
    "name": "GetAccountPasswordPolicy/UpdateAccountPasswordPolicy",
    "status": "OK",
    "detail": "",
@@ -1970,7 +3122,7 @@
    "name": "PutRolePolicy",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 1
+   "elapsed_ms": 0
   },
   {
    "service": "iam",
@@ -1978,7 +3130,7 @@
    "name": "CreateInstanceProfile",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 1
+   "elapsed_ms": 0
   },
   {
    "service": "iam",
@@ -1986,7 +3138,7 @@
    "name": "AddRoleToInstanceProfile",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 1
+   "elapsed_ms": 0
   },
   {
    "service": "iam",
@@ -2033,7 +3185,7 @@
    "kind": "behavior",
    "name": "IAM 사용자 액세스 키로 서명한 요청을 받아 줌",
    "status": "BEHAVIOR_OK",
-   "detail": "arn:aws:iam::000000000000:user/todayorder-probe-user-abaf7654",
+   "detail": "arn:aws:iam::000000000000:user/todayorder-probe-user-171de405",
    "elapsed_ms": 0
   },
   {
@@ -2047,25 +3199,25 @@
   {
    "service": "iam",
    "kind": "behavior",
-   "name": "정책 없는 사용자의 s3:ListAllMyBuckets 거부(암묵적 Deny)",
+   "name": "정책 없는 사용자의 s3:ListAllMyBuckets 거부(암묵적 Deny) [계정 수준 호출 — 전체 표는 iam-enforcement]",
    "status": "BEHAVIOR_DIFF",
-   "detail": "허용됨 — 이 서비스는 IAM 정책을 평가하지 않는다",
+   "detail": "허용됨 — 이 서비스는 계정·관리 수준 호출에 IAM 정책을 평가하지 않는다",
    "elapsed_ms": 0
   },
   {
    "service": "iam",
    "kind": "behavior",
-   "name": "정책 없는 사용자의 sqs:ListQueues 거부(암묵적 Deny)",
+   "name": "정책 없는 사용자의 sqs:ListQueues 거부(암묵적 Deny) [계정 수준 호출 — 전체 표는 iam-enforcement]",
    "status": "BEHAVIOR_DIFF",
-   "detail": "허용됨 — 이 서비스는 IAM 정책을 평가하지 않는다",
+   "detail": "허용됨 — 이 서비스는 계정·관리 수준 호출에 IAM 정책을 평가하지 않는다",
    "elapsed_ms": 0
   },
   {
    "service": "iam",
    "kind": "behavior",
-   "name": "정책 없는 사용자의 dynamodb:ListTables 거부(암묵적 Deny)",
+   "name": "정책 없는 사용자의 dynamodb:ListTables 거부(암묵적 Deny) [계정 수준 호출 — 전체 표는 iam-enforcement]",
    "status": "BEHAVIOR_DIFF",
-   "detail": "허용됨 — 이 서비스는 IAM 정책을 평가하지 않는다",
+   "detail": "허용됨 — 이 서비스는 계정·관리 수준 호출에 IAM 정책을 평가하지 않는다",
    "elapsed_ms": 0
   },
   {
@@ -2111,9 +3263,9 @@
   {
    "service": "iam",
    "kind": "behavior",
-   "name": "명시적 Deny(s3:*)가 ListBuckets를 막음",
+   "name": "명시적 Deny(s3:*)가 ListBuckets(계정 수준)를 막음",
    "status": "BEHAVIOR_DIFF",
-   "detail": "허용됨 — 명시적 Deny도 집행되지 않는다",
+   "detail": "허용됨 — 계정 수준 호출에는 명시적 Deny도 집행되지 않는다(객체 API는 집행: iam-enforcement)",
    "elapsed_ms": 0
   },
   {
@@ -2122,7 +3274,7 @@
    "name": "GetCallerIdentity",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 1
   },
   {
    "service": "sts",
@@ -2161,7 +3313,7 @@
    "kind": "behavior",
    "name": "임시 자격 증명으로 호출하면 assumed-role ARN",
    "status": "BEHAVIOR_OK",
-   "detail": "arn:aws:sts::000000000000:assumed-role/todayorder-probe-assume-abaf7654/probe",
+   "detail": "arn:aws:sts::000000000000:assumed-role/todayorder-probe-assume-6024cac3/probe",
    "elapsed_ms": 0
   },
   {
@@ -2226,7 +3378,7 @@
    "name": "EnablePolicyType(SCP)",
    "status": "NOT_IMPL",
    "detail": "HTTP 501 NotImplemented: operation EnablePolicyType is scaffolded but not implemented in this emulator",
-   "elapsed_ms": 4
+   "elapsed_ms": 1
   },
   {
    "service": "organizations",
@@ -2263,6 +3415,38 @@
   {
    "service": "organizations",
    "kind": "api",
+   "name": "DescribeAccount",
+   "status": "NOT_IMPL",
+   "detail": "HTTP 501 NotImplemented: operation DescribeAccount is scaffolded but not implemented in this emulator",
+   "elapsed_ms": 1
+  },
+  {
+   "service": "organizations",
+   "kind": "api",
+   "name": "ListAccountsForParent",
+   "status": "NOT_IMPL",
+   "detail": "HTTP 501 NotImplemented: operation ListAccountsForParent is scaffolded but not implemented in this emulator",
+   "elapsed_ms": 1
+  },
+  {
+   "service": "organizations",
+   "kind": "api",
+   "name": "ListChildren",
+   "status": "NOT_IMPL",
+   "detail": "HTTP 501 NotImplemented: operation ListChildren is scaffolded but not implemented in this emulator",
+   "elapsed_ms": 1
+  },
+  {
+   "service": "organizations",
+   "kind": "api",
+   "name": "MoveAccount",
+   "status": "NOT_IMPL",
+   "detail": "HTTP 501 NotImplemented: operation MoveAccount is scaffolded but not implemented in this emulator",
+   "elapsed_ms": 1
+  },
+  {
+   "service": "organizations",
+   "kind": "api",
    "name": "CreateAccount",
    "status": "NOT_IMPL",
    "detail": "HTTP 501 NotImplemented: operation CreateAccount is scaffolded but not implemented in this emulator",
@@ -2282,7 +3466,7 @@
    "name": "CreateQueue(std)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 1
   },
   {
    "service": "sqs",
@@ -2314,7 +3498,7 @@
    "name": "GetQueueUrl",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 1
+   "elapsed_ms": 0
   },
   {
    "service": "sqs",
@@ -2362,7 +3546,7 @@
    "name": "ChangeMessageVisibility(0)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 3
+   "elapsed_ms": 1
   },
   {
    "service": "sqs",
@@ -2378,7 +3562,7 @@
    "name": "DeleteMessage",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 1
   },
   {
    "service": "sqs",
@@ -2393,7 +3577,7 @@
    "kind": "behavior",
    "name": "롱 폴링: 빈 큐에서 WaitTimeSeconds=2 만큼 대기",
    "status": "BEHAVIOR_OK",
-   "detail": "2.1s 대기",
+   "detail": "2.0s 대기",
    "elapsed_ms": 0
   },
   {
@@ -2402,7 +3586,7 @@
    "name": "SendMessage(DelaySeconds=3)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 6
+   "elapsed_ms": 1
   },
   {
    "service": "sqs",
@@ -2418,7 +3602,7 @@
    "name": "SendMessageBatch",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 5
+   "elapsed_ms": 2
   },
   {
    "service": "sqs",
@@ -2426,7 +3610,7 @@
    "name": "PurgeQueue",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 1
   },
   {
    "service": "sqs",
@@ -2450,7 +3634,7 @@
    "name": "CreateQueue(dlq)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 1
   },
   {
    "service": "sqs",
@@ -2482,7 +3666,7 @@
    "name": "ListDeadLetterSourceQueues",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 5
+   "elapsed_ms": 2
   },
   {
    "service": "sqs",
@@ -2490,7 +3674,7 @@
    "name": "StartMessageMoveTask",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 1
   },
   {
    "service": "sqs",
@@ -2506,7 +3690,7 @@
    "name": "ListMessageMoveTasks",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 5
+   "elapsed_ms": 3
   },
   {
    "service": "sqs",
@@ -2546,7 +3730,7 @@
    "name": "CreateQueue(cbd.fifo)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 1
   },
   {
    "service": "sqs",
@@ -2562,7 +3746,7 @@
    "name": "CreateTopic",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 4
+   "elapsed_ms": 3
   },
   {
    "service": "sns",
@@ -2570,7 +3754,7 @@
    "name": "GetTopicAttributes",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 1
   },
   {
    "service": "sns",
@@ -2618,7 +3802,7 @@
    "name": "CreateQueue(fan-filter)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 1
+   "elapsed_ms": 0
   },
   {
    "service": "sns",
@@ -2650,7 +3834,7 @@
    "name": "CreateQueue(fan-nopolicy)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 1
+   "elapsed_ms": 0
   },
   {
    "service": "sns",
@@ -2674,7 +3858,7 @@
    "name": "Publish(eventType=order_paid)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 3
   },
   {
    "service": "sns",
@@ -2722,7 +3906,7 @@
    "name": "PublishBatch",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 12
+   "elapsed_ms": 4
   },
   {
    "service": "sns",
@@ -2738,14 +3922,14 @@
    "name": "Subscribe(email)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 4
+   "elapsed_ms": 1
   },
   {
    "service": "sns",
    "kind": "behavior",
    "name": "email 구독은 확인 대기 상태",
    "status": "BEHAVIOR_OK",
-   "detail": "654:584289af-bca4-4ad3-96b2-98fd4c3c48f6",
+   "detail": "2ba:a39cfeea-ae61-4dfd-8ce6-72100bc9419b",
    "elapsed_ms": 0
   },
   {
@@ -2754,7 +3938,7 @@
    "name": "Subscribe(https)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 1
   },
   {
    "service": "sns",
@@ -2762,7 +3946,7 @@
    "name": "ListSubscriptionsByTopic",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 1
   },
   {
    "service": "sns",
@@ -2778,7 +3962,7 @@
    "name": "CreateTopic(FIFO)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 1
   },
   {
    "service": "sns",
@@ -2810,7 +3994,7 @@
    "name": "CreateEventBus",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 4
+   "elapsed_ms": 3
   },
   {
    "service": "eventbridge",
@@ -2874,7 +4058,7 @@
    "name": "PutRule(schedule rate(1 minute))",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 4
+   "elapsed_ms": 1
   },
   {
    "service": "eventbridge",
@@ -2882,7 +4066,7 @@
    "name": "ListRules",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 4
+   "elapsed_ms": 1
   },
   {
    "service": "eventbridge",
@@ -2890,7 +4074,7 @@
    "name": "CreateArchive",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 4
+   "elapsed_ms": 1
   },
   {
    "service": "eventbridge",
@@ -2898,7 +4082,7 @@
    "name": "Scheduler CreateSchedule",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 6
+   "elapsed_ms": 3
   },
   {
    "service": "eventbridge",
@@ -2906,7 +4090,7 @@
    "name": "Scheduler GetSchedule",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 1
   },
   {
    "service": "eventbridge",
@@ -2937,7 +4121,7 @@
    "kind": "behavior",
    "name": "Pipes: 역할 신뢰 정책에 pipes.amazonaws.com 이 없으면 CREATE_FAILED",
    "status": "BEHAVIOR_OK",
-   "detail": "CREATE_FAILED: Pipes cannot assume the execution role arn:aws:iam::000000000000:role/todayorder-probe-pipebad-abaf7654: its trust polic",
+   "detail": "CREATE_FAILED: Pipes cannot assume the execution role arn:aws:iam::000000000000:role/todayorder-probe-pipebad-7073c29e: its trust polic",
    "elapsed_ms": 0
   },
   {
@@ -2946,7 +4130,7 @@
    "name": "Pipes CreatePipe(SQS→SQS)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 1
   },
   {
    "service": "eventbridge",
@@ -2978,7 +4162,7 @@
    "name": "StartExecution",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 3
+   "elapsed_ms": 2
   },
   {
    "service": "stepfunctions",
@@ -2994,7 +4178,7 @@
    "name": "GetExecutionHistory",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 4
+   "elapsed_ms": 1
   },
   {
    "service": "stepfunctions",
@@ -3010,7 +4194,7 @@
    "name": "CreateStateMachine(Fail)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 1
   },
   {
    "service": "stepfunctions",
@@ -3026,7 +4210,7 @@
    "name": "CreateQueue(sfntarget)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 3
+   "elapsed_ms": 1
   },
   {
    "service": "stepfunctions",
@@ -3034,14 +4218,14 @@
    "name": "CreateStateMachine(Task: sqs:sendMessage, 권한 없는 역할)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 1
   },
   {
    "service": "stepfunctions",
    "kind": "behavior",
    "name": "실행 역할에 sqs:SendMessage 가 없으면 Task가 AccessDenied로 FAILED (IAM 평가됨)",
    "status": "BEHAVIOR_OK",
-   "detail": "status=FAILED error=SQS.AmazonSQSException cause=User: arn:aws:iam::000000000000:role/todayorder-probe-sfnrole-abaf7654 is not authorized t",
+   "detail": "status=FAILED error=SQS.AmazonSQSException cause=User: arn:aws:iam::000000000000:role/todayorder-probe-sfnrole-c141e5aa is not authorized t",
    "elapsed_ms": 0
   },
   {
@@ -3050,7 +4234,7 @@
    "name": "CreateStateMachine(Task: sqs:sendMessage, sqs:SendMessage 허용 역할)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 6
+   "elapsed_ms": 1
   },
   {
    "service": "stepfunctions",
@@ -3066,7 +4250,7 @@
    "name": "CreateStateMachine(EXPRESS)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 4
+   "elapsed_ms": 1
   },
   {
    "service": "stepfunctions",
@@ -3074,7 +4258,7 @@
    "name": "StartSyncExecution",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 6
+   "elapsed_ms": 2
   },
   {
    "service": "stepfunctions",
@@ -3090,7 +4274,7 @@
    "name": "ListStateMachines",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 3
+   "elapsed_ms": 1
   },
   {
    "service": "kinesis",
@@ -3098,7 +4282,7 @@
    "name": "CreateStream(2 shards)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 4
+   "elapsed_ms": 3
   },
   {
    "service": "kinesis",
@@ -3114,7 +4298,7 @@
    "name": "DescribeStreamSummary",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 3
+   "elapsed_ms": 1
   },
   {
    "service": "kinesis",
@@ -3122,7 +4306,7 @@
    "name": "ListShards",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 4
+   "elapsed_ms": 1
   },
   {
    "service": "kinesis",
@@ -3130,7 +4314,7 @@
    "name": "PutRecord #0",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 3
+   "elapsed_ms": 1
   },
   {
    "service": "kinesis",
@@ -3138,7 +4322,7 @@
    "name": "PutRecord #1",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 1
   },
   {
    "service": "kinesis",
@@ -3162,7 +4346,7 @@
    "name": "PutRecords(10)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 1
   },
   {
    "service": "kinesis",
@@ -3178,7 +4362,7 @@
    "name": "GetShardIterator(TRIM_HORIZON)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 1
   },
   {
    "service": "kinesis",
@@ -3186,7 +4370,7 @@
    "name": "GetRecords",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 1
   },
   {
    "service": "kinesis",
@@ -3226,7 +4410,7 @@
    "name": "IncreaseStreamRetentionPeriod(48h)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 3
+   "elapsed_ms": 1
   },
   {
    "service": "kinesis",
@@ -3234,7 +4418,7 @@
    "name": "CreateStream(ON_DEMAND)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 1
   },
   {
    "service": "firehose",
@@ -3242,7 +4426,7 @@
    "name": "CreateBucket(대상)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 4
+   "elapsed_ms": 3
   },
   {
    "service": "firehose",
@@ -3250,7 +4434,7 @@
    "name": "CreateDeliveryStream(S3, 버퍼 60초/1MB)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 48
+   "elapsed_ms": 44
   },
   {
    "service": "firehose",
@@ -3266,7 +4450,7 @@
    "name": "PutRecord",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 1
   },
   {
    "service": "firehose",
@@ -3281,7 +4465,7 @@
    "kind": "behavior",
    "name": "버퍼 시간(60초) 안팎에 S3 객체가 실제로 생김",
    "status": "BEHAVIOR_OK",
-   "detail": "3s 대기, 객체 ['orders/2026/11/12/11/todayorder-probe-orders-abaf7654-1-2026-11-12-11-43-08-0-4afabccc-9f6f-4bdc-a711-233fe70b60fa']",
+   "detail": "3s 대기, 객체 ['orders/2026/11/12/21/todayorder-probe-orders-670a3c66-1-2026-11-12-21-03-38-0-4e8b447f-d120-43cd-97d7-d18342d28b7a']",
    "elapsed_ms": 0
   },
   {
@@ -3290,7 +4474,7 @@
    "name": "DescribeAvailabilityZones",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 4
+   "elapsed_ms": 3
   },
   {
    "service": "ec2-vpc",
@@ -3322,7 +4506,7 @@
    "name": "ModifyVpcAttribute(EnableDnsHostnames)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 4
+   "elapsed_ms": 1
   },
   {
    "service": "ec2-vpc",
@@ -3330,7 +4514,7 @@
    "name": "CreateSubnet(us-east-1a)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 3
+   "elapsed_ms": 1
   },
   {
    "service": "ec2-vpc",
@@ -3338,7 +4522,7 @@
    "name": "CreateSubnet(us-east-1b)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 1
   },
   {
    "service": "ec2-vpc",
@@ -3346,7 +4530,7 @@
    "name": "DescribeSubnets",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 3
+   "elapsed_ms": 1
   },
   {
    "service": "ec2-vpc",
@@ -3386,7 +4570,7 @@
    "name": "ModifySubnetAttribute(MapPublicIpOnLaunch)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 1
   },
   {
    "service": "ec2-vpc",
@@ -3418,7 +4602,7 @@
    "name": "CreateRouteTable",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 1
   },
   {
    "service": "ec2-vpc",
@@ -3441,7 +4625,7 @@
    "kind": "behavior",
    "name": "라우팅 테이블에 local 경로 + IGW 경로",
    "status": "BEHAVIOR_OK",
-   "detail": "[('10.0.0.0/16', 'local'), ('0.0.0.0/0', 'igw-00000000000000112')]",
+   "detail": "[('10.0.0.0/16', 'local'), ('0.0.0.0/0', 'igw-00000000000000186')]",
    "elapsed_ms": 0
   },
   {
@@ -3466,7 +4650,7 @@
    "name": "CreateNatGateway",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 1
   },
   {
    "service": "ec2-vpc",
@@ -3482,14 +4666,14 @@
    "name": "CreateRoute(0.0.0.0/0 → NAT)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 1
   },
   {
    "service": "ec2-vpc",
    "kind": "behavior",
    "name": "NAT 게이트웨이에 EIP 공인 IP가 붙음",
    "status": "BEHAVIOR_OK",
-   "detail": "[{'AllocationId': 'eipalloc-00000000000000115', 'NetworkInterfaceId': 'eni-00000000000000116', 'PrivateIp': '10.0.1.4', ",
+   "detail": "[{'AllocationId': 'eipalloc-00000000000000189', 'NetworkInterfaceId': 'eni-0000000000000018a', 'PrivateIp': '10.0.1.4', ",
    "elapsed_ms": 0
   },
   {
@@ -3498,7 +4682,7 @@
    "name": "CreateEgressOnlyInternetGateway",
    "status": "NOT_IMPL",
    "detail": "HTTP 501 NotImplemented: operation CreateEgressOnlyInternetGateway is scaffolded but not implemented in this emulator",
-   "elapsed_ms": 3
+   "elapsed_ms": 1
   },
   {
    "service": "ec2-vpc",
@@ -3506,7 +4690,7 @@
    "name": "CreateSecurityGroup(web)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 1
   },
   {
    "service": "ec2-vpc",
@@ -3514,7 +4698,7 @@
    "name": "CreateSecurityGroup(app)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 1
   },
   {
    "service": "ec2-vpc",
@@ -3530,7 +4714,7 @@
    "name": "AuthorizeSecurityGroupIngress(0.0.0.0/0:443 → web)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 1
   },
   {
    "service": "ec2-vpc",
@@ -3553,7 +4737,7 @@
    "kind": "behavior",
    "name": "SG 체이닝 규칙이 조회됨(db ← app 참조)",
    "status": "BEHAVIOR_OK",
-   "detail": "['sg-0000000000000011c']",
+   "detail": "['sg-00000000000000190']",
    "elapsed_ms": 0
   },
   {
@@ -3570,7 +4754,7 @@
    "name": "DescribeSecurityGroupRules",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 1
   },
   {
    "service": "ec2-vpc",
@@ -3593,7 +4777,7 @@
    "kind": "behavior",
    "name": "다른 SG가 참조 중인 SG 삭제 → DependencyViolation",
    "status": "BEHAVIOR_OK",
-   "detail": "DependencyViolation: resource sg-0000000000000011c has a dependent object",
+   "detail": "DependencyViolation: resource sg-00000000000000190 has a dependent object",
    "elapsed_ms": 0
   },
   {
@@ -3602,7 +4786,7 @@
    "name": "CreateNetworkAcl",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 1
   },
   {
    "service": "ec2-vpc",
@@ -3665,7 +4849,7 @@
    "kind": "behavior",
    "name": "게이트웨이 엔드포인트가 라우팅 테이블에 prefix list 경로 추가",
    "status": "BEHAVIOR_OK",
-   "detail": "[{'DestinationPrefixListId': 'pl-e9da6b72', 'GatewayId': 'vpce-00000000000000125', 'Origin': 'CreateRoute', 'State': 'active'}]",
+   "detail": "[{'DestinationPrefixListId': 'pl-e9da6b72', 'GatewayId': 'vpce-00000000000000199', 'Origin': 'CreateRoute', 'State': 'active'}]",
    "elapsed_ms": 0
   },
   {
@@ -3681,7 +4865,7 @@
    "kind": "behavior",
    "name": "인터페이스 엔드포인트 ENI·DNS 항목",
    "status": "BEHAVIOR_OK",
-   "detail": "ENI ['eni-00000000000000126'] DNS 2개",
+   "detail": "ENI ['eni-0000000000000019a'] DNS 2개",
    "elapsed_ms": 0
   },
   {
@@ -3722,7 +4906,7 @@
    "name": "AcceptVpcPeeringConnection",
    "status": "NOT_IMPL",
    "detail": "HTTP 501 NotImplemented: operation AcceptVpcPeeringConnection is scaffolded but not implemented in this emulator",
-   "elapsed_ms": 2
+   "elapsed_ms": 1
   },
   {
    "service": "ec2-vpc",
@@ -3738,7 +4922,7 @@
    "name": "CreateRoute(10.1.0.0/16 → pcx)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 1
   },
   {
    "service": "ec2-vpc",
@@ -3754,7 +4938,7 @@
    "name": "CreateTransitGateway",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 1
   },
   {
    "service": "ec2-vpc",
@@ -3770,7 +4954,7 @@
    "name": "CreateTransitGatewayVpcAttachment",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 4
+   "elapsed_ms": 5
   },
   {
    "service": "ec2-vpc",
@@ -3786,7 +4970,7 @@
    "name": "CreateTransitGatewayRouteTable",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 4
+   "elapsed_ms": 1
   },
   {
    "service": "ec2-vpc",
@@ -3794,7 +4978,7 @@
    "name": "CreateRoute(10.2.0.0/16 → TGW)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 1
   },
   {
    "service": "ec2-vpc",
@@ -3802,7 +4986,7 @@
    "name": "CreateCustomerGateway",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 3
+   "elapsed_ms": 1
   },
   {
    "service": "ec2-vpc",
@@ -3810,7 +4994,7 @@
    "name": "CreateVpnGateway",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 1
   },
   {
    "service": "ec2-vpc",
@@ -3818,7 +5002,7 @@
    "name": "CreateVpnConnection",
    "status": "NOT_IMPL",
    "detail": "HTTP 501 NotImplemented: operation CreateVpnConnection is scaffolded but not implemented in this emulator",
-   "elapsed_ms": 2
+   "elapsed_ms": 1
   },
   {
    "service": "ec2-vpc",
@@ -3826,7 +5010,7 @@
    "name": "CreateFlowLogs(cloud-watch-logs)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 1
   },
   {
    "service": "ec2-vpc",
@@ -3841,7 +5025,167 @@
    "kind": "behavior",
    "name": "서브넷이 남은 VPC 삭제 → DependencyViolation",
    "status": "BEHAVIOR_OK",
-   "detail": "DependencyViolation: The vpc 'vpc-00000000000000106' has dependencies and cannot be deleted.",
+   "detail": "DependencyViolation: The vpc 'vpc-0000000000000017a' has dependencies and cannot be deleted.",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "vpc-gaps",
+   "kind": "api",
+   "name": "CreateVpcPeeringConnection",
+   "status": "OK",
+   "detail": "",
+   "elapsed_ms": 1
+  },
+  {
+   "service": "vpc-gaps",
+   "kind": "api",
+   "name": "RejectVpcPeeringConnection",
+   "status": "NOT_IMPL",
+   "detail": "HTTP 501 NotImplemented: operation RejectVpcPeeringConnection is scaffolded but not implemented in this emulator",
+   "elapsed_ms": 1
+  },
+  {
+   "service": "vpc-gaps",
+   "kind": "api",
+   "name": "DeleteVpcPeeringConnection",
+   "status": "NOT_IMPL",
+   "detail": "HTTP 501 NotImplemented: operation DeleteVpcPeeringConnection is scaffolded but not implemented in this emulator",
+   "elapsed_ms": 1
+  },
+  {
+   "service": "vpc-gaps",
+   "kind": "api",
+   "name": "ReplaceRoute",
+   "status": "NOT_IMPL",
+   "detail": "HTTP 501 NotImplemented: operation ReplaceRoute is scaffolded but not implemented in this emulator",
+   "elapsed_ms": 1
+  },
+  {
+   "service": "vpc-gaps",
+   "kind": "api",
+   "name": "ReplaceRouteTableAssociation",
+   "status": "NOT_IMPL",
+   "detail": "HTTP 501 NotImplemented: operation ReplaceRouteTableAssociation is scaffolded but not implemented in this emulator",
+   "elapsed_ms": 1
+  },
+  {
+   "service": "vpc-gaps",
+   "kind": "api",
+   "name": "CreateNatGateway(zonal)",
+   "status": "OK",
+   "detail": "",
+   "elapsed_ms": 1
+  },
+  {
+   "service": "vpc-gaps",
+   "kind": "behavior",
+   "name": "NAT 게이트웨이를 지우면 그 경로가 blackhole 로 바뀜",
+   "status": "BEHAVIOR_DIFF",
+   "detail": "경로 State=['active']",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "vpc-gaps",
+   "kind": "api",
+   "name": "CreateNatGateway(AvailabilityMode=regional)",
+   "status": "NOT_IMPL",
+   "detail": "HTTP 501 NotImplemented: operation CreateNatGateway with a regional availability mode is scaffolded but not implemented in this emulator",
+   "elapsed_ms": 1
+  },
+  {
+   "service": "vpc-gaps",
+   "kind": "api",
+   "name": "CreateEgressOnlyInternetGateway",
+   "status": "NOT_IMPL",
+   "detail": "HTTP 501 NotImplemented: operation CreateEgressOnlyInternetGateway is scaffolded but not implemented in this emulator",
+   "elapsed_ms": 1
+  },
+  {
+   "service": "vpc-gaps",
+   "kind": "api",
+   "name": "DescribeEgressOnlyInternetGateways",
+   "status": "NOT_IMPL",
+   "detail": "HTTP 501 NotImplemented: operation DescribeEgressOnlyInternetGateways is scaffolded but not implemented in this emulator",
+   "elapsed_ms": 1
+  },
+  {
+   "service": "vpc-gaps",
+   "kind": "api",
+   "name": "CreateTransitGateway(기본 연결·전파 enable)",
+   "status": "OK",
+   "detail": "",
+   "elapsed_ms": 1
+  },
+  {
+   "service": "vpc-gaps",
+   "kind": "api",
+   "name": "CreateTransitGatewayVpcAttachment",
+   "status": "OK",
+   "detail": "",
+   "elapsed_ms": 1
+  },
+  {
+   "service": "vpc-gaps",
+   "kind": "behavior",
+   "name": "DefaultRouteTableAssociation=enable 이면 새 연결이 기본 TGW 라우팅 테이블에 자동 연결",
+   "status": "BEHAVIOR_DIFF",
+   "detail": "연결 0개",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "vpc-gaps",
+   "kind": "behavior",
+   "name": "DefaultRouteTablePropagation=enable 이면 새 연결이 기본 TGW 라우팅 테이블로 자동 전파",
+   "status": "BEHAVIOR_DIFF",
+   "detail": "전파 0개",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "vpc-gaps",
+   "kind": "api",
+   "name": "CreateTransitGatewayRoute",
+   "status": "NOT_IMPL",
+   "detail": "HTTP 501 NotImplemented: operation CreateTransitGatewayRoute is scaffolded but not implemented in this emulator",
+   "elapsed_ms": 1
+  },
+  {
+   "service": "vpc-gaps",
+   "kind": "api",
+   "name": "SearchTransitGatewayRoutes",
+   "status": "NOT_IMPL",
+   "detail": "HTTP 501 NotImplemented: operation SearchTransitGatewayRoutes is scaffolded but not implemented in this emulator",
+   "elapsed_ms": 1
+  },
+  {
+   "service": "vpc-gaps",
+   "kind": "api",
+   "name": "DeleteTransitGatewayVpcAttachment",
+   "status": "NOT_IMPL",
+   "detail": "HTTP 501 NotImplemented: operation DeleteTransitGatewayVpcAttachment is scaffolded but not implemented in this emulator",
+   "elapsed_ms": 1
+  },
+  {
+   "service": "vpc-gaps",
+   "kind": "api",
+   "name": "ACM ImportCertificate(Client VPN 서버 인증서)",
+   "status": "OK",
+   "detail": "",
+   "elapsed_ms": 4
+  },
+  {
+   "service": "vpc-gaps",
+   "kind": "api",
+   "name": "CreateClientVpnEndpoint",
+   "status": "NOT_IMPL",
+   "detail": "HTTP 501 NotImplemented: operation CreateClientVpnEndpoint is scaffolded but not implemented in this emulator",
+   "elapsed_ms": 2
+  },
+  {
+   "service": "vpc-gaps",
+   "kind": "behavior",
+   "name": "기본 VPC 에 IGW 와 0.0.0.0/0 경로가 있음",
+   "status": "BEHAVIOR_DIFF",
+   "detail": "172.31.0.0/16 IGW 0개, 0.0.0.0/0 경로 없음",
    "elapsed_ms": 0
   },
   {
@@ -3850,7 +5194,7 @@
    "name": "PutMetricData(사용자 지정 네임스페이스·차원)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 3
+   "elapsed_ms": 4
   },
   {
    "service": "cloudwatch",
@@ -3881,7 +5225,7 @@
    "kind": "behavior",
    "name": "데이터 포인트 집계(평균 200, 표본 3, 최댓값 300)",
    "status": "BEHAVIOR_OK",
-   "detail": "[{'Timestamp': datetime.datetime(2026, 11, 12, 20, 43, tzinfo=tzlocal()), 'SampleCount': 3.0, 'Average': 200.0, 'Maximum': 300.0, 'Unit': 'Millisecond",
+   "detail": "[{'Timestamp': datetime.datetime(2026, 11, 13, 6, 3, tzinfo=tzlocal()), 'SampleCount': 3.0, 'Average': 200.0, 'Maximum': 300.0, 'Unit': 'Milliseconds'",
    "elapsed_ms": 0
   },
   {
@@ -3906,7 +5250,7 @@
    "name": "ListMetrics(AWS/EC2)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 0
+   "elapsed_ms": 1
   },
   {
    "service": "cloudwatch",
@@ -3938,7 +5282,7 @@
    "name": "DescribeAlarmHistory",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 3
+   "elapsed_ms": 1
   },
   {
    "service": "cloudwatch",
@@ -3953,7 +5297,7 @@
    "kind": "behavior",
    "name": "알람 액션: SNS → 구독한 SQS 큐로 알림 도착",
    "status": "BEHAVIOR_OK",
-   "detail": "1건 {\"Version\":\"1.0\",\"AlarmName\":\"todayorder-probe-latency-high-abaf7654\",\"AWSAccountId\":\"000000000000\",",
+   "detail": "1건 {\"Version\":\"1.0\",\"AlarmName\":\"todayorder-probe-latency-high-54213339\",\"AWSAccountId\":\"000000000000\",",
    "elapsed_ms": 0
   },
   {
@@ -3962,7 +5306,7 @@
    "name": "PutCompositeAlarm",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 9
+   "elapsed_ms": 4
   },
   {
    "service": "cloudwatch",
@@ -3978,7 +5322,7 @@
    "name": "PutDashboard",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 1
   },
   {
    "service": "logs",
@@ -3986,7 +5330,7 @@
    "name": "CreateLogGroup",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 3
+   "elapsed_ms": 4
   },
   {
    "service": "logs",
@@ -4073,7 +5417,7 @@
    "kind": "behavior",
    "name": "지표 필터: ERROR 로그 2건 → CloudWatch 지표 ErrorCount 합계 2",
    "status": "BEHAVIOR_OK",
-   "detail": "[{'Timestamp': datetime.datetime(2026, 11, 12, 20, 43, tzinfo=tzlocal()), 'Sum': 2.0, 'Unit': 'None'}]",
+   "detail": "[{'Timestamp': datetime.datetime(2026, 11, 13, 6, 4, tzinfo=tzlocal()), 'Sum': 2.0, 'Unit': 'None'}]",
    "elapsed_ms": 0
   },
   {
@@ -4082,7 +5426,7 @@
    "name": "PutSubscriptionFilter(→ Kinesis)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 6
+   "elapsed_ms": 2
   },
   {
    "service": "logs",
@@ -4090,7 +5434,7 @@
    "name": "StartQuery(Logs Insights)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 3
+   "elapsed_ms": 1
   },
   {
    "service": "logs",
@@ -4106,7 +5450,7 @@
    "name": "ValidateTemplate",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 5
+   "elapsed_ms": 3
   },
   {
    "service": "cloudformation",
@@ -4122,7 +5466,7 @@
    "name": "CreateStack(VPC 템플릿)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 7
+   "elapsed_ms": 5
   },
   {
    "service": "cloudformation",
@@ -4145,7 +5489,7 @@
    "kind": "behavior",
    "name": "선언한 리소스가 EC2 API로 실제 조회됨(VPC·서브넷 2·IGW 연결·0.0.0.0/0 라우트·SG)",
    "status": "BEHAVIOR_OK",
-   "detail": "vpc=vpc-00000000000000143 subnets=2 igw=1 routes=['local', 'igw-0000000000000014f'] sg=1",
+   "detail": "vpc=vpc-000000000000001d6 subnets=2 igw=1 routes=['local', 'igw-000000000000001e2'] sg=1",
    "elapsed_ms": 0
   },
   {
@@ -4153,7 +5497,7 @@
    "kind": "behavior",
    "name": "Outputs(Ref, Fn::GetAtt) 값",
    "status": "BEHAVIOR_OK",
-   "detail": "{'VpcId': 'vpc-00000000000000143', 'PublicSubnetA': 'subnet-0000000000000014b', 'VpcCidrOut': '10.20.0.0/16'}",
+   "detail": "{'VpcId': 'vpc-000000000000001d6', 'PublicSubnetA': 'subnet-000000000000001de', 'VpcCidrOut': '10.20.0.0/16'}",
    "elapsed_ms": 0
   },
   {
@@ -4162,7 +5506,7 @@
    "name": "CreateChangeSet(서브넷 추가)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 3
+   "elapsed_ms": 2
   },
   {
    "service": "cloudformation",
@@ -4170,7 +5514,7 @@
    "name": "DescribeChangeSet",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 4
+   "elapsed_ms": 1
   },
   {
    "service": "cloudformation",
@@ -4186,7 +5530,7 @@
    "name": "ExecuteChangeSet",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 7
+   "elapsed_ms": 3
   },
   {
    "service": "cloudformation",
@@ -4202,7 +5546,7 @@
    "name": "DetectStackDrift",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 4
+   "elapsed_ms": 2
   },
   {
    "service": "cloudformation",
@@ -4218,7 +5562,7 @@
    "name": "DeleteStack",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 8
+   "elapsed_ms": 3
   },
   {
    "service": "cloudformation",
@@ -4234,7 +5578,7 @@
    "name": "CreateStack(잘못된 참조)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 3
+   "elapsed_ms": 2
   },
   {
    "service": "cloudformation",
@@ -4258,7 +5602,7 @@
    "name": "CreateStack(S3+SQS+DynamoDB)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 8
+   "elapsed_ms": 3
   },
   {
    "service": "cloudformation",
@@ -4274,7 +5618,7 @@
    "name": "CreateChangeSet(앱 스택에 큐 추가)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 4
+   "elapsed_ms": 2
   },
   {
    "service": "cloudformation",
@@ -4290,7 +5634,7 @@
    "name": "CreateStackSet",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 4
+   "elapsed_ms": 1
   },
   {
    "service": "cloudformation",
@@ -4298,7 +5642,7 @@
    "name": "CreateStackInstances(us-east-1, us-west-2)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 4
+   "elapsed_ms": 2
   },
   {
    "service": "glue",
@@ -4402,7 +5746,7 @@
    "name": "CreateWorkGroup(결과 위치)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 44
   },
   {
    "service": "athena",
@@ -4410,7 +5754,7 @@
    "name": "StartQueryExecution(SELECT 1)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 1
+   "elapsed_ms": 2
   },
   {
    "service": "athena",
@@ -4426,7 +5770,7 @@
    "name": "StartQueryExecution(Glue 테이블 집계)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 1
   },
   {
    "service": "athena",
@@ -4450,7 +5794,7 @@
    "name": "ListQueryExecutions",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 1
   },
   {
    "service": "backup",
@@ -4458,7 +5802,7 @@
    "name": "CreateBackupVault",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 3
+   "elapsed_ms": 4
   },
   {
    "service": "backup",
@@ -4466,7 +5810,7 @@
    "name": "CreateBackupPlan(일일 + 복사 액션)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 1
+   "elapsed_ms": 2
   },
   {
    "service": "backup",
@@ -4474,7 +5818,7 @@
    "name": "CreateBackupSelection(태그 기준)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 1
+   "elapsed_ms": 2
   },
   {
    "service": "backup",
@@ -4482,14 +5826,14 @@
    "name": "StartBackupJob(DynamoDB 테이블)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 6
+   "elapsed_ms": 2
   },
   {
    "service": "backup",
    "kind": "behavior",
    "name": "백업 작업이 COMPLETED, 복구 지점 생성",
    "status": "BEHAVIOR_OK",
-   "detail": "State=COMPLETED RecoveryPoint=int:18e74989-a096-0bfb-0000-000000000007",
+   "detail": "State=COMPLETED RecoveryPoint=int:18e76820-09da-3b48-0000-000000000007",
    "elapsed_ms": 0
   },
   {
@@ -4506,7 +5850,7 @@
    "name": "ListCopyJobs",
    "status": "NOT_IMPL",
    "detail": "HTTP 501 NotImplemented: operation ListCopyJobs is scaffolded but not implemented in this emulator",
-   "elapsed_ms": 3
+   "elapsed_ms": 2
   },
   {
    "service": "dms",
@@ -4538,7 +5882,7 @@
    "name": "CreateEndpoint(source mysql)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 3
+   "elapsed_ms": 1
   },
   {
    "service": "dms",
@@ -4546,7 +5890,7 @@
    "name": "CreateEndpoint(target aurora-postgresql)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 1
   },
   {
    "service": "dms",
@@ -4554,7 +5898,7 @@
    "name": "TestConnection",
    "status": "NOT_IMPL",
    "detail": "HTTP 501 NotImplemented: operation TestConnection is scaffolded but not implemented in this emulator",
-   "elapsed_ms": 3
+   "elapsed_ms": 1
   },
   {
    "service": "dms",
@@ -4562,7 +5906,7 @@
    "name": "CreateReplicationTask(full-load-and-cdc)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 1
   },
   {
    "service": "budgets",
@@ -4570,7 +5914,7 @@
    "name": "CreateBudget(월 COST 100 USD + 80% 알림)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 5
+   "elapsed_ms": 3
   },
   {
    "service": "budgets",
@@ -4578,7 +5922,7 @@
    "name": "DescribeBudgets",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 1
   },
   {
    "service": "budgets",
@@ -4618,7 +5962,7 @@
    "name": "GetResources(TagFilters)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 6
+   "elapsed_ms": 47
   },
   {
    "service": "tagging",
@@ -4658,7 +6002,7 @@
    "name": "elasticbeanstalk CreateApplication",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 6
+   "elapsed_ms": 49
   },
   {
    "service": "misc-optional",
@@ -4666,7 +6010,7 @@
    "name": "lightsail GetRegions",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 9
+   "elapsed_ms": 13
   },
   {
    "service": "misc-optional",
@@ -4674,7 +6018,7 @@
    "name": "batch CreateComputeEnvironment(FARGATE)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 6
+   "elapsed_ms": 8
   },
   {
    "service": "misc-optional",
@@ -4682,7 +6026,7 @@
    "name": "storagegateway ListGateways",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 6
+   "elapsed_ms": 4
   },
   {
    "service": "misc-optional",
@@ -4690,7 +6034,7 @@
    "name": "datasync ListTasks",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 5
+   "elapsed_ms": 4
   },
   {
    "service": "misc-optional",
@@ -4698,7 +6042,7 @@
    "name": "fsx CreateFileSystem(LUSTRE)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 7
+   "elapsed_ms": 8
   },
   {
    "service": "misc-optional",
@@ -4706,7 +6050,7 @@
    "name": "redshift CreateCluster",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 12
+   "elapsed_ms": 11
   },
   {
    "service": "misc-optional",
@@ -4714,7 +6058,7 @@
    "name": "opensearch CreateDomain",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 8
+   "elapsed_ms": 10
   },
   {
    "service": "misc-optional",
@@ -4722,7 +6066,7 @@
    "name": "emr ListClusters",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 6
+   "elapsed_ms": 7
   },
   {
    "service": "misc-optional",
@@ -4730,7 +6074,7 @@
    "name": "kafka ListClustersV2",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 6
+   "elapsed_ms": 7
   },
   {
    "service": "misc-optional",
@@ -4738,7 +6082,7 @@
    "name": "mq CreateBroker",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 4
+   "elapsed_ms": 6
   },
   {
    "service": "misc-optional",
@@ -4746,7 +6090,7 @@
    "name": "appflow ListFlows",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 5
+   "elapsed_ms": 7
   },
   {
    "service": "misc-optional",
@@ -4754,7 +6098,7 @@
    "name": "transfer CreateServer(SFTP)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 6
+   "elapsed_ms": 57
   },
   {
    "service": "misc-optional",
@@ -4762,7 +6106,7 @@
    "name": "servicecatalog ListPortfolios",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 6
+   "elapsed_ms": 538
   },
   {
    "service": "misc-optional",
@@ -4770,7 +6114,7 @@
    "name": "ram CreateResourceShare",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 5
+   "elapsed_ms": 6
   },
   {
    "service": "misc-optional",
@@ -4786,7 +6130,7 @@
    "name": "sso-admin ListInstances",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 9
+   "elapsed_ms": 6
   },
   {
    "service": "misc-optional",
@@ -4810,7 +6154,7 @@
    "name": "controltower ListLandingZones",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 4
+   "elapsed_ms": 50
   },
   {
    "service": "misc-optional",
@@ -4818,7 +6162,7 @@
    "name": "lakeformation GetDataLakeSettings",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 5
+   "elapsed_ms": 7
   },
   {
    "service": "misc-optional",
@@ -4826,7 +6170,7 @@
    "name": "quicksight ListDashboards",
    "status": "NOT_IMPL",
    "detail": "HTTP 501 NotImplemented: operation ListDashboards is scaffolded but not implemented in this emulator",
-   "elapsed_ms": 22
+   "elapsed_ms": 24
   },
   {
    "service": "misc-optional",
@@ -4834,7 +6178,7 @@
    "name": "comprehend DetectSentiment",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 8
+   "elapsed_ms": 9
   },
   {
    "service": "misc-optional",
@@ -4842,7 +6186,7 @@
    "name": "translate TranslateText",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 26
+   "elapsed_ms": 39
   },
   {
    "service": "misc-optional",
@@ -4850,7 +6194,7 @@
    "name": "rekognition ListCollections",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 7
+   "elapsed_ms": 9
   },
   {
    "service": "misc-optional",
@@ -4858,7 +6202,7 @@
    "name": "polly SynthesizeSpeech",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 4
+   "elapsed_ms": 5
   },
   {
    "service": "misc-optional",
@@ -4866,7 +6210,7 @@
    "name": "sagemaker ListNotebookInstances",
    "status": "NOT_IMPL",
    "detail": "HTTP 501 NotImplemented: operation ListNotebookInstances is scaffolded but not implemented in this emulator",
-   "elapsed_ms": 32
+   "elapsed_ms": 28
   },
   {
    "service": "misc-optional",
@@ -4874,7 +6218,7 @@
    "name": "wellarchitected ListWorkloads",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 7
+   "elapsed_ms": 9
   },
   {
    "service": "misc-optional",
@@ -4882,7 +6226,7 @@
    "name": "license-manager ListLicenseConfigurations",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 5
+   "elapsed_ms": 7
   },
   {
    "service": "misc-optional",
@@ -4922,7 +6266,7 @@
    "name": "CreateKey(대칭)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 3
   },
   {
    "service": "kms",
@@ -5074,7 +6418,7 @@
    "name": "CreateKey(비대칭 RSA_2048 SIGN_VERIFY)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 137
+   "elapsed_ms": 93
   },
   {
    "service": "kms",
@@ -5082,7 +6426,7 @@
    "name": "Sign",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 3
   },
   {
    "service": "kms",
@@ -5129,7 +6473,7 @@
    "kind": "behavior",
    "name": "다중 리전 키 ID는 mrk- 접두사",
    "status": "BEHAVIOR_OK",
-   "detail": "mrk-3154",
+   "detail": "mrk-e3bf",
    "elapsed_ms": 0
   },
   {
@@ -5161,7 +6505,7 @@
    "kind": "behavior",
    "name": "삭제 대기 중인 키로 Encrypt하면 KMSInvalidStateException",
    "status": "BEHAVIOR_OK",
-   "detail": "KMSInvalidStateException: arn:aws:kms:us-east-1:000000000000:key/3d533cd1-80d5-42be-83e3-e1048852bf63 is pending deletion.",
+   "detail": "KMSInvalidStateException: arn:aws:kms:us-east-1:000000000000:key/f81f1470-8e25-4199-a845-bd7a6de94474 is pending deletion.",
    "elapsed_ms": 0
   },
   {
@@ -5186,14 +6530,14 @@
    "name": "CreateSecret",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 3
   },
   {
    "service": "secretsmanager",
    "kind": "behavior",
    "name": "ARN 끝에 무작위 6자 접미사",
    "status": "BEHAVIOR_OK",
-   "detail": "todayorder-probe-db-abaf7654/password-MYc9FE",
+   "detail": "todayorder-probe-db-c93ae944/password-9UDaG1",
    "elapsed_ms": 0
   },
   {
@@ -5217,7 +6561,7 @@
    "kind": "behavior",
    "name": "새 값 저장 시 AWSCURRENT → 새 버전, AWSPREVIOUS → 이전 버전",
    "status": "BEHAVIOR_OK",
-   "detail": "{'28f3c2e2-527a-4b62-8b35-a2d8506a39b9': ['AWSPREVIOUS'], '2b256c79-72cb-4c61-bf4e-93d9e70e5d66': ['AWSCURRENT']}",
+   "detail": "{'b07c2d76-d37e-4798-8920-e5de0a64808a': ['AWSCURRENT'], '1019fbe8-f794-4079-a750-5f69fb19b487': ['AWSPREVIOUS']}",
    "elapsed_ms": 0
   },
   {
@@ -5250,7 +6594,7 @@
    "name": "RotateSecret(Lambda ARN 지정)",
    "status": "ERROR",
    "detail": "HTTP 400 AccessDeniedException: Secrets Manager cannot invoke the specified Lambda function. Ensure that the function policy grants access to the principal secretsmanager.amazonaws.com.",
-   "elapsed_ms": 4
+   "elapsed_ms": 9
   },
   {
    "service": "secretsmanager",
@@ -5258,7 +6602,7 @@
    "name": "GetRandomPassword",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 1
+   "elapsed_ms": 2
   },
   {
    "service": "secretsmanager",
@@ -5274,7 +6618,7 @@
    "name": "CreateSecret(삭제 테스트)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 0
+   "elapsed_ms": 1
   },
   {
    "service": "secretsmanager",
@@ -5338,7 +6682,7 @@
    "name": "PutParameter(SecureString, 기본 aws/ssm 키)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 0
+   "elapsed_ms": 1
   },
   {
    "service": "ssm",
@@ -5346,14 +6690,14 @@
    "name": "GetParameter(SecureString, 복호화 없이)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 0
+   "elapsed_ms": 1
   },
   {
    "service": "ssm",
    "kind": "behavior",
    "name": "WithDecryption 없이 조회하면 암호문이 반환됨",
    "status": "BEHAVIOR_OK",
-   "detail": "ASQ2ZWNjMzY0Yy00NTY5LTRiYzktYTkwNi1hNTEx",
+   "detail": "ASQ2ODllZDNlNi1jYjVjLTQ1MzUtOTVhNC0wMjQ1",
    "elapsed_ms": 0
   },
   {
@@ -5362,7 +6706,7 @@
    "name": "GetParameter(WithDecryption)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 0
+   "elapsed_ms": 1
   },
   {
    "service": "ssm",
@@ -5426,7 +6770,7 @@
    "name": "GetParameter(:label)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 0
+   "elapsed_ms": 1
   },
   {
    "service": "ssm",
@@ -5442,7 +6786,7 @@
    "name": "PutParameter(Advanced 계층)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 0
+   "elapsed_ms": 1
   },
   {
    "service": "ssm",
@@ -5514,7 +6858,7 @@
    "name": "RequestCertificate(DNS 검증)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 3
   },
   {
    "service": "acm",
@@ -5529,7 +6873,7 @@
    "kind": "behavior",
    "name": "DNS 검증용 CNAME 레코드(ResourceRecord) 제공",
    "status": "BEHAVIOR_OK",
-   "detail": "Status=PENDING_VALIDATION RR={'Name': '_07c06476d5e74dc4070b261267bf8313.api.abaf7654.todayorder.example.', 'Type': 'CNAME', 'Value': '_6fd1dc9b5998c98e88dfee8aba8bad1a.b069271fe3.acm-validations.aws.",
+   "detail": "Status=PENDING_VALIDATION RR={'Name': '_8a20164a3db72ac7d4e5be08e71432ad.api.34559525.todayorder.example.', 'Type': 'CNAME', 'Value': '_14dcfff0bb3de98aca3bc2bd8c93725b.268ee3856d.acm-validations.aws.",
    "elapsed_ms": 0
   },
   {
@@ -5546,7 +6890,7 @@
    "name": "RequestCertificate(Route 53 영역 도메인)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 1
   },
   {
    "service": "acm",
@@ -5586,7 +6930,7 @@
    "name": "CreateTrail(멀티 리전)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 3
   },
   {
    "service": "cloudtrail",
@@ -5618,7 +6962,7 @@
    "name": "PutEventSelectors(S3 데이터 이벤트)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 1
+   "elapsed_ms": 2
   },
   {
    "service": "cloudtrail",
@@ -5642,7 +6986,7 @@
    "name": "LookupEvents",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 5
+   "elapsed_ms": 6
   },
   {
    "service": "cloudtrail",
@@ -5665,7 +7009,7 @@
    "kind": "behavior",
    "name": "Config 전달 채널: 버킷 정책이 없으면 거부(버킷 정책을 평가함)",
    "status": "BEHAVIOR_OK",
-   "detail": "InsufficientDeliveryPolicyException: Insufficient delivery policy to s3 bucket: todayorder-probe-nopolicy-abaf7654, unable to get s3 bucket acl.",
+   "detail": "InsufficientDeliveryPolicyException: Insufficient delivery policy to s3 bucket: todayorder-probe-nopolicy-641d5264, unable to get s3 bucket acl.",
    "elapsed_ms": 0
   },
   {
@@ -5682,7 +7026,7 @@
    "name": "StartConfigurationRecorder",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 1
+   "elapsed_ms": 0
   },
   {
    "service": "config",
@@ -5738,7 +7082,7 @@
    "name": "PutConformancePack",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 3
   },
   {
    "service": "guardduty",
@@ -5794,7 +7138,7 @@
    "name": "inspector2 Enable(EC2)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 3
   },
   {
    "service": "guardduty",
@@ -5810,7 +7154,7 @@
    "name": "securityhub EnableSecurityHub",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 53
+   "elapsed_ms": 3
   },
   {
    "service": "guardduty",
@@ -5826,7 +7170,7 @@
    "name": "CreateFunction(python3.12, zip)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 4
+   "elapsed_ms": 3
   },
   {
    "service": "lambda",
@@ -5842,7 +7186,7 @@
    "name": "GetFunction",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 3
+   "elapsed_ms": 1
   },
   {
    "service": "lambda",
@@ -5850,7 +7194,7 @@
    "name": "UpdateFunctionConfiguration(env, 256MB, 900s)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 4
+   "elapsed_ms": 2
   },
   {
    "service": "lambda",
@@ -5866,7 +7210,7 @@
    "name": "UpdateFunctionCode",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 3
+   "elapsed_ms": 1
   },
   {
    "service": "lambda",
@@ -5874,7 +7218,7 @@
    "name": "PublishVersion",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 4
+   "elapsed_ms": 1
   },
   {
    "service": "lambda",
@@ -5882,7 +7226,7 @@
    "name": "UpdateFunctionCode(v3)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 1
   },
   {
    "service": "lambda",
@@ -5890,7 +7234,7 @@
    "name": "PublishVersion(2)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 3
+   "elapsed_ms": 1
   },
   {
    "service": "lambda",
@@ -5906,7 +7250,7 @@
    "name": "CreateAlias(live → v1, v2 10% 가중치)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 3
+   "elapsed_ms": 2
   },
   {
    "service": "lambda",
@@ -5922,7 +7266,7 @@
    "name": "ListVersionsByFunction",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 3
+   "elapsed_ms": 1
   },
   {
    "service": "lambda",
@@ -5930,7 +7274,7 @@
    "name": "PutFunctionConcurrency(5)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 1
   },
   {
    "service": "lambda",
@@ -5938,7 +7282,7 @@
    "name": "PutProvisionedConcurrencyConfig(live, 1)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 1
   },
   {
    "service": "lambda",
@@ -5946,7 +7290,7 @@
    "name": "GetAccountSettings",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 1
   },
   {
    "service": "lambda",
@@ -5954,7 +7298,7 @@
    "name": "Invoke(RequestResponse)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 75
+   "elapsed_ms": 68
   },
   {
    "service": "lambda",
@@ -5970,7 +7314,7 @@
    "name": "CreateFunction(예외를 던지는 핸들러)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 1
+   "elapsed_ms": 2
   },
   {
    "service": "lambda",
@@ -5978,14 +7322,14 @@
    "name": "Invoke(예외)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 73
+   "elapsed_ms": 64
   },
   {
    "service": "lambda",
    "kind": "behavior",
    "name": "핸들러 예외 → FunctionError=Unhandled, errorType 반환",
    "status": "BEHAVIOR_OK",
-   "detail": "FunctionError=Unhandled payload={\"errorMessage\":\"boom\",\"errorType\":\"ValueError\",\"requestId\":\"5e20e73e-198b-4181-b9f5-dccafc1a167d\",\"",
+   "detail": "FunctionError=Unhandled payload={\"errorMessage\":\"boom\",\"errorType\":\"ValueError\",\"requestId\":\"e0e5319a-5b17-4c64-9256-ccbe81d7b255\",\"",
    "elapsed_ms": 0
   },
   {
@@ -6033,7 +7377,7 @@
    "kind": "behavior",
    "name": "없는 함수 Invoke → ResourceNotFoundException",
    "status": "BEHAVIOR_OK",
-   "detail": "ResourceNotFoundException: Function not found: arn:aws:lambda:us-east-1:000000000000:function:todayorder-probe-nope-abaf7654:$LATEST",
+   "detail": "ResourceNotFoundException: Function not found: arn:aws:lambda:us-east-1:000000000000:function:todayorder-probe-nope-0dd35ad8:$LATEST",
    "elapsed_ms": 0
   },
   {
@@ -6074,7 +7418,7 @@
    "name": "UpdateEventSourceMapping(Enabled=False)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 3
+   "elapsed_ms": 5
   },
   {
    "service": "lambda",
@@ -6082,7 +7426,7 @@
    "name": "AddPermission(s3.amazonaws.com)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 3
+   "elapsed_ms": 2
   },
   {
    "service": "lambda",
@@ -6090,7 +7434,7 @@
    "name": "GetPolicy(리소스 기반 정책)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 3
   },
   {
    "service": "lambda",
@@ -6122,14 +7466,14 @@
    "name": "CreateFunctionUrlConfig(AuthType=NONE)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 4
+   "elapsed_ms": 5
   },
   {
    "service": "lambda",
    "kind": "behavior",
    "name": "함수 URL 발급",
    "status": "BEHAVIOR_OK",
-   "detail": "https://0e61738bf7ac4bf5997f684120a522f9.lambda-url.us-east-1.on.aws/",
+   "detail": "https://330352ff860f46078ce16176248df9ef.lambda-url.us-east-1.on.aws/",
    "elapsed_ms": 0
   },
   {
@@ -6138,7 +7482,7 @@
    "name": "PutFunctionEventInvokeConfig(OnFailure → SQS)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 4
+   "elapsed_ms": 2
   },
   {
    "service": "lambda",
@@ -6241,7 +7585,7 @@
    "kind": "behavior",
    "name": "배포된 REST API(MOCK)를 HTTPS로 실제 호출",
    "status": "BEHAVIOR_OK",
-   "detail": "성공 URL=https://127.0.0.1:9297/_aws/execute-api/eocd2yo7iw/dev/orders",
+   "detail": "성공 URL=https://127.0.0.1:9297/_aws/execute-api/8ib9n34r0l/dev/orders",
    "elapsed_ms": 0
   },
   {
@@ -6258,7 +7602,7 @@
    "name": "CreateUsagePlan(throttle+quota)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 1
+   "elapsed_ms": 7
   },
   {
    "service": "apigateway",
@@ -6282,14 +7626,14 @@
    "name": "CreateApi(HTTP)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 4
+   "elapsed_ms": 2
   },
   {
    "service": "apigatewayv2",
    "kind": "behavior",
    "name": "HTTP API 엔드포인트 URL 발급",
    "status": "BEHAVIOR_OK",
-   "detail": "https://127.0.0.1:9297/_aws/execute-api/mp67t4dbd4",
+   "detail": "https://127.0.0.1:9297/_aws/execute-api/e77k44w5b0",
    "elapsed_ms": 0
   },
   {
@@ -6354,14 +7698,14 @@
    "name": "CreateIntegration(AWS_PROXY → Lambda, 2.0)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 3
+   "elapsed_ms": 5
   },
   {
    "service": "apigatewayv2",
    "kind": "behavior",
    "name": "HTTP API → Lambda 프록시를 HTTPS로 호출하면 함수가 실행되어 응답 (AddPermission 없이도 성공)",
    "status": "BEHAVIOR_OK",
-   "detail": "https://127.0.0.1:9297/_aws/execute-api/e77k44w5b0/orders → 200 {\"echo\": {\"version\": \"2.0\", \"routeKey\": \"GET /orders\", \"rawPath\": \"/orders\", \"rawQueryStri",
+   "detail": "https://127.0.0.1:9297/_aws/execute-api/6o9xe5f0aw/orders → 200 {\"echo\": {\"version\": \"2.0\", \"routeKey\": \"GET /orders\", \"rawPath\": \"/orders\", \"rawQueryStri",
    "elapsed_ms": 0
   },
   {
@@ -6378,7 +7722,7 @@
    "name": "CreateApi(WEBSOCKET)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 4
+   "elapsed_ms": 1
   },
   {
    "service": "apigatewayv2",
@@ -6386,7 +7730,7 @@
    "name": "CreateRoute($connect)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 4
+   "elapsed_ms": 1
   },
   {
    "service": "ecr",
@@ -6394,14 +7738,14 @@
    "name": "CreateRepository(scanOnPush, IMMUTABLE)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 5
+   "elapsed_ms": 3
   },
   {
    "service": "ecr",
    "kind": "behavior",
    "name": "저장소 URI 발급",
    "status": "BEHAVIOR_OK",
-   "detail": "000000000000.dkr.ecr.us-east-1.amazonaws.com/todayorder-probe-api-abaf7654",
+   "detail": "000000000000.dkr.ecr.us-east-1.amazonaws.com/todayorder-probe-api-b1820bbd",
    "elapsed_ms": 0
   },
   {
@@ -6514,7 +7858,7 @@
    "name": "ListClusters",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 4
   },
   {
    "service": "cognito",
@@ -6522,7 +7866,7 @@
    "name": "CreateUserPool",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 4
+   "elapsed_ms": 3
   },
   {
    "service": "cognito",
@@ -6546,7 +7890,7 @@
    "name": "SignUp",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 1
+   "elapsed_ms": 2
   },
   {
    "service": "cognito",
@@ -6777,7 +8121,7 @@
    "kind": "behavior",
    "name": "버전 관리 켠 뒤 PutObject마다 VersionId 발급",
    "status": "BEHAVIOR_OK",
-   "detail": "e1a977e512112e3c074795ca858b4486 / 671e229e94ff57252b5467adc25547e3",
+   "detail": "8035e77e4676e858e7669c4f3c35084b / c62eefdad039ef336741d3a731693529",
    "elapsed_ms": 0
   },
   {
@@ -6793,7 +8137,7 @@
    "kind": "behavior",
    "name": "삭제하면 삭제 마커(DeleteMarker=true)가 생김",
    "status": "BEHAVIOR_OK",
-   "detail": "VersionId=0cd86c64bc203aa85963230f138d1afc",
+   "detail": "VersionId=eb1dec4e580cdd0e55079701b48f7e17",
    "elapsed_ms": 0
   },
   {
@@ -6871,9 +8215,57 @@
   {
    "service": "s3",
    "kind": "behavior",
-   "name": "STANDARD_IA 전환 30일 미만 → InvalidArgument",
-   "status": "BEHAVIOR_DIFF",
-   "detail": "기대 InvalidArgument, 실제로는 성공했다",
+   "name": "STANDARD_IA 10일 전환 규칙 수락 (2026-07 이후 AWS와 같음)",
+   "status": "BEHAVIOR_OK",
+   "detail": "",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "s3",
+   "kind": "behavior",
+   "name": "ONEZONE_IA 7일 전환 규칙 수락 (2026-07 이후 AWS와 같음)",
+   "status": "BEHAVIOR_OK",
+   "detail": "",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "s3",
+   "kind": "behavior",
+   "name": "STANDARD_IA 0일 전환 규칙 수락 (2026-07 이후 AWS와 같음)",
+   "status": "BEHAVIOR_OK",
+   "detail": "",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "s3",
+   "kind": "behavior",
+   "name": "최소 보관 기간(Glacier IR 90일)보다 빠른 연쇄 전환 → InvalidArgument",
+   "status": "BEHAVIOR_OK",
+   "detail": "InvalidArgument: 'Days' in the 'Transition' action for StorageClass 'DEEP_ARCHIVE' for filter '(prefix=lc/)' must be 90 days more than 'filter '(prefix=lc/)'' 'Days' in the 'Tra",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "s3",
+   "kind": "behavior",
+   "name": "거꾸로 된 전환(GLACIER → STANDARD_IA) → InvalidArgument",
+   "status": "BEHAVIOR_OK",
+   "detail": "InvalidArgument: 'Days' in the 'Transition' action for StorageClass 'GLACIER' for filter '(prefix=lc/)' must be greater than 'Days' in the 'Transition' action for StorageClass '",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "s3",
+   "kind": "behavior",
+   "name": "같은 규칙 ID 두 개 → InvalidArgument",
+   "status": "BEHAVIOR_OK",
+   "detail": "InvalidArgument: Rule 2: ID \"dup\" identifies an earlier rule as well; a rule identifier is unique within a lifecycle configuration",
+   "elapsed_ms": 0
+  },
+  {
+   "service": "s3",
+   "kind": "behavior",
+   "name": "만료 0일 → InvalidArgument",
+   "status": "BEHAVIOR_OK",
+   "detail": "InvalidArgument: 'Days' for Expiration action must be a positive integer",
    "elapsed_ms": 0
   },
   {
@@ -6922,7 +8314,7 @@
    "name": "CreateMultipartUpload",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 4
   },
   {
    "service": "s3",
@@ -6930,7 +8322,7 @@
    "name": "UploadPart(1)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 31
+   "elapsed_ms": 37
   },
   {
    "service": "s3",
@@ -6946,7 +8338,7 @@
    "name": "ListParts",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 1
+   "elapsed_ms": 2
   },
   {
    "service": "s3",
@@ -6954,7 +8346,7 @@
    "name": "CompleteMultipartUpload",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 9
+   "elapsed_ms": 11
   },
   {
    "service": "s3",
@@ -6986,7 +8378,7 @@
    "name": "upload_file(boto3 TransferManager, 자동 멀티파트)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 98
+   "elapsed_ms": 119
   },
   {
    "service": "s3",
@@ -7049,7 +8441,7 @@
    "kind": "behavior",
    "name": "퍼블릭 액세스 차단 상태에서 퍼블릭 정책 → AccessDenied",
    "status": "BEHAVIOR_OK",
-   "detail": "AccessDenied: User: arn:aws:iam::000000000000:user/emulator is not authorized to perform: s3:PutBucketPolicy on resource: \"arn:aws:s3:::todayorder-probe-main-abaf7654\" becaus",
+   "detail": "AccessDenied: User: arn:aws:iam::000000000000:user/emulator is not authorized to perform: s3:PutBucketPolicy on resource: \"arn:aws:s3:::todayorder-probe-main-95b84414\" becaus",
    "elapsed_ms": 0
   },
   {
@@ -7090,14 +8482,14 @@
    "name": "PutObject(SSE-KMS)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 1
+   "elapsed_ms": 2
   },
   {
    "service": "s3",
    "kind": "behavior",
    "name": "SSE-KMS 객체 HeadObject에 aws:kms·키 ID",
    "status": "BEHAVIOR_OK",
-   "detail": "aws:kms 5b58816d-2ee6-482e-8522-f82901412abf",
+   "detail": "aws:kms c96f8949-012e-4122-b39a-7072da51549e",
    "elapsed_ms": 0
   },
   {
@@ -7241,7 +8633,7 @@
    "kind": "behavior",
    "name": "기본 보존 기간이 객체에 적용됨",
    "status": "BEHAVIOR_OK",
-   "detail": "GOVERNANCE 2026-11-13 11:45:04+00:00",
+   "detail": "GOVERNANCE 2026-11-13 21:05:37+00:00",
    "elapsed_ms": 0
   },
   {
@@ -7258,7 +8650,7 @@
    "name": "PutObject(StorageClass=GLACIER)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 1
+   "elapsed_ms": 2
   },
   {
    "service": "s3",
@@ -7298,7 +8690,7 @@
    "name": "PutObject(INTELLIGENT_TIERING)",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 1
+   "elapsed_ms": 2
   },
   {
    "service": "s3",
@@ -7337,7 +8729,7 @@
    "kind": "behavior",
    "name": "같은 CreationToken 재사용 → FileSystemAlreadyExists(멱등성)",
    "status": "BEHAVIOR_OK",
-   "detail": "FileSystemAlreadyExists: File system 'fs-e220a8397b1dcdaf1' already exists with creation token 'todayorder-probe-efs-abaf7654'",
+   "detail": "FileSystemAlreadyExists: File system 'fs-e220a8397b1dcdaf1' already exists with creation token 'todayorder-probe-efs-90ff558c'",
    "elapsed_ms": 0
   },
   {
@@ -7346,7 +8738,7 @@
    "name": "CreateMountTarget",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 1
   },
   {
    "service": "efs",
@@ -7378,7 +8770,7 @@
    "name": "CreateAccessPoint",
    "status": "OK",
    "detail": "",
-   "elapsed_ms": 2
+   "elapsed_ms": 1
   },
   {
    "service": "efs",
