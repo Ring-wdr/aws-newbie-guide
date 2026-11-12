@@ -5,7 +5,9 @@
 #   scripts/emulator-up.sh 9298                              # 두 번째 에뮬레이터
 #   source scripts/dr-env.sh                                 # 두 번째 사이트 (예: "도쿄")
 #
-# 포트: DR_EMULATOR_PORT 가 있으면 그 포트, 없으면 EMULATOR_PORT + 1 (학습자 9297 → 9298, 에이전트 9312 → 9313).
+# 포트: DR_EMULATOR_PORT 가 있으면 그 포트. 없으면 **터미널에서 직접 source 할 때만** EMULATOR_PORT + 1
+#       (학습자 9297 → 9298). 비대화형(AI 에이전트·CI)에서는 DR_EMULATOR_PORT 가 없으면 거부한다 —
+#       에이전트 포트는 연달아 배정되므로 +1 이 다른 에이전트의 에뮬레이터일 수 있기 때문이다.
 # 에뮬레이터는 리전을 나누지 않으므로 "포트가 다른 두 에뮬레이터 = 서로 독립된 두 리전"으로 흉내 낸다.
 #
 # 내보내는 변수 (~/.aws/emulator/<포트>/ 의 파일로 만든다. env.sh 와 같은 규칙):
@@ -39,9 +41,20 @@ dr_aws() {
     aws --endpoint-url "$DR_AWS_ENDPOINT_URL" "$@"
 }
 
+_dr_env_clear() {
+  unset DR_AWS_ENDPOINT_URL DR_AWS_CA_BUNDLE DR_AWS_SHARED_CREDENTIALS_FILE DR_AWS_CONFIG_FILE
+}
+
 _dr_env_main() {
+  # 어떤 실패 경로에서도 이전 연결 정보가 남지 않도록 먼저 지운다 (DR_EMULATOR_PORT 는 입력이므로 둔다).
+  _dr_env_clear
   if [ -z "${EMULATOR_PORT:-}" ] || [ -z "${AWS_ENDPOINT_URL:-}" ]; then
     _dr_env_fail "scripts/env.sh 를 먼저 source 하세요 (주 사이트 연결이 없습니다)."
+    return 1
+  fi
+  if [ -z "${DR_EMULATOR_PORT:-}" ] && [ ! -t 0 ]; then
+    _dr_env_fail "DR_EMULATOR_PORT 가 설정되지 않았습니다. 비대화형 실행에서는 'EMULATOR_PORT + 1' 기본값을 쓰지 않습니다." \
+      "'export DR_EMULATOR_PORT=<자기 두 번째 포트>' 후 다시 source 하세요. (터미널에서 직접 실행하면 EMULATOR_PORT + 1 을 씁니다)"
     return 1
   fi
   local port="${DR_EMULATOR_PORT:-$((EMULATOR_PORT + 1))}"
@@ -68,15 +81,26 @@ _dr_env_main() {
   export DR_AWS_SHARED_CREDENTIALS_FILE="$dir/emulator_credentials"
   export DR_AWS_CONFIG_FILE="$dir/config"
 
-  local account
+  local account errfile errtext
+  errfile="$(mktemp)"
   account="$(dr_aws sts get-caller-identity --cli-connect-timeout 3 --cli-read-timeout 10 \
-    --query Account --output text 2>/dev/null)" || account=""
+    --query Account --output text 2>"$errfile")" || account=""
+  errtext="$(cat "$errfile")"
+  rm -f "$errfile"
   if [ "$account" != "000000000000" ]; then
-    unset DR_EMULATOR_PORT DR_AWS_ENDPOINT_URL DR_AWS_CA_BUNDLE DR_AWS_SHARED_CREDENTIALS_FILE DR_AWS_CONFIG_FILE
-    if ! bash "$_dr_env_dir/clock-check.sh" "$port"; then
-      _dr_env_fail "안전 장치: 시계 어긋남 때문에 두 번째 에뮬레이터가 서명을 거부했습니다 (위 안내 참고)."
-      return 1
-    fi
+    _dr_env_clear
+    case "$errtext" in
+      *SignatureDoesNotMatch* | *RequestTimeTooSkewed* | *InvalidSignatureException*)
+        # 서명 거부일 때만 시계를 의심한다. clock-check 가 15분 창에 가까운 차이를 확인하면 시계 어긋남으로 결론.
+        if ! bash "$_dr_env_dir/clock-check.sh" "$port"; then
+          _dr_env_fail "안전 장치: 시계 어긋남 때문에 두 번째 에뮬레이터가 서명을 거부했습니다 (위 [clock-check] 안내 참고)."
+          return 1
+        fi
+        _dr_env_fail "안전 장치: 두 번째 에뮬레이터가 서명을 거부했습니다 ($(printf '%s' "$errtext" | tr '\n' ' ' | cut -c1-160))." \
+          "에뮬레이터를 재시작했다면 dr-env.sh 를 다시 source 하세요."
+        return 1
+        ;;
+    esac
     _dr_env_fail "안전 장치: 두 번째 사이트 요청이 에뮬레이터로 간다는 것을 확인하지 못했습니다 (Account='${account:-응답 없음}')." \
       "scripts/emulator-status.sh 로 포트 $port 의 에뮬레이터를 확인하세요."
     return 1
@@ -86,7 +110,7 @@ _dr_env_main() {
 
 _dr_env_main
 _dr_env_rc=$?
-unset -f _dr_env_main _dr_env_fail
+unset -f _dr_env_main _dr_env_fail _dr_env_clear
 unset _dr_env_dir
 if [ "$_dr_env_rc" -ne 0 ]; then
   unset _dr_env_rc
