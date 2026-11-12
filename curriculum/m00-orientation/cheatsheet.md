@@ -8,6 +8,8 @@ scripts/emulator-up.sh [포트]          # 시작 (기본 9297)
 source scripts/env.sh                  # 셸 연결 + 안전 장치  (다른 포트: EMULATOR_PORT=9298 source scripts/env.sh)
                                        # 비대화형(에이전트·CI)에서는 EMULATOR_PORT 필수
 aws sts get-caller-identity            # Account 000000000000 이면 에뮬레이터
+source scripts/dr-env.sh               # 두 번째 에뮬레이터(DR_EMULATOR_PORT. 터미널에서만 기본 EMULATOR_PORT+1, 비대화형은 필수) → dr_aws <명령>
+bash scripts/clock-check.sh [포트]     # 잠자기 후 서명 오류 → VM 시계 확인 (어긋나면 해결 명령 안내)
 scripts/emulator-status.sh             # 상태·메모리
 scripts/emulator-reset.sh [포트]       # 재시작 = 모든 리소스 삭제
 scripts/emulator-down.sh [포트|--all]  # 끄기
@@ -83,6 +85,7 @@ from botocore.exceptions import ClientError
 from emulator_guard import require_emulator
 
 require_emulator()                                          # 클라이언트보다 먼저! (실제 AWS: TODAYORDER_ALLOW_REAL_AWS=1)
+# 에뮬레이터 두 개: dr = emulator_site("DR_"); dr.client("s3")   (from emulator_guard import emulator_site)
 s3 = boto3.client("s3")                                     # 엔드포인트·키는 환경 변수에서
 for page in s3.get_paginator("list_objects_v2").paginate(Bucket="b"):
     ...
