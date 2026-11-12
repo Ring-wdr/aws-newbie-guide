@@ -83,7 +83,7 @@ scripts/emulator-up.sh
 ```
 
 ```
-에뮬레이터를 시작합니다: aws-emulator-9297 (포트 9297, 메모리 상한 1g)
+에뮬레이터를 시작합니다: aws-emulator-9297 (포트 9297, 메모리 상한 2g)
 준비 완료: https://127.0.0.1:9297  (헬스 체크: ok)
 
 다음 명령으로 현재 셸을 이 에뮬레이터에 연결하세요:
@@ -97,7 +97,7 @@ scripts/emulator-up.sh
 |---|---|
 | `-p 127.0.0.1:9297:9297` | **내 컴퓨터에서만** 접속 가능하게 연다 (`-p 9297:9297`로 쓰면 같은 네트워크의 다른 컴퓨터도 접속할 수 있다) |
 | `-v ~/.aws/emulator:~/.aws/emulator`, `-e HOME=$HOME` | 에뮬레이터가 만든 키·인증서 파일을 내 홈 디렉터리에서 그대로 읽게 한다 |
-| `--memory=1g --memory-swap=1g` | 메모리 상한 (공식 가이드는 2g. 이 커리큘럼 실습에는 1g로 충분함을 측정했다 — [FIDELITY.md](../../docs/FIDELITY.md)) |
+| `--memory=2g --memory-swap=2g` | 메모리 상한 2 GiB, 스왑 없음 (공식 가이드와 같음). Lambda를 많이 호출하면 에뮬레이터 메모리가 계속 늘어나므로 넉넉히 둔다(아래 "문제 해결"). 바꾸려면 `EMULATOR_MEMORY=3g scripts/emulator-up.sh` |
 | `--telemetry off` | 사용 통계 전송을 끈다 (아래 "텔레메트리") |
 
 이미 떠 있을 때 다시 실행해도 안전하다("이미 실행 중입니다"를 출력하고 끝난다).
@@ -180,7 +180,7 @@ scripts/emulator-down.sh       # 끄기  (--all: 이 저장소로 띄운 모든 
   default    Running    aarch64    4       8GiB      60GiB    docker     
 
 CONTAINER            PORT   STATE      HEALTH   MEMORY(USED / LIMIT)
-aws-emulator-9297    9297   running    ok       173.8MiB / 1GiB
+aws-emulator-9297    9297   running    ok       173MiB / 2GiB
 ```
 
 방금 본 것: 첫 표는 Colima VM, 두 번째 표는 에뮬레이터 컨테이너다(이 출력은 CPU 4개·8 GiB로 켠 VM에서 얻었다). 공부를 마치면 `scripts/emulator-down.sh`로 끄고, 노트북 자원을 돌려받으려면 `colima stop`.
@@ -202,6 +202,15 @@ aws s3 ls | wc -l                    # (9298에 연결된 셸)
 
 ```
        0
+```
+
+두 번째 에뮬레이터를 한 셸에서 함께 쓰려면(M12 다중 리전 DR) `scripts/dr-env.sh`를 쓴다. `env.sh`를 source 한 셸에서 실행하며, 포트는 `DR_EMULATOR_PORT`(없으면 `EMULATOR_PORT + 1`)다. 기본 변수는 그대로 두고 `DR_AWS_ENDPOINT_URL` 등을 따로 만들며, 같은 안전 장치(다른 포트인지, 계정 000000000000인지)를 거친다. CLI는 `dr_aws <명령>`, boto3는 레슨 5의 `emulator_site("DR_")`.
+
+```bash
+scripts/emulator-up.sh 9298
+source scripts/env.sh && source scripts/dr-env.sh
+aws s3 ls        # 9297
+dr_aws s3 ls     # 9298
 ```
 
 ### 텔레메트리
@@ -234,7 +243,9 @@ scripts/emulator-down.sh && EMULATOR_TELEMETRY=on scripts/emulator-up.sh
 | 에뮬레이터를 재시작한 뒤, 계속 떠 있던 Python 프로세스(예: Jupyter, 대화형 셸)에서 `SSLError ... CERTIFICATE_VERIFY_FAILED` 또는 `AccessDenied ... Sign the request with the emulator credentials` | 재시작하면 인증서와 키가 새로 생성된다. 이미 떠 있는 프로세스는 예전 인증서·키를 메모리에 들고 있다 | 그 프로세스를 다시 시작한다. 터미널은 다시 열 필요 없다(환경 변수는 파일 경로라 그대로 맞다) |
 | `EMULATOR_PORT 가 설정되지 않았습니다. 비대화형 실행에서는 ...` | CI·AI 에이전트·`nohup`·`< /dev/null`처럼 표준 입력이 터미널이 아닌 곳에서 env.sh·lab·verify·reset·down을 포트 없이 실행 | `export EMULATOR_PORT=<포트>`. 다른 사람이 쓰는 9297을 실수로 건드리지 않게 하는 안전 장치다 |
 | `[emulator_guard] AWS_ENDPOINT_URL 이 로컬 에뮬레이터(...)가 아닙니다` | `source scripts/env.sh` 없이 boto3 예제를 실행 | env.sh를 source 한 셸에서 실행한다 ([레슨 5](./05-cli-and-boto3-survival.md)) |
-| 컨테이너가 갑자기 사라지고 `docker ps -a`에 `Exited (137)` | 메모리 상한 초과(OOM) | 리소스가 사라졌으므로 `scripts/emulator-reset.sh`. 반복되면 `EMULATOR_MEMORY=2g scripts/emulator-reset.sh` |
+| 노트북을 덮었다(잠자기) 연 뒤 모든 요청이 `SignatureDoesNotMatch`(STS) 또는 `RequestTimeTooSkewed`(S3·DynamoDB 등), `env.sh`가 `[clock-check] 시계 어긋남 ...`을 출력 | 맥의 시계는 맞는데 Colima VM(=에뮬레이터 컨테이너)의 시계가 뒤처졌다. AWS 서명(SigV4)은 15분 넘게 어긋나면 거부된다. VM 안의 `systemd-timesyncd`가 주기적으로(최대 약 34분 간격) 맞추므로 기다리면 저절로 풀리기도 한다 | VM을 끄지 않고 바로 맞춘다: `colima ssh -- sudo systemctl restart systemd-timesyncd` (즉시 NTP 재동기화, 인터넷 필요). 오프라인이면 `colima ssh -- sudo date -u -s "@$(date -u +%s)"` (맥 시각을 VM에 설정). 컨테이너는 VM 커널 시계를 그대로 쓰므로 에뮬레이터를 재시작할 필요 없다. 확인: `bash scripts/clock-check.sh` (조용히 끝나면 정상), 또는 `date -u; colima ssh -- date -u` |
+| `aws cloudformation wait stack-create-complete` 같은 긴 간격의 waiter가 오래 걸리거나 실제와 다르게 끝난다 | waiter는 AWS 기준 간격(예: 30초)으로 폴링하고, 에뮬레이터의 상태 전이 타이밍은 실제와 다르다 | 짧은 간격으로 직접 상태를 폴링한다. 자세한 내용은 M10(CloudFormation)에서 |
+| 잘 되던 명령이 갑자기 `Could not connect to the endpoint URL: "https://127.0.0.1:9297/"`, `env.sh`가 `메모리 상한을 넘어 강제 종료됐습니다 (... 137 ...)`, `emulator-status.sh`에 `OOM(137)` | 에뮬레이터 컨테이너가 메모리 상한을 넘어 커널에 의해 종료됐다(OOM, 종료 코드 137). 에뮬레이터 1.0.322 에서는 **동기 Lambda 호출(`invoke`) 한 번마다 약 7 MiB가 회수되지 않고 쌓인다** — 측정: 빈 상태 175 MiB → 20회 327 MiB → 100회 883 MiB, 1 GiB 상한에서는 약 120회 만에 종료. M06·M07 실습을 리셋 없이 여러 번 돌리면 생긴다 | 리소스는 이미 사라졌다. `scripts/emulator-reset.sh`로 다시 띄운다(기본 상한 2 GiB에서는 약 270회까지 버틴다). Lambda 실습을 반복할 때는 중간중간 리셋하고, 자주 반복되면 `EMULATOR_MEMORY=3g scripts/emulator-reset.sh` |
 | 이미 실제 AWS 프로필(`AWS_PROFILE`)을 쓰던 셸에서 `source scripts/env.sh` 뒤 실제 AWS를 다시 쓰고 싶다 | `env.sh`가 그 변수들을 지웠다 | 새 터미널을 연다. 에뮬레이터용 셸과 실제 AWS용 셸을 섞지 않는 것이 가장 안전하다 |
 
 ## 실제 AWS에서는

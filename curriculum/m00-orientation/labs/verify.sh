@@ -4,6 +4,7 @@
 #
 #   export EMULATOR_PORT=9297     # 학습자는 생략 가능(대화형 터미널이면 9297)
 #   curriculum/m00-orientation/labs/verify.sh
+#   DR_EMULATOR_PORT=9298 curriculum/m00-orientation/labs/verify.sh   # 두 번째 에뮬레이터(미리 up)로 두 사이트 시험까지
 set -euo pipefail
 ROOT="$(git rev-parse --show-toplevel)"
 MOD_DIR="$ROOT/curriculum/m00-orientation"
@@ -48,7 +49,35 @@ guard_refuses() {
   ! grep -qE 'Traceback|연결하지 못했습니다' <<<"$out"
 }
 
+# env.sh 의 시계 어긋남 진단: 서명 거부를 흉내 내는 가짜 aws 와 "20분 뒤" 시각으로 env.sh 를 source 한다.
+# (실제 에뮬레이터·VM 시계는 건드리지 않는다)
+envsh_clock_diag() {
+  local fake out
+  fake="$(mktemp -d)"
+  printf '#!/bin/sh\necho "An error occurred (SignatureDoesNotMatch) when calling the GetCallerIdentity operation" >&2\nexit 254\n' >"$fake/aws"
+  chmod +x "$fake/aws"
+  out="$(PATH="$fake:$PATH" EMULATOR_CLOCK_FAKE_NOW="$1" bash -c "source '$ROOT/scripts/env.sh'" 2>&1)" && { rm -rf "$fake"; echo "env.sh 가 통과해 버림"; return 1; }
+  rm -rf "$fake"
+  echo "$out"
+  grep -q "$2" <<<"$out"
+}
+envsh_clock_skewed() { envsh_clock_diag "$(($(date -u +%s) + 1200))" '\[clock-check\] 시계 어긋남'; }
+envsh_sig_no_skew() { envsh_clock_diag "$(date -u +%s)" '서명을 거부했습니다'; }
+
+# 두 번째 사이트(dr-env.sh + emulator_site("DR_")) 실시간 시험은 DR_EMULATOR_PORT 에 에뮬레이터가 떠 있을 때만.
+guard_selftest() {
+  if [ -n "${DR_EMULATOR_PORT:-}" ]; then
+    # shellcheck source=scripts/dr-env.sh
+    source "$ROOT/scripts/dr-env.sh" || return 1
+  fi
+  uv run --quiet python -m emulator_guard.selftest --live
+}
+
 cd "$ROOT"
+run "안전 장치 자체 시험 (URL 파싱 우회 차단·두 번째 사이트 API·opt-out)" guard_selftest
+[ -n "${DR_EMULATOR_PORT:-}" ] || echo "SKIP  두 번째 사이트 실시간 시험 (DR_EMULATOR_PORT 미설정 — 설정하고 그 포트에 에뮬레이터를 띄우면 시험)"
+run "env.sh: 서명 거부 + 시계 20분 어긋남 → 시계 어긋남 안내" envsh_clock_skewed
+run "env.sh: 서명 거부 + 시계 정상 → 서명 거부 안내" envsh_sig_no_skew
 for py in "$MOD_DIR"/sdk/*.py; do
   run "안전 장치: env.sh 없이 sdk/$(basename "$py") 실행 → 네트워크 호출 전 거부" guard_refuses "$py"
 done
