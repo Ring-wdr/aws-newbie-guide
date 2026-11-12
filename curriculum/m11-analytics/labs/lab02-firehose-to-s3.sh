@@ -12,6 +12,7 @@ STREAM="todayorder-orders-to-s3"
 KDS="todayorder-order-events"
 KDS_FH="todayorder-kds-to-s3"
 ROLE="todayorder-firehose-delivery"
+WRONG_ROLE="todayorder-ec2-only"   # 신뢰 정책이 ec2.amazonaws.com 인 역할 (Firehose 는 맡을 수 없음)
 TODAY="$(utc_day 0)"
 
 cleanup() {
@@ -21,6 +22,7 @@ cleanup() {
   aws kinesis delete-stream --stream-name "$KDS" --enforce-consumer-deletion >/dev/null 2>&1 || true
   aws iam delete-role-policy --role-name "$ROLE" --policy-name s3-and-kinesis >/dev/null 2>&1 || true
   aws iam delete-role --role-name "$ROLE" >/dev/null 2>&1 || true
+  aws iam delete-role --role-name "$WRONG_ROLE" >/dev/null 2>&1 || true
   empty_bucket "$BUCKET"
   wait_until 60 1 "이전 전송 스트림 삭제" bash -c \
     "! aws firehose describe-delivery-stream --delivery-stream-name $STREAM >/dev/null 2>&1 && ! aws firehose describe-delivery-stream --delivery-stream-name $KDS_FH >/dev/null 2>&1"
@@ -41,10 +43,13 @@ aws iam put-role-policy --role-name "$ROLE" --policy-name s3-and-kinesis --polic
     \"Resource\":\"arn:aws:kinesis:us-east-1:000000000000:stream/$KDS\"}]}"
 echo "$ROLE_ARN"
 
-echo "== 2. 신뢰 정책이 없는 역할을 주면? (Firehose가 역할을 맡을 수 없어 거부)"
+echo "== 2. 신뢰 정책이 Firehose 가 아닌(ec2.amazonaws.com) 역할을 주면? (Firehose가 역할을 맡을 수 없어 거부)"
+WRONG_ARN="$(aws iam create-role --role-name "$WRONG_ROLE" --assume-role-policy-document '{
+  "Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"ec2.amazonaws.com"},"Action":"sts:AssumeRole"}]}' \
+  --query Role.Arn --output text)"
 set +e
 bad_role="$(aws firehose create-delivery-stream --delivery-stream-name todayorder-bad-role \
-  --extended-s3-destination-configuration "RoleARN=arn:aws:iam::000000000000:role/does-not-exist,BucketARN=arn:aws:s3:::$BUCKET" 2>&1)"
+  --extended-s3-destination-configuration "RoleARN=$WRONG_ARN,BucketARN=arn:aws:s3:::$BUCKET" 2>&1)"
 set -e
 echo "$bad_role"
 

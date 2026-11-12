@@ -175,6 +175,7 @@ aws glue start-job-run --job-name todayorder-daily-revenue --arguments '{"--days
 
 - 크롤러는 실제로 S3를 훑어 테이블과 파티션을 만든다(에뮬레이터 501). 일정 실행, 스키마 변경 처리 정책을 설정할 수 있다.
 - Spark 작업(`glueetl`)은 에뮬레이터에서 `awsglue` 라이브러리가 없어 `ModuleNotFoundError`로 실패했다(이 모듈을 만들며 확인). 실제 Glue에서는 `GlueContext`·`DynamicFrame`으로 대용량을 분산 처리한다.
+- 실제 Glue에서는 작업 역할에 데이터 버킷 권한 외에 **CloudWatch Logs 쓰기 권한**도 있어야 작업 로그(`/aws-glue/python-jobs/output` 등)가 남는다 — 보통 관리형 정책 `AWSGlueServiceRole` + 데이터 버킷 권한을 붙인다. 에뮬레이터는 작업 로그를 CloudWatch Logs에 남기지 않았다.
 - 요금: ETL 작업은 DPU-시간 단위(Python shell은 0.0625 또는 1 DPU), 크롤러도 DPU-시간, Data Catalog는 일정 개수까지 무료 후 객체 수·요청 수. 프리 티어에 Data Catalog 일부가 포함된다.
 
 > **실제 AWS에서 해 보려면** (크롤러 🔴)

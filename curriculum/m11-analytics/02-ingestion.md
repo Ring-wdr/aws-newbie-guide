@@ -19,7 +19,7 @@
 
 ```mermaid
 flowchart LR
-  API[주문 API] -- PutRecord(Batch) --> FH[Data Firehose<br/>todayorder-orders-to-s3]
+  API[주문 API] -- "PutRecord(Batch)" --> FH[Data Firehose<br/>todayorder-orders-to-s3]
   FH -- "버퍼(60초 또는 1 MiB)가 차면<br/>한 객체로 묶어 쓰기" --> S3[(S3 raw/orders/dt=YYYY-MM-DD/)]
   API2[주문 API] -- PutRecord --> KDS[Kinesis Data Streams<br/>todayorder-order-events]
   KDS --> L[Lambda: 사기 탐지]
@@ -54,11 +54,13 @@ Firehose의 S3 목적지 핵심 설정:
 
 ### 1) 역할 신뢰가 먼저
 
+신뢰 정책이 `ec2.amazonaws.com`인 역할(`todayorder-ec2-only`)을 줘 본다.
+
 ```
-aws: [ERROR]: An error occurred (InvalidArgumentException) when calling the CreateDeliveryStream operation: Firehose is unable to assume role arn:aws:iam::000000000000:role/does-not-exist. Please check the role provided.
+aws: [ERROR]: An error occurred (InvalidArgumentException) when calling the CreateDeliveryStream operation: Firehose is unable to assume role arn:aws:iam::000000000000:role/todayorder-ec2-only. Please check the role provided.
 ```
 
-방금 본 것: Firehose는 **역할을 맡아서** S3에 쓴다. 신뢰 정책(`Principal: firehose.amazonaws.com`)이 있는 역할을 줘야 전송 스트림이 만들어진다.
+방금 본 것: Firehose는 **역할을 맡아서** S3에 쓴다. 역할이 있어도 신뢰 정책의 `Principal`이 `firehose.amazonaws.com`이 아니면 전송 스트림이 만들어지지 않는다.
 
 ### 2) Direct PUT 전송 스트림
 
@@ -160,5 +162,5 @@ aws: [ERROR]: An error occurred (InvalidArgumentException) when calling the PutR
 
 1. 주문 API → KDS → (Lambda 이벤트 소스 매핑으로 사기 탐지) + (Firehose KinesisStreamAsSource → S3). 같은 스트림을 두 소비자가 각자 읽는다.
 2. 작은 파일이 많아져 쿼리마다 열어야 할 파일 수가 늘고 느려진다(+ S3 요청 요금). 버퍼를 다시 키우거나, Glue ETL로 주기적으로 큰 Parquet 파일로 합친다(compaction).
-3. 여러 JSON이 한 줄로 이어져(`{...}{...}`) 줄 단위 JSON SerDe가 제대로 읽지 못한다. 이 실습을 만들 때 에뮬레이터 Athena에서도 그런 파일은 값이 모두 NULL인 행 하나로 읽혔다.
+3. 여러 JSON이 한 줄로 이어져(`{...}{...}`) 줄 단위 JSON SerDe가 제대로 읽지 못한다. **실제 Athena**(OpenX JSON SerDe)는 한 줄에서 **첫 레코드만** 읽어, 파일당 1건만 조회되고 `count(*)`가 실제 건수보다 훨씬 적게 나온다(AWS Knowledge Center "select-count-query-athena-json-records"). **에뮬레이터**에서는 증상이 달라, 그런 파일이 모든 열이 NULL인 행 하나로 읽혔다.
 </details>

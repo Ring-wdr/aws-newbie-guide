@@ -61,7 +61,7 @@ curriculum/m11-analytics/labs/verify.sh
 | Athena SQL 방언 | `date_trunc`, `from_iso8601_timestamp`, `approx_distinct` 없음, 중첩 필드(`customer.tier`) 실패, `MSCK REPAIR TABLE`·`SHOW PARTITIONS` 구문 오류. 오류 메시지가 SQLite 계열(`no such column`, `near "MSCK": syntax error`) | 실습 SQL은 Athena(Trino)와 공통인 `count/sum/avg/round/substr/CAST/GROUP BY/ORDER BY/CTE`만 사용 |
 | Athena 실행 시간 | 쿼리마다 약 3초 후 SUCCEEDED (`TotalExecutionTimeInMillis: 3000` 고정) | 폴링 |
 | Athena `DeleteWorkGroup`, `ListWorkGroups`, `ListNamedQueries`, `ListDataCatalogs` | `501 NotImplemented` | 작업 그룹이 남아 있으면 `update-work-group`으로 갱신(멱등) |
-| 줄바꿈 없는 JSON 레코드 | `{…}{…}` 파일은 모든 열이 NULL인 행 하나로 읽힘 | 생산자가 레코드 끝에 `\n`을 붙인다(실제 AWS에서도 필요) |
+| 줄바꿈 없는 JSON 레코드 | 에뮬레이터: `{…}{…}` 파일이 모든 열이 NULL인 행 하나로 읽힘. (실제 Athena: 한 줄의 **첫 레코드만** 읽혀 `count(*)`가 줄어듦 — 증상이 다름) | 생산자가 레코드 끝에 `\n`을 붙인다(실제 AWS에서도 필요) |
 | Lake Formation | 설정 조회만 확인. 열·행 권한 집행은 확인하지 않음 | 🟡 설정 읽기 |
 | QuickSight `ListDashboards`, SageMaker `ListNotebookInstances` | `501` (FIDELITY) | 레슨 4·5는 개념 |
 
