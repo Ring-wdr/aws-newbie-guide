@@ -79,7 +79,7 @@ Patch Manager 기준선 조회도 501이다(🔴). 에이전트가 필요 없는
 ## 실제 AWS에서는
 
 > **실제 AWS에서 해 보려면** (Session Manager 🔴 / Run Command 🟡)
-> - 프리 티어: Session Manager·Run Command는 EC2 대상이면 추가 요금이 없다. `t2.micro`/`t3.micro` 인스턴스는 프리 티어 대상(계정 조건 확인). **퍼블릭 서브넷에 두고 퍼블릭 IP를 붙이면 퍼블릭 IPv4 요금**이 붙고, 프라이빗 서브넷이면 NAT 게이트웨이나 VPC 엔드포인트(둘 다 유료)가 필요하다.
+> - 프리 티어: Session Manager·Run Command는 EC2 대상이면 추가 요금이 없다. 소형 인스턴스(`t3.micro` 등)는 프리 티어 또는 무료 플랜 크레딧으로 쓸 수 있다(2025-07-15 이후 만든 계정은 크레딧 기반 무료 플랜 — 계정 조건 확인). **퍼블릭 서브넷에 두고 퍼블릭 IP를 붙이면 퍼블릭 IPv4 요금**이 붙고, 프라이빗 서브넷이면 NAT 게이트웨이나 VPC 엔드포인트(둘 다 유료)가 필요하다.
 > - 순서: IAM 역할(신뢰: `ec2.amazonaws.com`, 정책: `AmazonSSMManagedInstanceCore`)과 인스턴스 프로파일 → Amazon Linux 2023 인스턴스 시작(보안 그룹 인바운드 규칙 없음) → 몇 분 뒤 `aws ssm describe-instance-information`에 나타나는지 확인 → `aws ssm start-session --target <id>`(로컬에 Session Manager 플러그인 필요) → `aws ssm send-command --document-name AWS-RunShellScript --targets Key=tag:app,Values=todayorder --parameters 'commands=["uptime"]'` → `aws ssm list-command-invocations --command-id <id> --details`.
 > - 정리: `aws ec2 terminate-instances --instance-ids <id>`, 역할·인스턴스 프로파일 삭제.
 
