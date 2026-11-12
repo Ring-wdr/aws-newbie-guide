@@ -43,7 +43,7 @@ AWS의 DR 백서도 같은 순서로 RPO/RTO를 "시간 → 수십 분 → 분 �
 | AWS Backup 교차 리전·교차 계정 복사, EBS·RDS 스냅샷 복사 | 백업·복원 (레슨 3) |
 | S3 교차 리전 복제(CRR), S3 Replication Time Control(RTC — 객체의 99.9%를 15분 안에 복제한다는 SLA) | 모든 전략의 객체 데이터 |
 | RDS 교차 리전 읽기 전용 복제본(승격), **Aurora Global Database**(보조 리전 승격, 복제 지연 보통 1초 미만) | 파일럿 라이트 이상 |
-| **DynamoDB 전역 테이블**(다중 리전·다중 활성) | 웜 스탠바이·액티브-액티브 |
+| **DynamoDB 글로벌 테이블**(다중 리전·다중 활성) | 웜 스탠바이·액티브-액티브 |
 | AWS Elastic Disaster Recovery(서버 블록 단위 연속 복제, RPO 초·RTO 분) | 서버 기반 앱의 파일럿 라이트형 DR (레슨 3) |
 | CloudFormation/IaC, AMI 복사 | DR 리전 인프라를 "언제든 똑같이" 만들기 |
 | Route 53 장애 조치 라우팅 + 상태 확인, Amazon Application Recovery Controller(ARC), Global Accelerator | 트래픽 전환 |
@@ -74,7 +74,7 @@ AWS의 DR 백서도 같은 순서로 RPO/RTO를 "시간 → 수십 분 → 분 �
 | a | **백업·복원** | RTO·RPO가 시간~하루 단위로 넉넉하다 → 가장 싼 전략. 매일 백업을 다른 리전에 복사(AWS Backup 복사 규칙) + IaC로 재구축. |
 | b | **파일럿 라이트** | RPO 1분 이하 → 데이터는 연속 복제(Aurora Global Database 또는 교차 리전 복제본, S3 CRR). RTO 30분 → 앱 서버는 꺼 두고 장애 때 ASG를 키워도 시간 안에 든다. 웜 스탠바이도 요구는 만족하지만 "평소 비용 최소"에 어긋난다. |
 | c | **웜 스탠바이** | "바로 응답(줄어든 용량으로라도)" = DR 쪽 스택이 항상 떠 있어야 한다. 파일럿 라이트는 서버를 켜는 시간이 걸린다. |
-| d | **다중 사이트 액티브-액티브** | RTO·RPO ≈ 0. DynamoDB 전역 테이블 등 다중 활성 데이터 + Route 53 지연 시간/장애 조치 라우팅 또는 Global Accelerator. |
+| d | **다중 사이트 액티브-액티브** | RTO·RPO ≈ 0. DynamoDB 글로벌 테이블 등 다중 활성 데이터 + Route 53 지연 시간/장애 조치 라우팅 또는 Global Accelerator. |
 | e | **백업·복원** + AWS Backup **교차 계정·교차 리전 복사** + **Vault Lock(규정 준수 모드)** 또는 논리적 에어갭 볼트 | 전략은 백업 기반, 핵심은 "삭제 불가". 레슨 3. |
 | f | **AWS Elastic Disaster Recovery** | 앱을 고치지 않고 서버 블록 단위 연속 복제, 장애 때 복구 인스턴스를 띄운다. RPO 초·RTO 분. |
 
@@ -192,17 +192,17 @@ scripts/emulator-down.sh "$DR_EMULATOR_PORT"     # 도쿄 에뮬레이터 끄기
 
 ## 실제 AWS에서는
 
-- 실제 다중 리전에서는 `DR_…` 변수 대신 **같은 자격 증명으로 리전만 다른 두 클라이언트**를 만든다(`boto3.client("s3", region_name="ap-northeast-1")`). 데이터 복사는 직접 하지 않고 **S3 CRR, DynamoDB 전역 테이블, Aurora Global Database, AWS Backup 교차 리전 복사** 같은 관리형 복제를 쓴다. 이 lab의 `dr_replicate.py`는 그 원리를 보이기 위한 교육용이다.
+- 실제 다중 리전에서는 `DR_…` 변수 대신 **같은 자격 증명으로 리전만 다른 두 클라이언트**를 만든다(`boto3.client("s3", region_name="ap-northeast-1")`). 데이터 복사는 직접 하지 않고 **S3 CRR, DynamoDB 글로벌 테이블, Aurora Global Database, AWS Backup 교차 리전 복사** 같은 관리형 복제를 쓴다. 이 lab의 `dr_replicate.py`는 그 원리를 보이기 위한 교육용이다.
 - 트래픽 전환은 사람이 `EMULATOR_PORT`를 바꾸는 것이 아니라 **Route 53 장애 조치 레코드 + 상태 확인**이나 **ARC 라우팅 제어**로 한다. 에뮬레이터의 Route 53 상태 확인은 항상 성공하므로 이 부분은 재현할 수 없다(M08).
 - 실제 리전 간 복제에는 **리전 간 데이터 전송 요금**과 DR 쪽 리소스 요금이 든다(M13).
 
-**실제 AWS에서 해 보려면**: 프리 티어 계정에서 두 리전(예: `ap-northeast-2`, `ap-northeast-1`)에 S3 버킷을 만들고 **버전 관리를 켠 뒤 CRR 규칙**을 걸어, 서울에 올린 객체가 도쿄에 복제되는 것을 볼 수 있다. S3 저장 요금(프리 티어 범위 안이면 거의 0)과 **리전 간 전송 요금**(작은 파일 몇 개면 몇 센트 미만)이 든다. 정리: 복제 규칙 삭제 → 두 버킷 비우기(모든 버전 포함) → 버킷 삭제. DynamoDB 전역 테이블은 쓰기 용량이 리전 수만큼 과금되니 실험 후 바로 지운다.
+**실제 AWS에서 해 보려면**: 프리 티어 계정에서 두 리전(예: `ap-northeast-2`, `ap-northeast-1`)에 S3 버킷을 만들고 **버전 관리를 켠 뒤 CRR 규칙**을 걸어, 서울에 올린 객체가 도쿄에 복제되는 것을 볼 수 있다. S3 저장 요금(프리 티어 범위 안이면 거의 0)과 **리전 간 전송 요금**(작은 파일 몇 개면 몇 센트 미만)이 든다. 정리: 복제 규칙 삭제 → 두 버킷 비우기(모든 버전 포함) → 버킷 삭제. DynamoDB 글로벌 테이블은 쓰기 용량이 리전 수만큼 과금되니 실험 후 바로 지운다.
 
 ## 시험 포인트
 
 - "RTO·RPO 몇 시간, 최저 비용" → **백업·복원**. "RPO 초~분, RTO 수십 분, DR 평소 비용 최소" → **파일럿 라이트**. "분 단위 RTO, 줄어든 용량으로 즉시 응답" → **웜 스탠바이**. "RTO·RPO ≈ 0" → **다중 사이트 액티브-액티브**.
 - 파일럿 라이트 vs 웜 스탠바이: **DR 쪽이 지금 바로 요청을 받을 수 있나?** 받을 수 있으면 웜 스탠바이.
-- "관계형 DB, 리전 장애 시 1분 안쪽 RTO·초 단위 RPO" → **Aurora Global Database**(보조 리전 승격). "NoSQL 다중 리전 다중 쓰기" → **DynamoDB 전역 테이블**.
+- "관계형 DB, 리전 장애 시 1분 안쪽 RTO·초 단위 RPO" → **Aurora Global Database**(보조 리전 승격). "NoSQL 다중 리전 다중 쓰기" → **DynamoDB 글로벌 테이블**.
 - "S3 객체를 다른 리전에, 시간 보장(SLA)과 함께" → **S3 CRR + Replication Time Control**.
 - 트래픽 전환: **Route 53 장애 조치 라우팅 + 상태 확인**, 정밀한 리전 전환 제어는 **ARC**.
 - 복제는 실수(잘못된 삭제·손상)도 복제한다 → 백업은 따로.
@@ -216,7 +216,7 @@ scripts/emulator-down.sh "$DR_EMULATOR_PORT"     # 도쿄 에뮬레이터 끄기
 <details><summary>답</summary>
 
 1. RTO가 넉넉하므로 서버는 장애 때 새로 만들어도 된다(백업·복원 수준의 인프라). 하지만 RPO 5분은 하루 백업으로는 못 지킨다 → 데이터만 연속 또는 5분 이내 주기로 복제한다(DB 교차 리전 복제본/Aurora Global, S3 CRR). 사실상 "데이터는 파일럿 라이트, 컴퓨트는 백업·복원" — 요구를 두 축으로 나눠 보는 것이 핵심이다.
-2. `dr_replicate.py`는 실행할 때만 한 번에 복사한다. 그래서 마지막 실행 이후의 쓰기는 모두 잃는다. 실제로는 DB의 지속 복제(Aurora Global Database, RDS 교차 리전 복제본, DynamoDB 전역 테이블)와 S3 CRR(+RTC)로 쓰기 직후 복제해 RPO를 초~분으로 만든다.
+2. `dr_replicate.py`는 실행할 때만 한 번에 복사한다. 그래서 마지막 실행 이후의 쓰기는 모두 잃는다. 실제로는 DB의 지속 복제(Aurora Global Database, RDS 교차 리전 복제본, DynamoDB 글로벌 테이블)와 S3 CRR(+RTC)로 쓰기 직후 복제해 RPO를 초~분으로 만든다.
 3. 장애 조치 이후 도쿄에서 받은 주문(A-1006)이 서울에 없다. 바로 되돌리면 그 주문이 "사라진" 것처럼 보이고, 단방향 복제를 다시 돌리면 덮어쓰거나 무시될 수 있다. 페일백 전에 도쿄 → 서울 역방향 동기화와 정합성 확인을 하고, 쓰기를 잠깐 멈춘 상태에서 전환한다.
 
 </details>
