@@ -137,6 +137,8 @@ export AWS_PAGER=""                                              # CLI 출력이
 
 엔드포인트는 반드시 **`127.0.0.1`** 이다. `localhost`를 쓰면 JavaScript·Java·Go SDK는 S3 버킷 이름을 호스트명에 붙여(`<버킷>.localhost`) 요청하는데, 에뮬레이터는 그런 요청을 받지 않는다.
 
+**어느 포트에 연결되나?** `EMULATOR_PORT`가 있으면 그 포트, 없으면 **터미널에서 직접 실행할 때만** 기본값 9297이다. 여러분이 터미널에 `source scripts/env.sh`나 `bash curriculum/m00-orientation/labs/lab01-emulator-health.sh`를 치는 경우는 모두 9297로 동작한다. 반대로 AI 에이전트·CI처럼 표준 입력이 터미널이 아닌 곳에서는 `EMULATOR_PORT`가 없으면 `env.sh`·lab·`verify.sh`·`emulator-reset.sh`·`emulator-down.sh`가 모두 거부한다. 여러 작업이 에뮬레이터를 나눠 쓸 때 남의 9297을 지우는 사고를 막기 위해서다.
+
 ### 4) 확인 실습
 
 ```bash
@@ -170,7 +172,7 @@ LAB01 OK
 ```bash
 scripts/emulator-status.sh     # 떠 있는 에뮬레이터와 메모리 사용량
 scripts/emulator-reset.sh      # 재시작 = 깨끗한 상태 (모든 리소스 삭제)
-scripts/emulator-down.sh       # 끄기
+scripts/emulator-down.sh       # 끄기  (--all: 이 저장소로 띄운 모든 에뮬레이터 — 다른 작업 것까지 끈다)
 ```
 
 ```
@@ -230,7 +232,8 @@ scripts/emulator-down.sh && EMULATOR_TELEMETRY=on scripts/emulator-up.sh
 | `[env.sh] 안전 장치: 요청이 에뮬레이터로 간다는 것을 확인하지 못했습니다 (Account='응답 없음')` | 파일은 남아 있는데 에뮬레이터가 죽었다(강제 종료·Colima 재시작 등) | `scripts/emulator-reset.sh` |
 | `curl: (60) SSL certificate problem: self signed certificate` | 에뮬레이터는 자체 서명 인증서를 쓴다 | `curl --cacert "$AWS_CA_BUNDLE" ...` 처럼 인증서를 지정한다 |
 | 에뮬레이터를 재시작한 뒤, 계속 떠 있던 Python 프로세스(예: Jupyter, 대화형 셸)에서 `SSLError ... CERTIFICATE_VERIFY_FAILED` 또는 `AccessDenied ... Sign the request with the emulator credentials` | 재시작하면 인증서와 키가 새로 생성된다. 이미 떠 있는 프로세스는 예전 인증서·키를 메모리에 들고 있다 | 그 프로세스를 다시 시작한다. 터미널은 다시 열 필요 없다(환경 변수는 파일 경로라 그대로 맞다) |
-| `오류: EMULATOR_PORT 가 설정되지 않았습니다. 비대화형 실행에서는 ...` | 스크립트·CI·AI 에이전트처럼 터미널이 아닌 곳에서 reset/down/verify를 포트 없이 실행 | `export EMULATOR_PORT=<포트>`. 다른 사람이 쓰는 9297을 실수로 지우지 않게 하는 안전 장치다 |
+| `EMULATOR_PORT 가 설정되지 않았습니다. 비대화형 실행에서는 ...` | CI·AI 에이전트·`nohup`·`< /dev/null`처럼 표준 입력이 터미널이 아닌 곳에서 env.sh·lab·verify·reset·down을 포트 없이 실행 | `export EMULATOR_PORT=<포트>`. 다른 사람이 쓰는 9297을 실수로 건드리지 않게 하는 안전 장치다 |
+| `[emulator_guard] AWS_ENDPOINT_URL 이 로컬 에뮬레이터(...)가 아닙니다` | `source scripts/env.sh` 없이 boto3 예제를 실행 | env.sh를 source 한 셸에서 실행한다 ([레슨 5](./05-cli-and-boto3-survival.md)) |
 | 컨테이너가 갑자기 사라지고 `docker ps -a`에 `Exited (137)` | 메모리 상한 초과(OOM) | 리소스가 사라졌으므로 `scripts/emulator-reset.sh`. 반복되면 `EMULATOR_MEMORY=2g scripts/emulator-reset.sh` |
 | 이미 실제 AWS 프로필(`AWS_PROFILE`)을 쓰던 셸에서 `source scripts/env.sh` 뒤 실제 AWS를 다시 쓰고 싶다 | `env.sh`가 그 변수들을 지웠다 | 새 터미널을 연다. 에뮬레이터용 셸과 실제 AWS용 셸을 섞지 않는 것이 가장 안전하다 |
 

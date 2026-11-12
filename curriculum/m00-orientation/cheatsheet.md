@@ -6,6 +6,7 @@
 scripts/install.sh                     # 처음 한 번 (여러 번 실행해도 안전) · --rebuild: 에뮬레이터 업데이트
 scripts/emulator-up.sh [포트]          # 시작 (기본 9297)
 source scripts/env.sh                  # 셸 연결 + 안전 장치  (다른 포트: EMULATOR_PORT=9298 source scripts/env.sh)
+                                       # 비대화형(에이전트·CI)에서는 EMULATOR_PORT 필수
 aws sts get-caller-identity            # Account 000000000000 이면 에뮬레이터
 scripts/emulator-status.sh             # 상태·메모리
 scripts/emulator-reset.sh [포트]       # 재시작 = 모든 리소스 삭제
@@ -31,7 +32,7 @@ colima stop                            # VM까지 끄기 (다음에 colima start
 
 | 🟢 재현 | 🟡 부분 | 🔴 개념 |
 |---|---|---|
-| 실제처럼 동작, 끝까지 검증 | 리소스는 생기지만 동작은 안 일어남 | 501이거나 의미 없음 → 개념·워크시트 |
+| 실제처럼 동작, 끝까지 검증 | 리소스는 생기지만 동작(실행·전달·차단)의 일부 또는 전부가 안 일어남 | 501이거나 의미 없음 → 개념·워크시트 |
 
 ## 글로벌 인프라 한눈에
 
@@ -46,7 +47,7 @@ colima stop                            # VM까지 끄기 (다음에 colima start
 | 정적 콘텐츠를 전 세계에 빠르게 | CloudFront (엣지 로케이션) |
 | 계정 간 같은 물리 AZ 지정 | AZ 이름 말고 **AZ ID** (`use1-az1`) |
 
-리전은 **최소 3개 AZ**를 가진다. 리전끼리는 독립적이다.
+리전은 여러 AZ(AWS 문서 기준 최소 3개, 단 `us-west-1`처럼 계정에 2개만 열린 오래된 리전도 있음)로 이뤄진다. 리전끼리는 독립적이다.
 
 ## 공동 책임 모델
 
@@ -65,7 +66,8 @@ colima stop                            # VM까지 끄기 (다음에 colima start
 | 필드 고르기 | `--query 'Items[].{Id: id, Name: name}'` |
 | 값 하나를 변수에 | `x=$(aws ... --query 'A.B' --output text)` |
 | 사람이 보기 좋게 | `--output table` |
-| 목록 일부만 / 이어서 | `--max-items N` → `NextToken` → `--starting-token` (토큰은 `--output json` 으로 받기) |
+| 목록 일부만 / 이어서 | `--max-items N` → `NextToken` → `--starting-token` |
+| 목록 결과를 변수에 | `--output json` 으로 받아 가공, 또는 `--no-paginate` (페이지네이션 + `--output text` 는 `None` 줄이 섞일 수 있음) |
 | API 호출 단위 줄이기 | `--page-size N` |
 | 상태가 될 때까지 대기 | `aws dynamodb wait table-exists --table-name T` |
 | 무슨 일이 일어나나 | `--debug` (stderr) |
@@ -78,7 +80,9 @@ colima stop                            # VM까지 끄기 (다음에 colima start
 ```python
 import boto3
 from botocore.exceptions import ClientError
+from emulator_guard import require_emulator
 
+require_emulator()                                          # 클라이언트보다 먼저! (실제 AWS: TODAYORDER_ALLOW_REAL_AWS=1)
 s3 = boto3.client("s3")                                     # 엔드포인트·키는 환경 변수에서
 for page in s3.get_paginator("list_objects_v2").paginate(Bucket="b"):
     ...

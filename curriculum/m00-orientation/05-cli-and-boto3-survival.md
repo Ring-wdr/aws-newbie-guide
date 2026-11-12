@@ -50,6 +50,27 @@ JMESPath 기본 문법: `Contents[]`(배열 펼치기), `Contents[0:3]`(슬라�
 
 오류는 `botocore.exceptions.ClientError` 하나로 오고, `e.response["Error"]["Code"]` 로 분기한다.
 
+### 이 저장소의 boto3 예제 규칙: 안전 장치 먼저
+
+boto3 코드에는 엔드포인트가 없다. 그래서 `source scripts/env.sh`를 잊은 셸에서 실행하면 boto3는 **실제 AWS 주소**(`https://s3.amazonaws.com` 등)로 요청하고, `~/.aws`에 실제 자격 증명이 있으면 그대로 쓴다. 이를 막으려고 모든 sdk 예제는 **클라이언트를 만들기 전에** 저장소의 안전 장치를 부른다.
+
+```python
+from emulator_guard import require_emulator
+
+def main() -> None:
+    require_emulator()          # 에뮬레이터가 아니면 여기서 종료 (종료 코드 1)
+    s3 = boto3.client("s3")     # 그다음에 클라이언트
+```
+
+`require_emulator()`는 ① 네트워크 호출 없이 `AWS_ENDPOINT_URL`이 `https://127.0.0.1:`로 시작하는지(서비스별 `AWS_ENDPOINT_URL_*`도) 보고, ② 통과하면 그 엔드포인트로만 STS를 불러 계정이 `000000000000`인지 확인한다. `emulator_guard`는 이 저장소의 작은 패키지(`src/emulator_guard/`)로, `uv sync`가 설치해 두므로 `uv run python ...`에서 바로 import 된다. env.sh 없이 실행하면:
+
+```
+[emulator_guard] AWS_ENDPOINT_URL 이 로컬 에뮬레이터(https://127.0.0.1:<포트>)가 아닙니다: '설정 안 됨'. 이대로 실행하면 실제 AWS로 요청이 갈 수 있어 중단합니다.
+                 먼저 저장소 루트에서 'source scripts/env.sh' 를 실행하세요 (에뮬레이터: scripts/emulator-up.sh).
+```
+
+나중에 **자기 AWS 계정에서** 같은 예제를 직접 돌려 보고 싶다면 `TODAYORDER_ALLOW_REAL_AWS=1`을 설정한다. 그러면 검사를 건너뛰고 경고만 출력한다(요금 주의, 기본값은 꺼짐). `verify.sh`는 "env.sh 없이 실행하면 네트워크 호출 전에 거부되는지"를 매번 확인한다.
+
 ## 직접 해 보기
 
 [lab04-cli-survival.sh](./labs/lab04-cli-survival.sh)는 버킷에 주문 파일 7개를 올리고 아래를 차례로 해 본다.
@@ -124,7 +145,7 @@ aws s3api list-objects-v2 --bucket todayorder-m00-cli --max-items 3 --starting-t
 
 방금 본 것: `NextToken`은 CLI가 만든 토큰이다(base64를 풀면 `{"ContinuationToken": null, "boto_truncate_amount": 3}`). S3가 준 토큰이 아니라 "첫 페이지에서 3개를 건너뛰라"는 CLI의 메모라서, 다른 도구에 넘기면 안 된다.
 
-> ⚠️ 함정: 토큰을 `--query NextToken --output text` 로 받으면 페이지마다 한 줄씩 찍혀 `None` 이 섞여 나온다. 실제로 이 실습을 만들 때 그 값을 `--starting-token`에 넘겨 `InvalidArgument: The continuation token provided is incorrect` 를 받았다. 토큰은 `--output json` 으로 받아 따옴표만 벗기자(`| tr -d '"'`).
+> ⚠️ 함정: **페이지네이션되는 목록 명령**(S3 `list-objects-v2`, API Gateway `get-resources`, 대부분의 `list-*`/`describe-*`)의 결과를 `--query ... --output text`로 받으면, CLI가 페이지마다 쿼리를 적용해 한 줄씩 찍기 때문에 값 앞뒤에 `None` 줄이 섞일 수 있다. 실제로 이 실습을 만들 때 그렇게 받은 토큰을 `--starting-token`에 넘겨 `InvalidArgument: The continuation token provided is incorrect` 를 받았다. 목록 결과를 셸 변수에 담을 때는 `--output json`으로 받아 가공하거나(`| tr -d '"'`), 첫 페이지만 필요하면 `--no-paginate`를 붙이자.
 
 **4) 같은 일을 boto3로** — [sdk/client_resource_paginator_waiter.py](./sdk/client_resource_paginator_waiter.py)
 
@@ -136,14 +157,14 @@ uv run python curriculum/m00-orientation/sdk/client_resource_paginator_waiter.py
 [client] 한 번 호출: 3건, IsTruncated=True
 [paginator] 페이지별 건수: [3, 3, 1] → 합계 7
 [resource] 첫 키 orders/A-1001.txt, 마지막 키 orders/A-1007.txt
-[waiter] 생성 직후 상태: ACTIVE
+[waiter] create_table 응답의 상태: CREATING
 [waiter] 기다린 뒤 상태: ACTIVE
 SDK client_resource_paginator_waiter OK
 ```
 
 방금 본 것:
 - client 한 번 호출은 `MaxKeys=3` 만큼만 주고 `IsTruncated=True` 로 "더 있다"고 알린다. paginator는 3+3+1 세 번 호출해 7개를 모두 읽었다.
-- 에뮬레이터의 DynamoDB 테이블은 boto3로 만들면 **곧바로 ACTIVE**였다. CLI로 만든 [lab03](./labs/lab03-validation-error.sh)에서는 생성 응답에 `CREATING`이 찍혔다. 실제 AWS에서는 보통 수 초 동안 `CREATING`이다. 그래서 상태를 가정하지 말고 **항상 waiter로 기다리는 습관**이 중요하다. CLI에서는 `aws dynamodb wait table-exists`, `aws s3api wait bucket-exists` 가 같은 역할을 한다.
+- `create_table` **응답**의 상태는 CLI([lab03](./labs/lab03-validation-error.sh))든 boto3든 항상 `CREATING`이다. 에뮬레이터는 1초 안에 `ACTIVE`가 되는 경우가 많아서, 만든 직후 `describe_table`을 부르면 실행할 때마다 `CREATING`이 나오기도 하고 `ACTIVE`가 나오기도 한다(경쟁 상태). 실제 AWS에서는 보통 수 초 동안 `CREATING`이다. 그래서 상태를 가정하지 말고 **항상 waiter로 기다리는 습관**이 중요하다. CLI에서는 `aws dynamodb wait table-exists`, `aws s3api wait bucket-exists` 가 같은 역할을 한다.
 
 **5) 같은 S3 왕복을 boto3로** — [sdk/s3_roundtrip.py](./sdk/s3_roundtrip.py) (lab02의 Python 버전)
 
@@ -162,7 +183,7 @@ S3 엔드포인트: https://127.0.0.1:9297  리전: us-east-1
 SDK s3_roundtrip OK
 ```
 
-방금 본 것: 코드에는 엔드포인트도 키도 없다(`boto3.client("s3")`). 환경 변수가 대상을 정한다. 그래서 **같은 코드가 실제 AWS에서도 그대로 동작한다** — 이 커리큘럼의 모든 boto3 예제의 규칙이다.
+방금 본 것: 코드에는 엔드포인트도 키도 없다(`boto3.client("s3")`). 환경 변수가 대상을 정한다. 그래서 **같은 코드가 실제 AWS에서도 그대로 동작한다** — 이 커리큘럼의 모든 boto3 예제의 규칙이다. 다만 맨 앞의 `require_emulator()`가 "지금은 에뮬레이터"임을 먼저 확인한다.
 
 ## 실제 AWS에서는
 
