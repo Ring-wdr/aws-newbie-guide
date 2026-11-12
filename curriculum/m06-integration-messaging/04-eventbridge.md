@@ -127,7 +127,7 @@ LAB05 OK
 
 - 규칙 패턴 매칭과 SQS 대상 전달은 에뮬레이터에서도 실제로 일어났다(🟢).
 - **Scheduler의 발화 시각은 에뮬레이터가 지키지 않는다.** 저자가 `at(현재+10분)` 일회성 일정을 만들었더니 약 10초 만에 대상 큐에 메시지가 도착했다. 반면 위 실습의 `cron(0 3 * * ? *)` 일정은 20초 넘게 지켜봐도 발화하지 않았다. 그래서 실습은 일정의 **구성만** 확인하고 발화는 단언하지 않는다. 실제 AWS에서는 지정한 시각(유연한 시간 창이면 그 창 안)에 실행된다.
-- 실제 AWS에서 해 보려면: 사용자 지정 이벤트 발행은 100만 건당 과금(소량이면 몇 원 수준), Scheduler는 매월 일정 호출 1,400만 건까지 프리 티어다. 끝나면 `aws scheduler delete-schedule --name todayorder-daily-settlement`, `aws events remove-targets --rule todayorder-high-value-orders --event-bus-name todayorder-bus --ids vip-queue`, `aws events delete-rule ...`, `aws events delete-event-bus --name todayorder-bus`, `aws sqs delete-queue ...`.
+- 실제 AWS에서 해 보려면: 사용자 지정 이벤트 발행은 100만 건당 과금(소량이면 몇 원 수준), Scheduler도 호출 수 기준 과금이라 실습 몇 건은 거의 무료다(일정을 지우지 않으면 계속 발화하니 반드시 정리). 끝나면 `aws scheduler delete-schedule --name todayorder-daily-settlement`, `aws events remove-targets --rule todayorder-high-value-orders --event-bus-name todayorder-bus --ids vip-queue`, `aws events delete-rule ...`, `aws events delete-event-bus --name todayorder-bus`, `aws sqs delete-queue ...`.
 
 ## 시험 포인트
 
