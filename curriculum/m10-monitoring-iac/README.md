@@ -64,7 +64,15 @@ curriculum/m10-monitoring-iac/labs/verify.sh
 ## 설계 대비 대체 사유
 
 - CURRICULUM.md의 M10 실습을 모두 구현했다. 등급 조정:
-  - "CloudFormation으로 M02 VPC 재현(Outputs, 드리프트, 롤백)" 🟢 → 생성·EC2 API 확인·Outputs·롤백·삭제는 🟢, **드리프트는 🟡**(위 표: VPC 리소스 오판). 정확한 드리프트 시연은 lab05의 앱 스택으로 옮겼다.
+  - "CloudFormation으로 M02 VPC 재현(Outputs, 드리프트, 롤백)" 🟢 → (M02와 똑같은 VPC가 아니라 같은 요구의 2-AZ 3-티어 VPC — 아래 차이 표) 생성·EC2 API 확인·Outputs·롤백·삭제는 🟢, **드리프트는 🟡**(위 표: VPC 리소스 오판). 정확한 드리프트 시연은 lab05의 앱 스택으로 옮겼다.
   - VPC 스택 변경 세트는 CURRICULUM 지시대로 앱 스택으로 대체했고, VPC 스택에서의 501 롤백은 "정직한 실패 예"로 lab04에 남겼다(🔴).
-- M02 모듈은 다른 저자가 병렬로 작성 중이라, 같은 요구(10.0.0.0/16, 서브넷 6개, IGW, NAT, 라우팅 테이블, SG 체인)를 이 모듈의 템플릿 [vpc-3tier.yaml](./labs/templates/vpc-3tier.yaml)로 독립 설계했다. M02의 CLI 구성과 CIDR이 다를 수 있다.
+- M02 모듈은 다른 저자가 병렬로 작성 중이라, 같은 요구(10.0.0.0/16, 서브넷 6개, IGW, NAT, 라우팅 테이블, SG 체인)를 이 모듈의 템플릿 [vpc-3tier.yaml](./labs/templates/vpc-3tier.yaml)로 독립 설계했다. 그래서 M02의 VPC를 그대로 재현한 것이 아니라 **같은 요구를 만족하는 자기 2-AZ 3-티어 VPC**다. M02([README "CIDR 계획"](../m02-vpc-networking/README.md#cidr-계획))와 다른 점:
+
+  | 항목 | M02 (CLI, `labs/_lib.sh`) | M10 (CloudFormation, `vpc-3tier.yaml`) |
+  |---|---|---|
+  | 서브넷 CIDR (퍼블릭 / 앱 / DB, a·b) | `10.0.0.0/24`·`10.0.1.0/24` / `10.0.10.0/24`·`10.0.11.0/24` / `10.0.20.0/24`·`10.0.21.0/24` | `10.0.1.0/24`·`10.0.2.0/24` / `10.0.11.0/24`·`10.0.12.0/24` / `10.0.21.0/24`·`10.0.22.0/24` |
+  | NAT 게이트웨이 | AZ마다 1개 (`todayorder-nat-a`·`-b`) | AZ a에 1개 (비용 절감용) |
+  | 앱 라우팅 테이블 | AZ별 2개 (`app-rt-a → nat-a`, `app-rt-b → nat-b`) | 1개 (두 앱 서브넷 → AZ a의 NAT) |
+  | 보안 그룹 | `todayorder-alb-sg` → `todayorder-app-sg` → `todayorder-db-sg` | 논리 ID `WebSg` → `AppSg` → `DbSg` (`GroupName` 미지정 — CloudFormation이 `<스택>-WebSg-<무작위>` 형식으로 이름을 붙인다) |
+  | 리소스 `Name` 태그 | 모든 리소스에 `todayorder-…` | VPC(`${EnvName}-vpc`)에만 |
 - 추가(보강): lab06(SSM 관찰), lab07(운영 지원 서비스 설정값 읽기) — 레슨 4·5에 손으로 만져 볼 거리를 주려는 것. sdk 예제에 EMF(로그에서 지표 추출)를 넣었다(에뮬레이터에서 동작 확인).
