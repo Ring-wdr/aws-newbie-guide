@@ -51,7 +51,10 @@ curriculum/mNN-<slug>/
    - **포트**: `scripts/env.sh`는 `EMULATOR_PORT`를 읽는다(학습자 기본값 9297). 에이전트는 반드시 [AGENTS.md](./AGENTS.md)에 배정된 포트를 `export EMULATOR_PORT=<port>`로 지정하고 작업한다. 스크립트 안에 포트를 하드코딩하지 않는다.
 6. **리소스 이름**은 `todayorder-` 접두사. 리전은 `us-east-1` 고정. 계정 ID는 `000000000000`.
 7. **boto3 예제**는 타입 힌트와 `if __name__ == "__main__":`을 갖춘 실행 가능한 단일 파일. 엔드포인트·자격 증명을 코드에 하드코딩하지 않는다(환경 변수로 주입 — 실제 AWS에서도 그대로 동작하는 코드여야 한다).
-8. 실제 AWS 자격 증명·계정을 절대 사용하지 않는다. 모든 실행 전 `aws sts get-caller-identity`의 Account가 `000000000000`인지 env 스크립트가 보장한다.
+8. **정책을 실제처럼 쓴다.** SNS→SQS·S3→SQS(큐 정책), Step Functions·Pipes·Glue·Backup(역할 신뢰 정책·권한), CloudFront OAC·Config(버킷 정책)는 정책이 없으면 실패하거나 조용히 아무 일도 일어나지 않는다. 반대로 에뮬레이터가 검사하지 않는 권한(예: API Gateway→Lambda의 `AddPermission`)도 실제 AWS에 필요하면 스크립트에 넣는다.
+9. **리소스 엔드포인트(RDS·ALB·CloudFront)는 컨테이너 안에만 있다.** 호스트에서 접속하는 실습을 설계하지 않는다. 꼭 필요하면 `docker exec aws-emulator-$EMULATOR_PORT ...`로 보여 주되 선택 과제로 둔다.
+10. **시간에 기대지 않는다.** 비동기 상태는 waiter/폴링으로 기다리고 "몇 초 뒤"를 단언하지 않는다. 에뮬레이터의 타이밍(TTL 수 초, Firehose 버퍼 무시 등)을 실제 AWS의 특성처럼 설명하지 않는다.
+11. 실제 AWS 자격 증명·계정을 절대 사용하지 않는다. 모든 실행 전 `aws sts get-caller-identity`의 Account가 `000000000000`인지 env 스크립트가 보장한다.
 
 ## 4. 내용 정확성
 
