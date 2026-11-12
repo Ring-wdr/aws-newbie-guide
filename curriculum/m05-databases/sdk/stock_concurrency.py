@@ -8,8 +8,11 @@
 
 1. 나쁜 방법 — 읽고(GetItem) → 애플리케이션에서 계산하고 → 덮어쓰기(SET stock = 9)
    40개의 스레드가 모두 "재고 10"을 읽은 뒤에 쓰도록 threading.Barrier 로 줄을 세운다.
-   (실제 서버에서도 요청이 몰리면 흔히 일어나는 순서다. Barrier 는 그 순서를 매번 똑같이 재현하려는 장치일 뿐이다.)
-   → 40명 모두 "구매 성공", 재고는 9. 39개가 초과 판매되고 업데이트도 사라졌다(lost update).
+   Barrier 는 "모두 같은 값을 읽은 뒤 쓴다"는 **최악의 경우를 강제**하는 장치다. 실제 서버에서는 요청이
+   겹치는 정도가 실행마다 달라 성공 수·남은 재고도 매번 다르지만, 같은 종류의 오류가 생긴다.
+   → 40명 모두 "구매 성공", 재고는 9.
+     · 사라진 차감(lost update) = 40 - (10 - 9) = 39건: 40번 줄였는데 실제로는 1만 줄었다
+     · 재고를 넘어 판 수량(초과 판매) = 40 - 10 = 30건: 10개뿐인 상품을 40명에게 팔았다
 
 2. 좋은 방법 — 조건부 원자적 감소 한 번:
        UpdateExpression    = "SET stock = stock - :q"
@@ -132,7 +135,8 @@ def main() -> None:
 
     print(f"\n[1] 읽고-계산하고-덮어쓰기  (재고 {INITIAL_STOCK}, 구매자 {BUYERS}명)")
     sold, stock = naive_round(ddb)
-    print(f"    '구매 성공' 응답 {sold}건, 남은 재고 {stock}  → 초과 판매 {sold - (INITIAL_STOCK - stock)}건")
+    print(f"    '구매 성공' 응답 {sold}건, 남은 재고 {stock}")
+    print(f"    → 사라진 차감(lost update) {sold - (INITIAL_STOCK - stock)}건, 재고를 넘어 판 수량(초과 판매) {max(0, sold - INITIAL_STOCK)}건")
 
     print(f"\n[2] 조건부 원자적 감소  SET stock = stock - :q  IF stock >= :q")
     ok, rejected, stock2 = conditional_round(ddb)

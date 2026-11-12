@@ -31,7 +31,7 @@ flowchart LR
 | 두 번째 DB로 읽기 | **불가**(대기 인스턴스는 트래픽을 받지 않음) | 가능(복제본마다 자기 엔드포인트) |
 | 장애 시 | **자동 장애 조치**: 같은 DNS 이름이 대기 쪽을 가리킴(보통 1~2분) | 자동 아님. 필요하면 **수동 승격(promote)** → 독립 DB(새 엔드포인트) |
 | 위치 | 같은 리전의 다른 AZ | 같은 AZ·다른 AZ·**다른 리전**(교차 리전 복제본 → DR) |
-| 개수 | 대기 1 | 원본당 최대 **15** (Oracle은 15까지 되지만 5개 이하 권장) |
+| 개수 | 대기 1 | 원본당 최대 **15**(MySQL·MariaDB·PostgreSQL·SQL Server), **Oracle은 최대 5** |
 | 전제 조건 | — | 원본의 **자동 백업이 켜져 있어야** 함(보존 기간 ≥ 1) |
 
 둘은 함께 쓸 수 있다. "Multi-AZ 원본 + 다른 AZ의 읽기 복제본 2개"가 흔한 운영 구성이다. 복제본 자체도 Multi-AZ로 만들 수 있다.
@@ -109,7 +109,7 @@ aws rds reboot-db-instance --db-instance-identifier todayorder-m05-maz --force-f
 ]
 ```
 
-방금 본 것: API는 받아들이고 `rebooting`을 거치지만 AZ는 그대로이고 이벤트도 "restarted"뿐이다. **장애 조치는 이 에뮬레이터에서 재현되지 않는다** → 위 시퀀스 다이어그램이 실제 동작이다. (실제 AWS의 이벤트 메시지에는 "Multi-AZ instance failover started/completed"가 찍힌다.)
+방금 본 것: API는 받아들이고 `rebooting`을 거치지만 AZ는 그대로이고 이벤트도 "restarted"뿐이다. (이벤트는 이번 실행이 시작된 뒤의 것만 `--start-time`으로 본다. 이 필터가 없으면 같은 에뮬레이터에서 다시 실행할 때 이전 실행의 "created/restarted"가 반복해 보인다.) **장애 조치는 이 에뮬레이터에서 재현되지 않는다** → 위 시퀀스 다이어그램이 실제 동작이다. (실제 AWS의 이벤트 메시지에는 "Multi-AZ instance failover started/completed"가 찍힌다.)
 
 **3) 읽기 전용 복제본을 다른 AZ에**
 
