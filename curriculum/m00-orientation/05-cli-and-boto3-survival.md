@@ -79,9 +79,9 @@ dr = emulator_site("DR_", real_aws_region="ap-northeast-1")  # DR_AWS_* (scripts
 dr.client("dynamodb").put_item(...)                          # 각 사이트의 엔드포인트·키·인증서로 고정된 클라이언트
 ```
 
-`real_aws_region`은 실제 AWS에서 돌릴 때(아래 opt-out)만 쓰인다.
+`real_aws_region`은 실제 AWS에서 돌릴 때(아래 opt-out)만 쓰인다. 서비스별 `AWS_ENDPOINT_URL_*`이 있다면 그 포트도 `AWS_ENDPOINT_URL`과 같아야 한다(다른 사람의 에뮬레이터로 새는 것을 막기 위해).
 
-나중에 **자기 AWS 계정에서** 같은 예제를 직접 돌려 보고 싶다면 `TODAYORDER_ALLOW_REAL_AWS=1`을 설정한다. 그러면 검사를 건너뛰고 경고만 출력한다(요금 주의, 기본값은 꺼짐). `emulator_site()`는 이때 엔드포인트 없이 `real_aws_region` 리전의 세션을 쓴다. `verify.sh`는 "env.sh 없이 실행하면 네트워크 호출 전에 거부되는지"와 가드 자체 시험(`uv run python -m emulator_guard.selftest`: URL 우회 사례, 두 번째 사이트, opt-out)을 매번 확인한다.
+나중에 **자기 AWS 계정에서** 같은 예제를 직접 돌려 보고 싶다면 `TODAYORDER_ALLOW_REAL_AWS=1`을 설정한다. 그러면 검사를 건너뛰고 경고만 출력한다(요금 주의, 기본값은 꺼짐). `emulator_site()`는 이때 엔드포인트 없이 `real_aws_region` 리전의 세션을 쓴다. `verify.sh`는 "env.sh 없이 실행하면 네트워크 호출 전에 거부되는지"와 가드 자체 시험(`uv run python -m emulator_guard.selftest`: URL 우회 사례, 두 번째 사이트, opt-out)을 매번 확인한다. 이때 `DR_AWS_*`는 쓰이지 않아 **두 번째 사이트도 주 사이트와 같은 환경을 따른다**(env.sh를 source 한 셸이면 두 사이트 모두 주 에뮬레이터로 간다). 실제 AWS에서 두 리전을 쓰려면 env.sh 없이 새 셸에서 실행하고 `real_aws_region`만 다르게 준다.
 
 ## 직접 해 보기
 

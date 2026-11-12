@@ -51,18 +51,38 @@ guard_refuses() {
 
 # env.sh 의 시계 어긋남 진단: 서명 거부를 흉내 내는 가짜 aws 와 "20분 뒤" 시각으로 env.sh 를 source 한다.
 # (실제 에뮬레이터·VM 시계는 건드리지 않는다)
-envsh_clock_diag() {
+envsh_clock_diag() {  # $1=가짜 현재 시각 $2=가짜 aws 의 stderr 문구 $3=종료 코드 $4=기대 문구 $5=있으면 안 되는 문구
   local fake out
   fake="$(mktemp -d)"
-  printf '#!/bin/sh\necho "An error occurred (SignatureDoesNotMatch) when calling the GetCallerIdentity operation" >&2\nexit 254\n' >"$fake/aws"
+  printf '#!/bin/sh\n[ -n "%s" ] && echo "%s" >&2\nexit %s\n' "$2" "$2" "$3" >"$fake/aws"
   chmod +x "$fake/aws"
   out="$(PATH="$fake:$PATH" EMULATOR_CLOCK_FAKE_NOW="$1" bash -c "source '$ROOT/scripts/env.sh'" 2>&1)" && { rm -rf "$fake"; echo "env.sh 가 통과해 버림"; return 1; }
   rm -rf "$fake"
   echo "$out"
-  grep -q "$2" <<<"$out"
+  grep -q "$4" <<<"$out" || return 1
+  [ -z "${5:-}" ] || ! grep -q "$5" <<<"$out"
 }
-envsh_clock_skewed() { envsh_clock_diag "$(($(date -u +%s) + 1200))" '\[clock-check\] 시계 어긋남'; }
-envsh_sig_no_skew() { envsh_clock_diag "$(date -u +%s)" '서명을 거부했습니다'; }
+SIGERR="An error occurred (SignatureDoesNotMatch) when calling the GetCallerIdentity operation"
+now_plus() { echo "$(($(date -u +%s) + $1))"; }
+envsh_sig_skew20() { envsh_clock_diag "$(now_plus 1200)" "$SIGERR" 254 '\[clock-check\] 시계 어긋남'; }
+envsh_sig_skew2() { envsh_clock_diag "$(now_plus 120)" "$SIGERR" 254 '서명을 거부했습니다' '시계 어긋남 때문에'; }
+envsh_nosig_skew20() { envsh_clock_diag "$(now_plus 1200)" "" 255 '확인하지 못했습니다' '시계 어긋남'; }
+
+# dr-env.sh: 비대화형에서 DR_EMULATOR_PORT 없으면 거부하고, 실패하면 이전 DR_AWS_* 를 남기지 않는다.
+drenv_refuses_without_port() {
+  local out
+  out="$(env -u DR_EMULATOR_PORT DR_AWS_ENDPOINT_URL=https://127.0.0.1:1 bash -c \
+    "source '$ROOT/scripts/env.sh' 2>/dev/null; source '$ROOT/scripts/dr-env.sh'; echo rc=\$?; echo \"left=\${DR_AWS_ENDPOINT_URL:-}\"" </dev/null 2>&1)"
+  echo "$out"
+  grep -q 'DR_EMULATOR_PORT 가 설정되지 않았습니다' <<<"$out" && grep -q '^rc=1$' <<<"$out" && grep -q '^left=$' <<<"$out"
+}
+drenv_bad_port_clears() {
+  local out
+  out="$(DR_EMULATOR_PORT=notaport DR_AWS_ENDPOINT_URL=https://127.0.0.1:1 bash -c \
+    "source '$ROOT/scripts/env.sh' 2>/dev/null; source '$ROOT/scripts/dr-env.sh'; echo rc=\$?; echo \"left=\${DR_AWS_ENDPOINT_URL:-}\"" </dev/null 2>&1)"
+  echo "$out"
+  grep -q '^rc=1$' <<<"$out" && grep -q '^left=$' <<<"$out"
+}
 
 # 두 번째 사이트(dr-env.sh + emulator_site("DR_")) 실시간 시험은 DR_EMULATOR_PORT 에 에뮬레이터가 떠 있을 때만.
 guard_selftest() {
@@ -76,8 +96,11 @@ guard_selftest() {
 cd "$ROOT"
 run "안전 장치 자체 시험 (URL 파싱 우회 차단·두 번째 사이트 API·opt-out)" guard_selftest
 [ -n "${DR_EMULATOR_PORT:-}" ] || echo "SKIP  두 번째 사이트 실시간 시험 (DR_EMULATOR_PORT 미설정 — 설정하고 그 포트에 에뮬레이터를 띄우면 시험)"
-run "env.sh: 서명 거부 + 시계 20분 어긋남 → 시계 어긋남 안내" envsh_clock_skewed
-run "env.sh: 서명 거부 + 시계 정상 → 서명 거부 안내" envsh_sig_no_skew
+run "env.sh: 서명 거부 + 시계 20분 어긋남 → 시계 어긋남 안내" envsh_sig_skew20
+run "env.sh: 서명 거부 + 시계 2분 차이(허용 범위 안) → 서명 거부 안내, 시계 탓 안 함" envsh_sig_skew2
+run "env.sh: 응답 없음(서명 오류 아님) + 시계 20분 차이 → 시계 탓 안 함" envsh_nosig_skew20
+run "dr-env.sh: 비대화형 + DR_EMULATOR_PORT 없음 → 거부, 이전 DR_AWS_* 지움" drenv_refuses_without_port
+run "dr-env.sh: 잘못된 포트 → 거부, 이전 DR_AWS_* 지움" drenv_bad_port_clears
 for py in "$MOD_DIR"/sdk/*.py; do
   run "안전 장치: env.sh 없이 sdk/$(basename "$py") 실행 → 네트워크 호출 전 거부" guard_refuses "$py"
 done
