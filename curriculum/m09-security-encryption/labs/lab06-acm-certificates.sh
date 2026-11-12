@@ -7,7 +7,9 @@ set -euo pipefail
 source "$(git rev-parse --show-toplevel)/scripts/env.sh"
 source "$(dirname "$0")/_lib.sh"
 
-DOMAIN="todayorder.kr"          # 예약 도메인(.example/.test/.local)은 에뮬레이터가 곧바로 FAILED 처리한다
+# 예약 이름만 쓴다(RFC 2606). 에뮬레이터는 .example/.test/.local/.invalid 최상위 도메인을 곧바로 FAILED 처리하지만
+# example.com 아래 이름은 PENDING_VALIDATION 에 머문다.
+DOMAIN="todayorder.example.com"
 INTERNAL="api.todayorder.internal"
 WORK="$TMP_LIB"
 cd "$WORK"
@@ -74,9 +76,9 @@ done
 echo "관찰한 상태:$seen"
 requested_status="$(aws acm describe-certificate --certificate-arn "$REQ" --query Certificate.Status --output text)"
 
-echo "== 5. 예약 도메인(.example)으로 요청하면 에뮬레이터는 곧 FAILED 로 바꾼다"
+echo "== 5. .example 최상위 도메인으로 요청하면 에뮬레이터는 곧 FAILED 로 바꾼다"
 BAD="$(aws acm request-certificate --domain-name api.todayorder.example --validation-method DNS --query CertificateArn --output text)"
-poll 60 "예약 도메인 FAILED" sh -c "aws acm describe-certificate --certificate-arn '$BAD' --query Certificate.Status --output text | grep -qx FAILED"
+poll 60 ".example 최상위 도메인 FAILED" sh -c "aws acm describe-certificate --certificate-arn '$BAD' --query Certificate.Status --output text | grep -qx FAILED"
 aws acm describe-certificate --certificate-arn "$BAD" --query 'Certificate.[Status, FailureReason]' --output text
 
 echo "== 6. 목록"

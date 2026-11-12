@@ -63,7 +63,7 @@ ValidationException) when calling the ExportCertificate operation: Certificate A
 ### 2) 공인 인증서 요청(DNS 검증) — 🟡 요청·검증 레코드 / 🔴 발급
 
 ```
-== 3. 공인 인증서 요청 — DNS 검증 (api.todayorder.kr)
+== 3. 공인 인증서 요청 — DNS 검증 (api.todayorder.example.com)
 {
     "Status": "PENDING_VALIDATION",
     "Type": "AMAZON_ISSUED",
@@ -71,9 +71,9 @@ ValidationException) when calling the ExportCertificate operation: Certificate A
         "Method": "DNS",
         "Status": "PENDING_VALIDATION",
         "Record": {
-            "Name": "_52319207bbe0b212b60abd3139b6ff73.api.todayorder.kr.",
+            "Name": "_a3a209eb4d8c2c1719dbdd12f323df28.api.todayorder.example.com.",
             "Type": "CNAME",
-            "Value": "_68f21c3792d52e894cd22cb841926bf5.e5e9449fd0.acm-validations.aws."
+            "Value": "_a891091eff9aaffe40cfa059318069c2.dc463b3261.acm-validations.aws."
         }
     }
 }
@@ -85,16 +85,16 @@ CNAME 반영됨(INSYNC). 20초 동안 상태를 지켜본다:
 방금 본 것: ACM은 "이 이름의 CNAME을 이 값으로 만들어 보라"고 알려 준다. 도메인을 통제하는 사람만 만들 수 있으니 소유 증명이 된다. 이 CNAME을 **지우지 않고 두면** ACM이 갱신할 때도 같은 레코드로 다시 검증한다(그래서 DNS 검증이 자동 갱신에 유리하다). 에뮬레이터는 실제 DNS 검증을 하지 않으므로 Route 53에 레코드를 넣어도 **`PENDING_VALIDATION`에서 멈춘다.**
 
 ```
-== 5. 예약 도메인(.example)으로 요청하면 에뮬레이터는 곧 FAILED 로 바꾼다
+== 5. .example 최상위 도메인으로 요청하면 에뮬레이터는 곧 FAILED 로 바꾼다
 FAILED	ADDITIONAL_VERIFICATION_REQUIRED
 == 6. 목록
 api.todayorder.example	FAILED	AMAZON_ISSUED
-api.todayorder.kr	PENDING_VALIDATION	AMAZON_ISSUED
 api.todayorder.internal	ISSUED	IMPORTED
+api.todayorder.example.com	PENDING_VALIDATION	AMAZON_ISSUED
 LAB06 OK
 ```
 
-`.example`·`.test`·`.local` 같은 예약 도메인은 에뮬레이터가 곧바로 `FAILED`로 바꾼다. 그래서 이 lab은 DNS 검증 요청에 `todayorder.kr`을 썼다(에뮬레이터 안에서만 쓰는 이름이며 실제 DNS는 건드리지 않는다).
+에뮬레이터는 `.example`·`.test`·`.local`·`.invalid` 같은 예약 **최상위 도메인**을 곧바로 `FAILED`로 바꾼다. 그래서 이 lab은 DNS 검증 요청에 역시 예약 이름(RFC 2606)인 `example.com` 아래의 `api.todayorder.example.com`을 썼다 — 이 이름은 `PENDING_VALIDATION`에 머문다. 실습에서는 남의 실제 도메인을 쓰지 않는다.
 
 ## 실제 AWS에서는
 
