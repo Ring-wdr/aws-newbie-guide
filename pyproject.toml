@@ -8,5 +8,11 @@ dependencies = [
     "boto3>=1.40",
 ]
 
-[tool.uv]
-package = false
+# src/emulator_guard: 모든 boto3 예제가 클라이언트를 만들기 전에 호출하는 안전 장치.
+# uv sync 가 이 저장소를 편집 가능 모드로 설치하므로 어디서든 `from emulator_guard import require_emulator`.
+[build-system]
+requires = ["uv_build>=0.8,<0.14"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "emulator_guard"

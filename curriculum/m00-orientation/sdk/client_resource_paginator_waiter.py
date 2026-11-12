@@ -10,6 +10,8 @@ from __future__ import annotations
 import boto3
 from botocore.exceptions import ClientError
 
+from emulator_guard import require_emulator
+
 BUCKET = "todayorder-m00-boto3-tools"
 TABLE = "todayorder-m00-boto3-orders"
 
@@ -28,6 +30,8 @@ def cleanup(s3, ddb) -> None:  # type: ignore[no-untyped-def]
 
 
 def main() -> None:
+    require_emulator()  # 클라이언트를 만들기 전에: 에뮬레이터가 아니면 여기서 종료
+
     s3 = boto3.client("s3")
     ddb = boto3.client("dynamodb")
     cleanup(s3, ddb)
@@ -51,13 +55,14 @@ def main() -> None:
     print(f"[resource] 첫 키 {keys[0]}, 마지막 키 {keys[-1]}")
 
     # 4) waiter: "원하는 상태가 될 때까지" 폴링해 준다.
-    ddb.create_table(
+    created = ddb.create_table(
         TableName=TABLE,
         AttributeDefinitions=[{"AttributeName": "orderId", "AttributeType": "S"}],
         KeySchema=[{"AttributeName": "orderId", "KeyType": "HASH"}],
         BillingMode="PAY_PER_REQUEST",
     )
-    print(f"[waiter] 생성 직후 상태: {ddb.describe_table(TableName=TABLE)['Table']['TableStatus']}")
+    # 생성 응답의 상태는 항상 CREATING. (직후에 describe_table 을 부르면 CREATING/ACTIVE 가 실행마다 다르다)
+    print(f"[waiter] create_table 응답의 상태: {created['TableDescription']['TableStatus']}")
     ddb.get_waiter("table_exists").wait(TableName=TABLE, WaiterConfig={"Delay": 1, "MaxAttempts": 30})
     status = ddb.describe_table(TableName=TABLE)["Table"]["TableStatus"]
     print(f"[waiter] 기다린 뒤 상태: {status}")

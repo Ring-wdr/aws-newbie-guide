@@ -7,6 +7,10 @@
 코드에는 엔드포인트도 자격 증명도 없다. boto3가 환경 변수(AWS_ENDPOINT_URL,
 AWS_SHARED_CREDENTIALS_FILE, AWS_CA_BUNDLE, AWS_REGION …)를 읽어 에뮬레이터로 보낸다.
 그래서 같은 코드가 실제 AWS에서도 그대로 동작한다.
+
+main() 첫 줄의 require_emulator() 는 클라이언트를 만들기 전에 "에뮬레이터가 맞는지"
+확인하고, 아니면 아무 요청도 보내지 않고 종료한다. (실제 AWS에서 해 보려면
+TODAYORDER_ALLOW_REAL_AWS=1 — 요금 주의)
 """
 
 from __future__ import annotations
@@ -15,6 +19,8 @@ import json
 
 import boto3
 from botocore.exceptions import ClientError
+
+from emulator_guard import require_emulator
 
 BUCKET = "todayorder-m00-receipts-sdk"
 KEY = "receipts/2026/11/A-1002.json"
@@ -33,10 +39,11 @@ def empty_and_delete_bucket(s3, bucket: str) -> None:  # type: ignore[no-untyped
 
 
 def main() -> None:
+    require_emulator()  # 클라이언트를 만들기 전에: 에뮬레이터가 아니면 여기서 종료
+
     sts = boto3.client("sts")
     who = sts.get_caller_identity()
     print(f"계정: {who['Account']}  ARN: {who['Arn']}")
-    assert who["Account"] == "000000000000", "에뮬레이터가 아닙니다!"
 
     s3 = boto3.client("s3")
     print(f"S3 엔드포인트: {s3.meta.endpoint_url}  리전: {s3.meta.region_name}")
