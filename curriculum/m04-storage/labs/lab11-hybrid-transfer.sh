@@ -101,6 +101,16 @@ L_DST="$(aws datasync create-location-s3 --s3-bucket-arn "arn:aws:s3:::$DST" \
 TASK="$(aws datasync create-task --name todayorder-m04-migrate --source-location-arn "$L_SRC" \
   --destination-location-arn "$L_DST" --options VerifyMode=ONLY_FILES_TRANSFERRED,OverwriteMode=ALWAYS \
   --query TaskArn --output text)"
+# CreateTask 는 작업을 CREATING 상태로 돌려준다. AVAILABLE 이 되기 전에 실행하면
+# InvalidRequestException("is in status CREATING") — 그래서 상태를 폴링한다 (최대 120초).
+task_status=""
+for _ in $(seq 1 60); do
+  task_status="$(aws datasync describe-task --task-arn "$TASK" --query Status --output text)"
+  [ "$task_status" = "AVAILABLE" ] && break
+  sleep 2
+done
+[ "$task_status" = "AVAILABLE" ] || { echo "FAIL: 120초 안에 DataSync 작업이 AVAILABLE 이 되지 않음 (마지막 상태: $task_status)"; exit 1; }
+echo "작업 상태: $task_status"
 EXEC="$(aws datasync start-task-execution --task-arn "$TASK" --query TaskExecutionArn --output text)"
 ds_status=""
 for _ in $(seq 1 60); do
@@ -108,6 +118,7 @@ for _ in $(seq 1 60); do
   case "$ds_status" in SUCCESS | ERROR) break ;; esac
   sleep 2
 done
+case "$ds_status" in SUCCESS | ERROR) ;; *) echo "FAIL: 120초 안에 실행이 끝나지 않음 (마지막 상태: $ds_status)"; exit 1 ;; esac
 aws datasync describe-task-execution --task-execution-arn "$EXEC" \
   --query '{Status: Status, FilesTransferred: FilesTransferred, BytesTransferred: BytesTransferred}' --output json
 dst_count="$(aws s3api list-objects-v2 --bucket "$DST" --output json | jq '(.Contents // []) | length')"
@@ -136,8 +147,8 @@ for r in todayorder-m04-sgw-role todayorder-m04-datasync-role; do
 done
 
 # ---- 단언 (데이터가 움직이지 않는 것까지 확인: 에뮬레이터가 복사를 시작하면 문서 갱신 필요)
-[ "$share_status" = "AVAILABLE" ] || { echo "FAIL: 파일 공유 상태 ($share_status)"; exit 1; }
+[ "$share_status" = "AVAILABLE" ] || { echo "FAIL: 파일 공유가 AVAILABLE 이 되지 않음 (마지막 상태: $share_status)"; exit 1; }
 [ "$ds_status" = "SUCCESS" ] || { echo "FAIL: DataSync 실행 상태 ($ds_status)"; exit 1; }
 [ "$dst_count" = "0" ] || { echo "NOTE: DataSync 가 실제로 복사하기 시작함 → 레슨 7·README 갱신 필요"; exit 1; }
-[ "$sftp_state" = "ONLINE" ] || { echo "FAIL: SFTP 서버 상태 ($sftp_state)"; exit 1; }
+[ "$sftp_state" = "ONLINE" ] || { echo "FAIL: SFTP 서버가 ONLINE 이 되지 않음 (마지막 상태: $sftp_state)"; exit 1; }
 echo "LAB11 OK"
