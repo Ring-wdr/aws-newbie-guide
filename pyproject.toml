@@ -1,0 +1,12 @@
+[project]
+name = "aws-newbie-guide"
+version = "0.1.0"
+description = "aws-emulator로 실습하는 AWS SAA-C03 커리큘럼의 Python(boto3) 예제 실행 환경"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "boto3>=1.40",
+]
+
+[tool.uv]
+package = false
