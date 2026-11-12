@@ -14,8 +14,10 @@ CloudTrail과 Config는 "기록"이다. 수백만 줄의 기록에서 **이상�
 | **GuardDuty** | **위협 탐지** — "지금 공격·침해가 일어나고 있나" | CloudTrail 이벤트, VPC Flow Logs, DNS 로그(+ S3·EKS·RDS·Lambda·런타임 보호 등) — **켜기만 하면 됨, 에이전트·로그 설정 불필요** | 채굴 도메인 조회, 탈취된 자격 증명이 AWS 밖에서 사용, 포트 스캔 |
 | **Inspector** | **취약점 스캔** — "약점(CVE)·노출이 있나" | EC2(SSM 에이전트 또는 에이전트리스), ECR 컨테이너 이미지, Lambda 코드 | 패키지의 CVE, 인터넷에 열린 포트(네트워크 도달성) |
 | **Macie** | **S3 민감 데이터 발견** — "버킷에 개인정보·카드 번호가 있나" | S3 객체 내용(머신 러닝·패턴) + 버킷 공개 여부 | 영수증 CSV에 신용카드 번호, 공개된 버킷 |
-| **Security Hub** | **통합 대시보드·보안 표준 점검** — "한 화면에 모아 점수 매기기" | GuardDuty·Inspector·Macie·Config·서드파티 결과를 모으고 CIS·AWS 기본 보안 모범 사례 표준으로 점검 | 계정 보안 점수, 표준별 실패 컨트롤 |
+| **Security Hub** (현 이름 Security Hub **CSPM**) | **통합 대시보드·보안 표준 점검** — "한 화면에 모아 점수 매기기" | GuardDuty·Inspector·Macie·Config·서드파티 결과를 모으고 CIS·AWS 기본 보안 모범 사례 표준으로 점검 | 계정 보안 점수, 표준별 실패 컨트롤 |
 | **Detective** | **조사(사후 분석)** — "이 결과의 원인·범위는" | GuardDuty 결과 + 로그로 만든 **행동 그래프** | 이 IAM 사용자가 지난주 어떤 IP에서 무엇을 했나 |
+
+> **이름 변경 주의**: 2025년 12월 새 **AWS Security Hub**가 정식 출시되면서, 기존 서비스(ASFF 형식으로 결과를 모으고 CIS·AWS 기본 보안 모범 사례 표준으로 점수를 매기는 것)는 **AWS Security Hub CSPM**으로 이름이 바뀌어 따로 계속 제공된다. 새 Security Hub는 GuardDuty·Inspector·Macie·Security Hub CSPM의 신호를 OCSF 형식으로 상관 분석해 위험의 우선순위를 매긴다. 시험 가이드와 문제에는 대개 그냥 "Security Hub"로 나오며, 묻는 것은 "여러 보안 결과를 한곳에 모으고 표준 준수를 점검"이다. 이 레슨의 lab이 켜는 것(`securityhub enable-security-hub`, 표준 구독)은 CSPM 쪽 API다.
 
 > 외우는 법: **G**uardDuty = **G**uard(경비원, 지금 수상한 행동), **I**nspector = **I**nspect(점검, 취약점), **M**acie = 데이터 속 개인정보, **Security Hub** = 허브(모으기), **Detective** = 형사(사후 조사).
 
@@ -37,7 +39,7 @@ flowchart LR
 
 ### GuardDuty 결과(finding) 읽기
 
-결과 유형 이름은 `위협 목적:리소스 유형/위협 패밀리.변형!탐지 방법` 형식이다. 예: `CryptoCurrency:EC2/BitcoinTool.B!DNS` = 암호 화폐 채굴 목적, 대상은 EC2, DNS 로그로 탐지. 심각도는 낮음·중간·높음(숫자 구간)으로 나뉜다. 탐지 후 자동 대응은 **EventBridge 규칙 → Lambda/SSM**으로 만든다(GuardDuty가 스스로 차단하지는 않는다).
+결과 유형 이름은 `위협 목적:리소스 유형/위협 패밀리.변형!탐지 방법` 형식이다. 예: `CryptoCurrency:EC2/BitcoinTool.B!DNS` = 암호 화폐 채굴 목적, 대상은 EC2, DNS 로그로 탐지. 심각도는 1.0~10.0 값이고 **치명(Critical, 9.0~10.0)·높음(7.0~8.9)·중간(4.0~6.9)·낮음(1.0~3.9)** 네 단계로 나뉜다. 치명은 공격 시퀀스(여러 신호가 이어진 랜섬웨어형 공격 등)가 진행 중일 수 있다는 뜻이다. 탐지 후 자동 대응은 **EventBridge 규칙 → Lambda/SSM**으로 만든다(GuardDuty가 스스로 차단하지는 않는다).
 
 ## 직접 해 보기
 

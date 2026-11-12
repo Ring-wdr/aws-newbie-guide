@@ -154,10 +154,8 @@ LAB08 OK
 방금 본 것: 자동 수정을 켜 두면 **새로 만든 위반 버킷의 버전 관리를 Config가 SSM Automation으로 직접 켠다.** 수정이 쓸 역할은 `ssm.amazonaws.com`이 맡고 `s3:PutBucketVersioning`만 할 수 있게 최소 권한으로 만들었다.
 
 이 실습을 만들면서 겪은 함정 두 가지:
-1. 처음에는 규칙 범위를 "모든 S3 버킷"으로 두었더니, 자동 수정이 **CloudTrail 로그 버킷 같은 다른 실습의 버킷까지 버전 관리를 켜 버렸다.** 그 버킷은 `aws s3 rb --force`로 지워지지 않게 됐다(옛 버전이 남으므로). 그래서 규칙 범위를 **태그 `lab=m09-lab08`** 인 버킷으로 좁혔다(`Scope.TagKey/TagValue`) — 태그 없는 로그 버킷은 그대로 `None`이다.
-2. 규칙만 지우고 자동 수정 설정을 남겨 두면, 같은 이름으로 규칙을 다시 만들었을 때 수정이 다시 붙어 버린다. 스크립트는 시작과 끝에 **자동 수정 설정부터** 지운다.
-
-운영에서도 똑같다. 자동 수정은 범위를 좁게, 먼저 수동 수정으로 검증한 뒤 자동으로 바꾼다.
+1. 처음에는 규칙 범위를 "모든 S3 버킷"으로 두었더니, 자동 수정이 **CloudTrail 로그 버킷 같은 다른 실습의 버킷까지 버전 관리를 켜 버렸다.** 그 버킷은 `aws s3 rb --force`로 지워지지 않게 됐다(옛 버전이 남으므로). 그래서 규칙 범위를 **태그 `lab=m09-lab08`** 인 버킷으로 좁혔다(`Scope.TagKey/TagValue`) — 태그 없는 로그 버킷은 그대로 `None`이다. **운영에서도 똑같다.** 자동 수정은 범위 안의 모든 위반 리소스에 즉시 손을 대므로, 범위를 좁게 잡고 먼저 수동 수정으로 검증한 뒤 자동으로 바꾼다.
+2. **(에뮬레이터 차이)** 에뮬레이터는 자동 수정 설정이 붙은 규칙도 그냥 지워 주고, 남은 수정 설정이 같은 이름으로 다시 만든 규칙에 다시 붙어 버렸다. **실제 AWS에서는** 자동 수정 설정이 연결된 규칙을 `DeleteConfigRule`로 지우면 `ResourceInUseException`으로 거부된다("Delete the remediation action associated with the rule before deleting the rule"). 즉 실제로는 `delete-remediation-configuration` → `delete-config-rule` 순서가 강제된다. 스크립트도 그 순서로 정리한다.
 
 ## 실제 AWS에서는
 
@@ -182,12 +180,12 @@ LAB08 OK
 
 1. 보안 그룹에 0.0.0.0/0:22가 열려 있는 것을 발견했다. "언제부터 열려 있었나"와 "누가 열었나"를 각각 어느 서비스로 확인하나?
 2. lab07에서 추적을 만들 때 처음 실패한 이유는?
-3. lab08을 만들면서 "새 버킷이 저절로 버전 관리가 켜지는" 현상이 생겼다. 원인과, 운영에서 같은 기능을 쓸 때 주의할 점은?
+3. lab08을 만들면서 "다른 실습의 버킷에도 버전 관리가 저절로 켜지는" 현상이 생겼다. 원인과, 운영에서 같은 기능을 쓸 때 주의할 점은? 자동 수정이 붙은 규칙을 지우려면 실제 AWS에서는 어떤 순서여야 하나?
 
 <details><summary>답</summary>
 
 1. 언제부터 → **Config** 구성 이력(그 보안 그룹의 구성 항목 타임라인). 누가 → **CloudTrail**(`AuthorizeSecurityGroupIngress` 이벤트의 `userIdentity`).
 2. 로그 버킷에 CloudTrail 서비스 주체를 허용하는 버킷 정책이 없었다(`InsufficientS3BucketPolicyException`).
-3. 이전 실행의 **자동 수정 설정(Automatic=true)** 이 남아 있어서, 규칙이 위반을 찾을 때마다 SSM Automation이 버전 관리를 켰다. 운영에서는 자동 수정이 계정 전체에 즉시 손을 댄다는 점을 알고, 수정 역할을 최소 권한으로, 범위(규칙의 Scope)를 좁게, 먼저 수동 수정으로 검증한 뒤 자동으로 바꾼다.
+3. 규칙 범위가 "모든 S3 버킷"이었고 **자동 수정(Automatic=true)** 이 켜져 있어서, 범위 안의 위반 버킷마다 SSM Automation이 버전 관리를 켰다. 운영에서도 같은 일이 일어나므로 수정 역할은 최소 권한으로, 범위(규칙의 Scope)는 좁게, 먼저 수동 수정으로 검증한 뒤 자동으로 바꾼다. 실제 AWS에서는 자동 수정 설정이 남아 있으면 `DeleteConfigRule`이 `ResourceInUseException`으로 거부되므로 `delete-remediation-configuration`을 먼저 한다(규칙을 지워도 수정 설정이 남아 다시 붙는 것은 에뮬레이터만의 동작).
 
 </details>

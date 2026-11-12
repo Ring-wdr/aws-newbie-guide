@@ -55,7 +55,7 @@ curriculum/m09-security-encryption/labs/verify.sh
 
 ## sdk/envelope_encryption.py 의 로컬 암호
 
-이 저장소의 Python 의존성은 boto3뿐이고 표준 라이브러리에는 AES가 없다. 예제는 `cryptography` 패키지가 있으면 **AES-256-GCM**을, 없으면(기본) 표준 라이브러리로 만든 **교육용 대체 암호**(HMAC-SHA256 카운터 모드 + HMAC 태그)를 쓴다. 대체 암호는 AES가 아니며 실서비스용이 아니다. 실행하면 첫 줄에 어느 쪽인지 출력한다. 봉투 암호화 흐름(GenerateDataKey → 로컬 암호화 → 평문 키 폐기 → Decrypt)은 두 경우가 같다. 셸 판(lab03)은 openssl의 진짜 AES-256을 쓴다. → PR에서 `cryptography`를 dev 의존성으로 추가해 달라고 요청했다.
+이 저장소의 Python 의존성은 boto3뿐이고 표준 라이브러리에는 AES가 없다. 예제는 `cryptography` 패키지가 있으면 **AES-256-GCM**을, 없으면(기본) 표준 라이브러리로 만든 **교육용 대체 암호**(HMAC-SHA256 카운터 모드 + HMAC 태그)를 쓴다. 대체 암호는 AES가 아니며 실서비스용이 아니다. 실행하면 첫 줄에 어느 쪽인지 출력한다. 봉투 암호화 흐름(GenerateDataKey → 로컬 암호화 → 평문 키 폐기 → Decrypt)은 두 경우가 같다. 셸 판(lab03)은 openssl의 진짜 AES-256을 쓴다. → 공용 도구 PR에서 `cryptography`를 프로젝트 의존성(`[project].dependencies`)으로 추가하는 중이다. 추가되면 이 예제는 AES-256-GCM만 쓰도록 바뀐다.
 
 ## 에뮬레이터 제약
 
@@ -67,9 +67,9 @@ curriculum/m09-security-encryption/labs/verify.sh
 | S3 SSE-KMS 객체 읽기(키 비활성화) | 읽힌다(M04에서 관찰, FIDELITY) | "키를 끄면 못 읽는다"는 KMS 직접 호출로 시연 |
 | SSM SecureString 복호화(고객 관리형 키 **비활성화**) | 복호화된다 — SSM이 키 상태를 확인하지 않음(AWS와 다름). 키 정책 **Deny**는 집행됨 | lab05는 키 정책 Deny로 시연하고 비활성화 결과는 참고로 출력 |
 | SSM 공개 파라미터 `/aws/service/global-infrastructure/...` | 비어 있음 | 사용 안 함 |
-| ACM DNS 검증 | Route 53에 검증 CNAME을 넣어도 `PENDING_VALIDATION`에서 바뀌지 않음. `.example`·`.test`·`.local` 도메인은 곧 `FAILED`(`ADDITIONAL_VERIFICATION_REQUIRED`) | 요청 🟡 / 발급 🔴. DNS 검증 요청은 `todayorder.kr`로 |
+| ACM DNS 검증 | Route 53에 검증 CNAME을 넣어도 `PENDING_VALIDATION`에서 바뀌지 않음. `.example`·`.test`·`.local`·`.invalid` 최상위 도메인은 곧 `FAILED`(`ADDITIONAL_VERIFICATION_REQUIRED`) | 요청 🟡 / 발급 🔴. DNS 검증 요청은 예약 이름 `api.todayorder.example.com`으로 |
 | CloudTrail `LookupEvents` | IAM 이벤트는 나오지만 **S3·KMS 이벤트는 나오지 않음**. `sourceIPAddress`가 `null`. 로그 파일은 거의 즉시 S3에 씀 | 🟡. 단언은 IAM 이벤트로 |
-| Config 자동 수정 | `Automatic=true` 자동 수정이 **실제로 실행**되어 버킷 버전 관리를 켬(규칙 범위의 모든 위반 리소스). 규칙을 지워도 수정 설정이 남아 같은 이름의 규칙에 다시 붙음 | lab08 7단계에서 시연. 규칙 범위를 태그로 좁히고, 시작·끝에 수정 설정 삭제 |
+| Config 자동 수정 | `Automatic=true` 자동 수정이 **실제로 실행**되어 버킷 버전 관리를 켬(규칙 범위의 모든 위반 리소스). 자동 수정이 연결된 규칙도 `DeleteConfigRule`로 지워지고(실제 AWS는 `ResourceInUseException`), 남은 수정 설정이 같은 이름의 규칙에 다시 붙음 | lab08 7단계에서 시연. 규칙 범위를 태그로 좁히고, 시작·끝에 수정 설정 삭제 |
 | Config 평가 결과 | 지운 버킷의 평가 결과를 이름으로 기억 | 평가 대상 버킷 이름에 실행마다 다른 접미사 |
 | GuardDuty | 실제 위협 탐지 없음(샘플 결과만). 결과가 EventBridge(`source=aws.guardduty`)로 전달되지 않았고 Security Hub에도 모이지 않음 | 🟡 |
 | Inspector·Macie·Security Hub·Detective | 활성화·상태 조회까지. Audit Manager `GetAccountStatus`는 501 | 상태 읽기만 |

@@ -161,14 +161,14 @@ LAB05 OK
 
 ```
 설정 로드: timeout=3000ms origins=['https://todayorder.example', 'https://admin.todayorder.example']
-           payment_api_key=pk********* db=orders_app@orders-db.internal pw=fi********
+           payment_api_key=<11자 숨김> db=orders_app@orders-db.internal password=<10자 숨김>
 요청 100번 뒤 AWS 호출 수: 2 (첫 로드 2)
-교체 직후(캐시): pw=fi******** → TTL 지난 뒤: pw=ro**********
+교체 직후(TTL 안, 캐시): <10자 숨김> · TTL 지난 뒤: <12자 숨김> · 같은 값? False
 정리 완료
 SDK app_config_loader OK
 ```
 
-방금 본 것: 요청마다 AWS를 부르지 않도록 **캐시**한다(호출 수 2에서 그대로). 대신 TTL이 지나면 다시 읽어 **교체된 비밀번호를 따라간다.** 캐시 TTL이 교체 주기보다 훨씬 짧아야 하고, DB 접속이 인증 오류로 실패하면 캐시를 버리고 다시 읽는 것도 좋은 습관이다. (Lambda라면 AWS가 제공하는 Parameters and Secrets Lambda Extension이 같은 캐시 역할을 한다.)
+방금 본 것: 요청마다 AWS를 부르지 않도록 **캐시**한다(호출 수 2에서 그대로). 대신 TTL이 지나면 다시 읽어 **교체된 비밀번호를 따라간다.** 예제는 실제 시간을 기다리지 않도록 **시계를 주입**해 "TTL 직전"과 "TTL 경과"를 흉내 냈고, 인증 오류가 나면 즉시 다시 읽는 `invalidate()`도 둔다. 캐시 TTL은 교체 주기보다 훨씬 짧아야 한다. 출력에는 비밀의 앞 글자조차 찍지 않고 길이만 보여 준다(로그에 비밀 일부가 남는 것도 유출이다). (Lambda라면 AWS가 제공하는 Parameters and Secrets Lambda Extension이 같은 캐시 역할을 한다.)
 
 ## 실제 AWS에서는
 
@@ -195,7 +195,7 @@ SDK app_config_loader OK
 <details><summary>답</summary>
 
 1. 저장·암호화는 되지만 **자동 교체가 없다.** 직접 스케줄러·함수를 만들어야 한다. Secrets Manager의 관리형 교체(RDS)가 정답에 가깝다.
-2. 옛 비밀번호를 오래 캐시하고 있는 인스턴스. 캐시 TTL을 짧게 하고, 인증 실패 시 캐시를 비우고 `AWSCURRENT`를 다시 읽는다(sdk/app_config_loader.py는 TTL이 지나면 새 값을 읽는다). 교체 함수는 새 비밀번호가 유효해진 뒤(`testSecret`) `AWSCURRENT`를 옮긴다.
+2. 옛 비밀번호를 오래 캐시하고 있는 인스턴스. 캐시 TTL을 짧게 하고, 인증 실패 시 캐시를 비우고 `AWSCURRENT`를 다시 읽는다(sdk/app_config_loader.py는 TTL이 지나면 새 값을 읽고, `invalidate()`로 즉시 버릴 수도 있다). 교체 함수는 새 비밀번호가 유효해진 뒤(`testSecret`) `AWSCURRENT`를 옮긴다.
 3. 교체 Lambda의 리소스 정책에 `secretsmanager.amazonaws.com`의 `lambda:InvokeFunction` 허용이 없었다(`add-permission` 후 성공).
 
 </details>

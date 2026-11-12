@@ -7,7 +7,7 @@
 | GuardDuty | **위협·침해 탐지**(CloudTrail·VPC Flow Logs·DNS 로그 분석, 에이전트 불필요) |
 | Inspector | **취약점(CVE)·네트워크 노출 스캔**(EC2·ECR 이미지·Lambda) |
 | Macie | **S3 민감 데이터(PII)** 발견 |
-| Security Hub | 보안 결과 **모으기 + 표준 준수 점수**(CIS, AWS 모범 사례) |
+| Security Hub (현 Security Hub CSPM) | 보안 결과 **모으기 + 표준 준수 점수**(CIS, AWS 모범 사례). 2025-12 출시된 새 Security Hub는 이들 신호를 상관 분석해 위험 우선순위 |
 | Detective | 결과의 **원인·범위 조사**(행동 그래프) |
 | CloudTrail | **누가 무엇을 했나**(API 호출 기록, 이벤트 기록 90일 무료) |
 | Config | **리소스 구성 이력 + 규칙 준수 평가 + 자동 수정** |
@@ -25,7 +25,7 @@
 | SSE-S3 | S3 | ❌ | ❌ | 기본값, 추가 비용 없음 |
 | SSE-KMS | KMS(aws/s3 또는 고객 관리형) | ✅ CloudTrail | ✅ | 감사·분리 통제 요구 (대량이면 S3 버킷 키) |
 | DSSE-KMS | KMS, 2계층 | ✅ | ✅ | 2계층 암호화 규정 |
-| SSE-C | 고객이 요청마다 키 제공 | ❌ | 고객 몫 | 키를 AWS에 두면 안 될 때 (HTTPS 필수) |
+| SSE-C | 고객이 요청마다 키 제공 | ❌ | 고객 몫 | 키를 AWS에 두면 안 될 때 (HTTPS 필수, **2026-04부터 새 버킷은 기본 차단** → `BlockedEncryptionTypes`로 허용) |
 | 클라이언트 측 | 앱 | – | – | AWS가 평문을 보면 안 될 때 |
 
 ## KMS 숫자·규칙
