@@ -41,7 +41,7 @@ AWS의 DR 백서도 같은 순서로 RPO/RTO를 "시간 → 수십 분 → 분 �
 | 재료 | 쓰임 |
 |---|---|
 | AWS Backup 교차 리전·교차 계정 복사, EBS·RDS 스냅샷 복사 | 백업·복원 (레슨 3) |
-| S3 교차 리전 복제(CRR), S3 Replication Time Control(RTC — 객체의 99.9%를 15분 안에 복제한다는 SLA) | 모든 전략의 객체 데이터 |
+| S3 교차 리전 복제(CRR), S3 Replication Time Control(RTC — 객체의 99.9%를 15분 안에 복제한다는 SLA, [S3 RTC](https://docs.aws.amazon.com/AmazonS3/latest/userguide/replication-time-control.html)) | 모든 전략의 객체 데이터 |
 | RDS 교차 리전 읽기 전용 복제본(승격), **Aurora Global Database**(보조 리전 승격, 복제 지연 보통 1초 미만) | 파일럿 라이트 이상 |
 | **DynamoDB 글로벌 테이블**(다중 리전·다중 활성) | 웜 스탠바이·액티브-액티브 |
 | AWS Elastic Disaster Recovery(서버 블록 단위 연속 복제, RPO 초·RTO 분) | 서버 기반 앱의 파일럿 라이트형 DR (레슨 3) |
