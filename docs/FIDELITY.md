@@ -18,6 +18,8 @@ source scripts/env.sh
 uv run python tools/probe/probe.py   # 전체 (약 수 분) · 일부: --service s3,sqs
 ```
 
+탐침은 실행마다 새 이름(`todayorder-probe-*-<무작위>`)을 쓰고 끝나면 대부분 정리하므로 같은 에뮬레이터에서 다시 돌려도 된다. 다만 계정에 한 번만 되는 호출(`iam GenerateCredentialReport`, `macie2 EnableMacie`, `securityhub EnableSecurityHub`)은 두 번째 실행부터 409 오류로 기록된다(AWS와 같은 동작). 보고서를 갱신할 때는 깨끗한 에뮬레이터에서 실행한다.
+
 등급 정의는 [CURRICULUM.md 3장](./CURRICULUM.md#3-에뮬레이터-충실도-등급): 🟢 재현 · 🟡 부분(리소스는 생기지만 동작은 안 일어남) · 🔴 개념(501이거나 의미 없음).
 
 ## 요약

@@ -12,6 +12,10 @@ docs/FIDELITY.md 를 다시 만든다.
     uv run python tools/probe/probe.py --service s3,sqs # 일부만 (나머지 결과는 유지)
     uv run python tools/probe/probe.py --list           # 서비스 목록
     uv run python tools/probe/probe.py --report-only    # results.json 으로 보고서만 재생성
+    uv run python tools/probe/probe.py --dry            # 결과를 저장하지 않음 (탐침 코드 수정 중·병렬 실행)
+
+같은 에뮬레이터에서 다시 실행해도 되지만, 계정에 한 번만 되는 호출(GenerateCredentialReport,
+EnableMacie, EnableSecurityHub)은 두 번째부터 409로 기록된다. 저장용 실행은 깨끗한 에뮬레이터에서.
 """
 
 from __future__ import annotations
