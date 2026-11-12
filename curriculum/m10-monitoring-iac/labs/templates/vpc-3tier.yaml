@@ -1,0 +1,128 @@
+# TodayOrder 2-AZ 3-티어 VPC (M10 lab04)
+#   10.0.0.0/16
+#   ├─ 퍼블릭  10.0.1.0/24 (a)  10.0.2.0/24 (b)   → IGW        (ALB, NAT GW 자리)
+#   ├─ 앱      10.0.11.0/24(a)  10.0.12.0/24(b)   → NAT GW(a)  (API 서버)
+#   └─ DB      10.0.21.0/24(a)  10.0.22.0/24(b)   → 인터넷 경로 없음 (RDS)
+#   NAT 게이트웨이는 비용을 줄이려고 AZ a 에 1개만 둔다. 운영 환경에서는 AZ마다 1개씩(앱 라우팅 테이블도 AZ별로) 두어야 AZ 장애에 견딘다.
+#   보안 그룹 체인: 인터넷 → web(443) → app(8080, web SG만) → db(5432, app SG만)
+# 비용 주의: 실제 AWS에서는 NAT 게이트웨이와 퍼블릭 IPv4(EIP)가 시간당 과금된다. 실습 후 반드시 스택을 삭제할 것.
+AWSTemplateFormatVersion: "2010-09-09"
+Description: TodayOrder 2-AZ 3-tier VPC
+Parameters:
+  VpcCidr:
+    Type: String
+    Default: 10.0.0.0/16
+  EnvName:
+    Type: String
+    Default: todayorder
+    AllowedValues: [todayorder, todayorder-stg]
+Resources:
+  Vpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCidr
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags: [{Key: Name, Value: !Sub "${EnvName}-vpc"}]
+  Igw:
+    Type: AWS::EC2::InternetGateway
+  IgwAttach:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties: {VpcId: !Ref Vpc, InternetGatewayId: !Ref Igw}
+  PublicA:
+    Type: AWS::EC2::Subnet
+    Properties: {VpcId: !Ref Vpc, CidrBlock: 10.0.1.0/24, AvailabilityZone: us-east-1a, MapPublicIpOnLaunch: true}
+  PublicB:
+    Type: AWS::EC2::Subnet
+    Properties: {VpcId: !Ref Vpc, CidrBlock: 10.0.2.0/24, AvailabilityZone: us-east-1b, MapPublicIpOnLaunch: true}
+  AppA:
+    Type: AWS::EC2::Subnet
+    Properties: {VpcId: !Ref Vpc, CidrBlock: 10.0.11.0/24, AvailabilityZone: us-east-1a}
+  AppB:
+    Type: AWS::EC2::Subnet
+    Properties: {VpcId: !Ref Vpc, CidrBlock: 10.0.12.0/24, AvailabilityZone: us-east-1b}
+  DbA:
+    Type: AWS::EC2::Subnet
+    Properties: {VpcId: !Ref Vpc, CidrBlock: 10.0.21.0/24, AvailabilityZone: us-east-1a}
+  DbB:
+    Type: AWS::EC2::Subnet
+    Properties: {VpcId: !Ref Vpc, CidrBlock: 10.0.22.0/24, AvailabilityZone: us-east-1b}
+  NatEip:
+    Type: AWS::EC2::EIP
+    DependsOn: IgwAttach
+    Properties: {Domain: vpc}
+  NatGw:
+    Type: AWS::EC2::NatGateway
+    Properties: {AllocationId: !GetAtt NatEip.AllocationId, SubnetId: !Ref PublicA}
+  PublicRt:
+    Type: AWS::EC2::RouteTable
+    Properties: {VpcId: !Ref Vpc}
+  PublicDefault:
+    Type: AWS::EC2::Route
+    DependsOn: IgwAttach
+    Properties: {RouteTableId: !Ref PublicRt, DestinationCidrBlock: 0.0.0.0/0, GatewayId: !Ref Igw}
+  PublicAAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: {SubnetId: !Ref PublicA, RouteTableId: !Ref PublicRt}
+  PublicBAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: {SubnetId: !Ref PublicB, RouteTableId: !Ref PublicRt}
+  AppRt:
+    Type: AWS::EC2::RouteTable
+    Properties: {VpcId: !Ref Vpc}
+  AppDefault:
+    Type: AWS::EC2::Route
+    Properties: {RouteTableId: !Ref AppRt, DestinationCidrBlock: 0.0.0.0/0, NatGatewayId: !Ref NatGw}
+  AppAAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: {SubnetId: !Ref AppA, RouteTableId: !Ref AppRt}
+  AppBAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: {SubnetId: !Ref AppB, RouteTableId: !Ref AppRt}
+  DbRt:
+    Type: AWS::EC2::RouteTable
+    Properties: {VpcId: !Ref Vpc}
+  DbAAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: {SubnetId: !Ref DbA, RouteTableId: !Ref DbRt}
+  DbBAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: {SubnetId: !Ref DbB, RouteTableId: !Ref DbRt}
+  WebSg:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: web tier - HTTPS from internet
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - {IpProtocol: tcp, FromPort: 443, ToPort: 443, CidrIp: 0.0.0.0/0}
+  AppSg:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: app tier - 8080 from web SG only
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - {IpProtocol: tcp, FromPort: 8080, ToPort: 8080, SourceSecurityGroupId: !Ref WebSg}
+  DbSg:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: db tier - 5432 from app SG only
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - {IpProtocol: tcp, FromPort: 5432, ToPort: 5432, SourceSecurityGroupId: !Ref AppSg}
+Outputs:
+  VpcId:
+    Value: !Ref Vpc
+    Export: {Name: !Sub "${EnvName}-VpcId"}
+  VpcCidr:
+    Value: !GetAtt Vpc.CidrBlock
+  PublicSubnets:
+    Value: !Join [",", [!Ref PublicA, !Ref PublicB]]
+  AppSubnets:
+    Value: !Join [",", [!Ref AppA, !Ref AppB]]
+    Export: {Name: !Sub "${EnvName}-AppSubnets"}
+  DbSubnets:
+    Value: !Join [",", [!Ref DbA, !Ref DbB]]
+  NatGatewayId:
+    Value: !Ref NatGw
+  DbSgId:
+    Value: !GetAtt DbSg.GroupId

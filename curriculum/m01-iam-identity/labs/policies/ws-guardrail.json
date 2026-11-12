@@ -1,0 +1,17 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "NoDeletes",
+      "Effect": "Deny",
+      "Action": ["s3:DeleteObject", "dynamodb:DeleteTable"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "ArchiveIsReadOnly",
+      "Effect": "Deny",
+      "Action": "s3:PutObject",
+      "Resource": "arn:aws:s3:::todayorder-receipts/archive/*"
+    }
+  ]
+}
