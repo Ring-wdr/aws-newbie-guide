@@ -29,7 +29,7 @@ for name in $names; do
   if [ "$state" != "running" ]; then
     detail="$(docker container inspect -f '{{.State.ExitCode}} {{.State.OOMKilled}}' "$name" 2>/dev/null || echo '')"
     case "$detail" in
-      "137 "* | *" true") state="OOM(137)"; oom_hint="$oom_hint $port" ;;
+      *" true") state="OOM(137)"; oom_hint="$oom_hint $port" ;;
       *) state="$state(${detail%% *})" ;;
     esac
   fi

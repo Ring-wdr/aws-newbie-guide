@@ -92,7 +92,7 @@ _emu_env_main() {
       cstate="$(docker container inspect -f '{{.State.Status}} {{.State.ExitCode}} {{.State.OOMKilled}}' "aws-emulator-$port" 2>/dev/null)" || cstate=""
     fi
     case "$cstate" in
-      *" 137 "* | *" true")
+      *" true")
         _emu_env_fail "포트 $port 의 에뮬레이터가 메모리 상한을 넘어 강제 종료됐습니다 (컨테이너 상태: $cstate — 종료 코드 137/OOMKilled). 만든 리소스는 모두 사라졌습니다." \
           "scripts/emulator-reset.sh $port 로 다시 띄우세요. 자주 반복되면 EMULATOR_MEMORY=3g scripts/emulator-reset.sh $port (M00 레슨 3 문제 해결)."
         return 1
@@ -102,13 +102,14 @@ _emu_env_main() {
         return 1
         ;;
     esac
-    # 원인 진단 2: 시계 어긋남(노트북 수면 후 VM 시계)이면 해결 방법을 따로 알려 준다.
-    if ! bash "$_emu_env_dir/clock-check.sh" "$port"; then
-      _emu_env_fail "안전 장치: 시계 어긋남 때문에 에뮬레이터가 서명을 거부했습니다 (위 [clock-check] 안내대로 VM 시계를 맞춘 뒤 다시 source 하세요)."
-      return 1
-    fi
+    # 원인 진단 2: 서명 거부일 때만 시계를 의심한다. clock-check 가 SigV4 허용 범위(15분)에 가까운
+    # 차이를 확인하면 시계 어긋남으로 결론 내리고, 그보다 작으면 측정값만 참고로 보여 준다.
     case "$errtext" in
       *SignatureDoesNotMatch* | *RequestTimeTooSkewed* | *InvalidSignatureException*)
+        if ! bash "$_emu_env_dir/clock-check.sh" "$port"; then
+          _emu_env_fail "안전 장치: 시계 어긋남 때문에 에뮬레이터가 서명을 거부했습니다 (위 [clock-check] 안내대로 VM 시계를 맞춘 뒤 다시 source 하세요)."
+          return 1
+        fi
         _emu_env_fail "안전 장치: 에뮬레이터가 서명을 거부했습니다 ($(printf '%s' "$errtext" | tr '\n' ' ' | cut -c1-160))." \
           "에뮬레이터를 재시작했다면 'source scripts/env.sh' 를 다시, 노트북이 잠들었었다면 bash scripts/clock-check.sh $port 로 시계를 확인하세요."
         return 1
