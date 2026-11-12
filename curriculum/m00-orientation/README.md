@@ -64,7 +64,7 @@ curriculum/m00-orientation/labs/verify.sh
 | 오퍼레이션 / 동작 | 증상 |
 |---|---|
 | `organizations:CreatePolicy` | `501 NotImplemented` (SCP 생성 불가) |
-| IAM 정책 평가 | IAM·EC2·KMS 등은 평가하지만 S3·SQS·DynamoDB는 평가하지 않는다. 정책 없는 사용자가 S3 버킷을 만들 수 있다 |
+| IAM 정책 평가 | IAM·EC2·KMS는 사용자 정책을 평가한다. S3·SQS·DynamoDB는 객체·메시지·항목 요청은 평가하지만 버킷·큐·테이블의 생성·삭제·나열(계정 수준 요청)은 평가하지 않아, 정책 없는 사용자가 S3 버킷을 만들 수 있다. 상세는 FIDELITY.md "IAM 평가" |
 | `DescribeAvailabilityZones`, `DescribeRegions` | 고정 목록(리전 17개, 리전당 AZ 3개). 실제 AWS의 숫자와 다르다 |
 | Lambda 동기 `Invoke` | 호출마다 에뮬레이터 메모리가 약 7 MiB씩 늘고 줄지 않는다. 1 GiB 상한에서 약 120회, 기본 2 GiB에서 약 270회 뒤 OOM(137) — 레슨 3 문제 해결 |
 | DynamoDB `CreateTable` | 생성 응답은 (CLI·boto3 모두) `CREATING`. 에뮬레이터는 1초 안에 `ACTIVE`가 되는 경우가 많아, 직후 `DescribeTable` 결과는 실행마다 다르다(경쟁 상태). waiter로 기다릴 것 |

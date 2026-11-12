@@ -35,7 +35,7 @@ flowchart LR
 - **영속 저장소가 아니다.** 모든 상태는 메모리에 있다. 에뮬레이터를 끄면 사라진다. 상태를 비우는 API도 없어서, **재시작이 곧 초기화**다(`scripts/emulator-reset.sh`).
 - **모든 API가 구현된 것이 아니다.** 미구현 오퍼레이션은 HTTP 501과 오류 코드 `NotImplemented`를 돌려준다.
 
-반대로 **생각보다 많이 "진짜로" 하는 것**도 있다(탐침으로 확인, [FIDELITY.md](../../docs/FIDELITY.md)): SNS에 발행한 메시지가 구독한 SQS 큐에 실제로 도착하고, Step Functions 실행이 끝까지 돌고, Lambda `Invoke`는 **함수 코드를 실제로 실행**한다. RDS 인스턴스를 만들면 컨테이너 안에 실제 DB 엔진이 뜨고, ALB는 HTTP 응답을 한다. 다만 이런 "리소스 자체의 포트"(RDS 엔드포인트, ALB DNS 이름)는 에뮬레이터 컨테이너 **안에서만** 열려 있어 내 Mac에서는 접속할 수 없다. 또 공식 문서는 "에뮬레이터가 실행하는 코드(예: 함수 코드)는 격리되지 않는다"고 경고한다. 믿을 수 있는 코드만 넣자.
+반대로 **생각보다 많이 "진짜로" 하는 것**도 있다(탐침으로 확인, [FIDELITY.md](../../docs/FIDELITY.md)): SNS에 발행한 메시지가 구독한 SQS 큐에 실제로 도착하고, Step Functions 실행이 끝까지 돌고, Lambda `Invoke`는 **함수 코드를 실제로 실행**한다(다만 CPython이 아니라 RustPython과 축소된 boto3 위에서 — M07). RDS 인스턴스를 만들면 컨테이너 안에 실제 DB 엔진이 뜨고, ALB는 HTTP 응답을 한다. 다만 이런 "리소스 자체의 포트"(RDS 엔드포인트, ALB DNS 이름)는 에뮬레이터 컨테이너 **안에서만** 열려 있어 내 Mac에서는 접속할 수 없다. 또 공식 문서는 "에뮬레이터가 실행하는 코드(예: 함수 코드)는 격리되지 않는다"고 경고한다. 믿을 수 있는 코드만 넣자.
 
 ### 충실도 등급
 
@@ -83,7 +83,7 @@ aws: [ERROR]: An error occurred (AccessDenied) when calling the ListUsers operat
 make_bucket: todayorder-intern-bucket
 ```
 
-방금 본 것: 같은 사용자인데 **IAM API는 거부되고, S3 버킷 생성은 통과했다.** 에뮬레이터는 서비스마다 정책 평가 여부가 다르다(탐침 결과: 사용자에게 붙인 IAM 정책을 IAM·EC2·KMS는 평가하고 S3·SQS·DynamoDB는 평가하지 않는다. 그런데 S3 **버킷 정책**의 명시적 Deny는 집행됐다 — [FIDELITY.md](../../docs/FIDELITY.md)). 에뮬레이터에서 "통과했다"는 것이 "권한 설계가 맞다"는 뜻이 아님을 기억하자.
+방금 본 것: 같은 사용자인데 **IAM API는 거부되고, S3 버킷 생성은 통과했다.** 에뮬레이터의 IAM 평가는 서비스와 요청 종류에 따라 다르다. 탐침과 모듈 저자들이 확인한 바로는 IAM·EC2·KMS는 사용자 정책을 평가하고, S3·SQS·DynamoDB는 **객체·메시지·항목을 다루는 요청**(`GetObject`, `SendMessage`, `PutItem` 등)은 평가하지만 **버킷·큐·테이블을 만들고 지우고 나열하는 계정 수준 요청**(`CreateBucket`, `ListBuckets`, `CreateQueue`, `CreateTable` 등)은 평가하지 않는다. 그 밖에도 AssumeRole이 호출자 정책을 보지 않는 등 차이가 많다([FIDELITY.md](../../docs/FIDELITY.md) "IAM 평가"). 에뮬레이터에서 "통과했다"는 것이 "권한 설계가 맞다"는 뜻이 아님을 기억하자.
 
 ## 실제 AWS에서는
 
