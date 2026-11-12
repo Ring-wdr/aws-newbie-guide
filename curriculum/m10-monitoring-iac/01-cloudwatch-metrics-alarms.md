@@ -19,7 +19,7 @@
 
 ### 기본 지표에 없는 것: 메모리와 디스크 (시험 단골)
 
-EC2가 공짜로 주는 기본 지표는 **하이퍼바이저가 밖에서 볼 수 있는 것**뿐이다: CPU 사용률, 네트워크 입출력, 상태 확인(그리고 인스턴스 스토어의 디스크 I/O — EBS 볼륨 I/O는 `AWS/EBS` 네임스페이스). **메모리 사용률·디스크 남은 용량·프로세스 수는 게스트 OS 안에서만 보인다** → 인스턴스에 **CloudWatch 에이전트**를 설치해 사용자 지정 지표로 보내야 한다.
+EC2가 공짜로 주는 기본 지표는 **하이퍼바이저가 밖에서 볼 수 있는 것**뿐이다: CPU 사용률, 네트워크 입출력, 디스크 I/O(인스턴스 스토어, Nitro 인스턴스는 `EBSReadOps` 같은 EBS I/O도), 상태 확인(상태 확인 지표는 기본 모니터링에서도 1분 주기). **메모리 사용률·디스크 남은 용량·프로세스 수는 게스트 OS 안에서만 보인다** → 인스턴스에 **CloudWatch 에이전트**를 설치해 사용자 지정 지표로 보내야 한다.
 
 | 모니터링 | 주기 | 비용 |
 |---|---|---|
@@ -41,8 +41,8 @@ stateDiagram-v2
 
 - **Period × EvaluationPeriods × DatapointsToAlarm** — "최근 N개 구간 중 M개가 위반이면 ALARM" (M of N). 순간 튀는 값에 깨지 않게 하는 장치다.
 - **TreatMissingData** — 데이터가 안 올 때: `missing`(판단 보류) · `notBreaching`(정상 취급) · `breaching`(위반 취급) · `ignore`(직전 상태 유지). 하트비트 지표가 끊기면 장애로 보고 싶다면 `breaching`.
-- **액션** — 상태가 **바뀔 때** 실행: SNS 알림, EC2 Auto Scaling 정책, EC2 동작(중지·종료·재부팅·복구), Systems Manager OpsItem. 상태에 "머물러 있다"고 반복 실행하지 않는다.
-- **복합 알람(composite alarm)** — 여러 알람을 `AND`/`OR`/`NOT`으로 묶는다. "지연 높음 AND 5xx 많음"일 때만 당직을 깨워 **알람 피로**를 줄인다.
+- **액션** — 상태가 **바뀔 때** 실행: SNS 알림, Lambda 함수 호출, EC2 Auto Scaling 정책, EC2 동작(중지·종료·재부팅·복구), Systems Manager OpsItem·Incident Manager 인시던트. 상태에 머물러 있는 동안 다시 실행하지 않는다 — **단, Auto Scaling 액션은 예외**로, 알람이 그 상태에 머무는 동안 1분에 한 번씩 계속 호출된다(그래서 부하가 안 내려가면 조정이 계속된다).
+- **복합 알람(composite alarm)** — 여러 알람을 `AND`/`OR`/`NOT`으로 묶는다. "지연 높음 AND 5xx 많음"일 때만 당직을 깨워 **알람 피로**를 줄인다. 복합 알람은 SNS·Lambda·Systems Manager 액션은 실행하지만 **EC2 동작이나 Auto Scaling 액션은 실행할 수 없다.**
 - **지표 수학(metric math)** — `100*errors/requests` 처럼 지표끼리 계산한 값에 알람을 건다.
 
 ```mermaid
@@ -210,7 +210,8 @@ aws cloudwatch put-composite-alarm --alarm-name todayorder-api-degraded \
 ## 시험 포인트
 
 - "EC2 **메모리** 사용률을 보고 싶다 / 디스크 여유 공간으로 알람" → **CloudWatch 에이전트**(사용자 지정 지표). 기본 지표에는 없다.
-- "1분보다 촘촘하게" → 세부 모니터링(1분)·**고해상도 사용자 지정 지표**(1초) + 10/30초 알람.
+- "EC2 지표를 5분보다 촘촘하게" → **세부 모니터링**(1분, 유료).
+- "1분보다 촘촘하게(초 단위)" → **고해상도 사용자 지정 지표**(1초) + 10/30초 알람.
 - "CPU 70% 넘으면 서버 추가" → 알람 액션 = **Auto Scaling 정책**(요즘은 대상 추적 정책이 알람을 알아서 만든다). "사람에게 알림" → SNS.
 - "알람이 너무 자주 울린다" → **M of N(DatapointsToAlarm)**, **복합 알람**.
 - "인스턴스 상태 확인 실패 시 자동 복구" → 알람 액션의 **EC2 recover**(같은 인스턴스 ID·IP 유지).

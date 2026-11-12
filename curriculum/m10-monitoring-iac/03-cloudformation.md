@@ -11,7 +11,7 @@ M02에서 3-티어 VPC를 CLI 명령 수십 개로 만들었다. 스테이징 �
 flowchart LR
   T[템플릿<br/>YAML/JSON] -- create-stack --> S[스택]
   S -- 생성·수정·삭제를 한 단위로 --> R1[VPC] & R2[서브넷 ×6] & R3[NAT GW] & R4[보안 그룹 ×3]
-  T2[템플릿 v2] -- create-change-set --> C[변경 세트<br/>무엇이 Add/Modify/Remove<br/>교체(Replacement) 여부] -- execute --> S
+  T2[템플릿 v2] -- create-change-set --> C["변경 세트<br/>무엇이 Add/Modify/Remove<br/>교체(Replacement) 여부"] -- execute --> S
   S -- detect-drift --> D[드리프트<br/>템플릿 ≠ 실제]
 ```
 
@@ -21,6 +21,13 @@ flowchart LR
 - **드리프트(drift)** — 누가 콘솔·CLI로 스택 밖에서 리소스를 바꿔 템플릿과 실제가 달라진 상태. `detect-stack-drift`로 찾는다. 찾기만 하고 고쳐 주지는 않는다.
 - **스택 세트(StackSets)** — 한 템플릿을 **여러 계정·여러 리전**에 한 번에 배포(Organizations와 함께 쓰면 새 계정에 자동 배포).
 - 그 밖의 보호 장치: **종료 보호**(실수로 스택 삭제 방지), **DeletionPolicy: Retain/Snapshot**(스택을 지워도 버킷·DB는 남기거나 스냅샷), **스택 정책**(업데이트로 특정 리소스를 못 바꾸게).
+
+| 리소스 속성·기능 | 언제 쓰나 |
+|---|---|
+| `DeletionPolicy: Retain / Snapshot / RetainExceptOnCreate` | 스택(또는 리소스)을 지울 때 실제 리소스를 남기거나 스냅샷을 뜬다 |
+| `UpdateReplacePolicy: Retain / Snapshot` | 업데이트로 리소스가 **교체**될 때 옛 리소스를 남기거나 스냅샷 |
+| `CreationPolicy` + `cfn-signal` (또는 WaitCondition) | EC2·ASG가 "만들어졌다"가 아니라 **부트스트랩(사용자 데이터) 완료 신호**를 보낼 때까지 CREATE_COMPLETE를 미룬다. 신호가 안 오면 실패 → 롤백 |
+| 롤백 트리거 | 생성·업데이트 직후 지정한 CloudWatch 알람이 울리면 자동 롤백 |
 
 ### 템플릿 해부
 
@@ -68,6 +75,8 @@ aws cloudformation validate-template --template-body file://templates/vpc-3tier.
 aws cloudformation create-stack --stack-name todayorder-network --template-body file://templates/vpc-3tier.yaml --tags Key=project,Value=todayorder
 # 이후 describe-stacks 로 2초마다 상태를 확인 (labs/_lib.sh 의 wait_stack)
 ```
+
+> ⚠️ **에뮬레이터 전용 주의**: 이 VPC 스택에 `aws cloudformation wait stack-create-complete`를 쓰면 에뮬레이터에서는 **항상 롤백된다.** 에뮬레이터는 스택을 **`describe-stacks`로 조회할 때만** 다음 단계로 진행시키고, 다른 리소스를 기다리는 리소스(NAT 게이트웨이를 기다리는 `AppDefault` 경로)에는 **약 10초의 마감**이 있다. 생성 직후 그 안에 스택 조회가 한 번도 오지 않으면 NAT가 이미 available이어도 경로가 "wait ran out"으로 실패한다. CLI 웨이터는 0초와 30초에 조회하므로 이 VPC 스택에서는 항상 마감을 놓치고 롤백된다. 기다리는 리소스가 없는 앱 스택(lab05)에서는 `wait`가 정상 동작한다(확인함). 그래서 lab은 생성 직후부터 2초마다 `describe-stacks`를 직접 부른다. **실제 AWS에서는 `aws cloudformation wait`가 정상적인 도구**이고 그대로 쓰면 된다(NAT 게이트웨이 생성에 수 분 걸린다).
 
 ```
 스택 상태: CREATE_COMPLETE
@@ -251,12 +260,12 @@ aws: [ERROR]: An error occurred (ValidationError) when calling the DeleteStack o
 
 ## 실제 AWS에서는
 
-- 에뮬레이터의 스택 진행은 **조회 호출에 맞춰** 움직이는 것으로 보인다. CLI의 `aws cloudformation wait stack-create-complete`(30초 간격 폴링)로 VPC 스택을 기다리면 NAT 경로(`AppDefault`)가 "생성 대기 시간 초과"로 실패하고 롤백됐다(반복 재현). 그래서 lab은 2초 간격으로 `describe-stacks`를 직접 폴링한다. 실제 AWS에서는 `wait` 명령을 그대로 쓰면 되고, NAT 게이트웨이 생성에는 수 분이 걸린다.
+- CLI 웨이터 문제(에뮬레이터 전용): 에뮬레이터는 스택을 **`describe-stacks`로 조회할 때만** 다음 단계로 진행시키고, 다른 리소스를 기다리는 리소스(NAT 게이트웨이를 기다리는 `AppDefault` 경로)에는 **약 10초의 마감**이 있다. 생성 직후 그 안에 스택 조회가 한 번도 오지 않으면 NAT가 이미 available이어도 경로가 "wait ran out"으로 실패한다. CLI 웨이터는 0초와 30초에 조회하므로 이 VPC 스택에서는 항상 마감을 놓치고 롤백된다. 기다리는 리소스가 없는 앱 스택(lab05)에서는 `wait`가 정상 동작한다(확인함). 실제 AWS에서는 `aws cloudformation wait stack-create-complete`를 그대로 쓰면 된다.
 - 드리프트 감지는 AWS에서도 **지원하는 리소스 유형만** 검사한다. 에뮬레이터는 EC2 네트워크 리소스·DynamoDB 테이블을 DELETED로 오판하고 보안 그룹 규칙 변경을 놓쳤다.
 - VPC 스택 변경 세트 실행은 에뮬레이터에서 `VPCGatewayAttachment` 갱신 501로 롤백된다. AWS에서는 서브넷 추가가 정상 완료된다.
 
 > **실제 AWS에서 해 보려면** (🟡/🔴 부분: 드리프트, VPC 변경 세트)
-> - 프리 티어: CloudFormation 자체는 무료(AWS 리소스 유형). **NAT 게이트웨이(시간당 + 처리 GB당)와 퍼블릭 IPv4 주소(EIP, 시간당)는 프리 티어가 아니다** — 몇 시간만 둬도 요금이 나온다. 비용 없이 하려면 템플릿에서 `NatEip`·`NatGw`·`AppDefault`를 빼고 해 본다.
+> - 프리 티어: CloudFormation 자체는 무료(AWS 리소스 유형). **NAT 게이트웨이(시간당 + 처리 GB당)와 퍼블릭 IPv4 주소(EIP, 시간당)는 프리 티어가 아니다** — 몇 시간만 둬도 요금이 나온다. 비용 없이 하려면 템플릿에서 `NatEip`·`NatGw`·`AppDefault` 리소스와 **Outputs의 `NatGatewayId`도 함께** 지운다(출력이 `!Ref NatGw`를 참조하므로 남겨 두면 템플릿 검증이 `Unresolved resource dependencies [NatGw]`로 실패한다).
 > - 순서: `create-stack` → 콘솔에서 web SG에 22번 규칙 추가 → `detect-stack-drift` → `describe-stack-resource-drifts --stack-resource-drift-status-filters MODIFIED` 로 `WebSg`의 `PropertyDifferences` 확인 → 변경 세트로 `AppC` 추가·실행.
 > - 정리: `aws cloudformation delete-stack --stack-name todayorder-network` 후 `aws cloudformation wait stack-delete-complete --stack-name todayorder-network`. 콘솔에서 VPC·EIP가 남지 않았는지 확인.
 
@@ -266,7 +275,8 @@ aws: [ERROR]: An error occurred (ValidationError) when calling the DeleteStack o
 - "업데이트가 무엇을 바꾸는지(특히 교체) 실행 전에 확인" → **변경 세트**.
 - "누가 콘솔에서 바꾼 것을 찾기" → **드리프트 감지**. (규정 준수 규칙으로 계속 감시하려면 AWS Config — M09)
 - "여러 계정·리전에 같은 스택" → **StackSets**(+ Organizations 자동 배포).
-- "스택을 지워도 DB·버킷은 남겨야" → **DeletionPolicy: Retain / Snapshot**. "스택 삭제 자체를 막아야" → **종료 보호**. "업데이트로 특정 리소스를 바꾸지 못하게" → **스택 정책**.
+- "EC2 사용자 데이터 설치가 끝난 뒤에야 스택 완료로" → **CreationPolicy + cfn-signal**.
+- "스택을 지워도 DB·버킷은 남겨야" → **DeletionPolicy: Retain / Snapshot**. "교체될 때 옛 DB 스냅샷" → **UpdateReplacePolicy: Snapshot**. "스택 삭제 자체를 막아야" → **종료 보호**. "업데이트로 특정 리소스를 바꾸지 못하게" → **스택 정책**.
 - 스택 간 값 공유 → **Outputs Export + `Fn::ImportValue`**(또는 중첩 스택). 생성 실패 → 기본 **롤백**.
 - 비교: Elastic Beanstalk(앱 배포 플랫폼, 내부적으로 CloudFormation 사용) vs CloudFormation(모든 리소스) vs AWS CDK(코드로 쓰고 CloudFormation 템플릿으로 합성) vs Service Catalog(승인된 템플릿을 셀프서비스로 — 레슨 5).
 

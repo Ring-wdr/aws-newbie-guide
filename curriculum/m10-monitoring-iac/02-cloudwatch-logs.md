@@ -159,13 +159,13 @@ fields @timestamp, status, msg | filter status >= 500 | sort @timestamp desc
 
 ### 6) boto3: 구조화 로그 전송기 — [sdk/structured_logger.py](./sdk/structured_logger.py)
 
-로그를 버퍼에 모았다가 `PutLogEvents` 한 번으로 보내고(호출 수 = 비용·스로틀링), 각 줄에 EMF 블록을 넣어 지표까지 만든다.
+로그를 버퍼에 모았다가 `PutLogEvents` 한 번으로 보내고(호출 수 = 비용·스로틀링), 각 줄에 EMF 블록을 넣어 지표까지 만든다. EMF 차원에 실행마다 바뀌는 `run` 값을 넣어, 지울 수 없는 이전 실행의 지표 때문에 확인이 저절로 통과하지 않게 했다.
 
 ```
-로그 그룹 /todayorder/sdk/api / 스트림 api-8df41f9e
+로그 그룹 /todayorder/sdk/api / 스트림 api-401cbab2
 보낸 로그: 7건
 Insights(레벨별): [{"level": "INFO", "n": "4", "max_ms": "180"}, {"level": "ERROR", "n": "2", "max_ms": "3000"}, {"level": "WARN", "n": "1", "max_ms": "950"}]
-EMF 지표 TodayOrder/EMF/latency_ms(route=POST /orders) 생성: True
+EMF 지표 TodayOrder/EMF/latency_ms(route=POST /orders, run=401cbab2) 생성: True
 SDK structured_logger OK
 ```
 

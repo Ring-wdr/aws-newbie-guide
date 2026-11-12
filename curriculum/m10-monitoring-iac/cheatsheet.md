@@ -31,8 +31,9 @@
 |---|---|
 | Period × EvaluationPeriods, DatapointsToAlarm | "최근 N개 중 M개 위반이면 ALARM" |
 | TreatMissingData | `missing`(보류) · `notBreaching` · `breaching`(끊기면 장애) · `ignore` |
-| 상태 | `OK` / `ALARM` / `INSUFFICIENT_DATA`. 액션은 상태가 **바뀔 때** |
-| 복합 알람 | `ALARM("a") AND ALARM("b")` — 알람 피로 감소. 지울 때 복합 알람 먼저 |
+| 상태 | `OK` / `ALARM` / `INSUFFICIENT_DATA`. 액션은 상태가 **바뀔 때** (예외: **Auto Scaling 액션은 그 상태에 머무는 동안 1분마다 반복**) |
+| 액션 종류 | SNS · Lambda · Auto Scaling · EC2 동작(중지·종료·재부팅·복구) · SSM OpsItem/Incident Manager |
+| 복합 알람 | `ALARM("a") AND ALARM("b")` — 알람 피로 감소. 지울 때 복합 알람 먼저. **EC2·Auto Scaling 액션 불가** |
 | `set-alarm-state` | 알림 경로 테스트용, 다음 평가에서 원래대로 |
 | 지표 수학 | `100*errors/requests` 에 알람 |
 
@@ -60,7 +61,10 @@
 | 롤백 | 생성 실패 → `ROLLBACK_COMPLETE`(삭제만 가능), 업데이트 실패 → `UPDATE_ROLLBACK_COMPLETE` |
 | StackSets | 여러 계정 × 여러 리전 배포 |
 | 중첩 스택 | 템플릿 재사용·500개 리소스 한도 넘기 |
-| DeletionPolicy | `Retain` / `Snapshot` / `Delete` |
+| DeletionPolicy | `Retain` / `Snapshot` / `Delete` / `RetainExceptOnCreate` |
+| UpdateReplacePolicy | 교체될 때 옛 리소스 `Retain` / `Snapshot` |
+| CreationPolicy + cfn-signal | 부트스트랩 완료 신호까지 생성 완료를 미룸 |
+| 롤백 트리거 | 배포 직후 CloudWatch 알람이 울리면 롤백 |
 | 종료 보호 / 스택 정책 | 스택 삭제 방지 / 특정 리소스 업데이트 방지 |
 | 한도 | 템플릿당 리소스 500 · 파라미터 200 · 출력 200 · 본문 51,200바이트(S3 URL이면 1 MB) |
 
@@ -81,13 +85,13 @@
 
 | 서비스 | 한 줄 |
 |---|---|
-| Trusted Advisor | 비용·보안·성능·내결함성·한도 점검 (전체는 Business+) |
+| Trusted Advisor | 비용·보안·성능·내결함성·한도 점검 (전체 점검·API는 Business Support+ / Enterprise / Unified Operations — 옛 Business·Developer 플랜은 2027-01-01 종료) |
 | Health Dashboard | AWS 이벤트가 **내 리소스**에 미치는 영향 (+EventBridge) |
 | Service Quotas | 한도 조회·증가 요청 (EIP 기본 5/리전) |
 | Compute Optimizer | 적정 크기 권고 (옵트인) |
 | License Manager | 라이선스 사용량 추적·강제 |
 | Service Catalog | 승인된 템플릿 셀프서비스 |
-| Proton | 플랫폼 팀 템플릿으로 앱 배포 표준화 |
+| Proton | 플랫폼 팀 템플릿으로 앱 배포 표준화 — **2026-10-07 지원 종료**(시험 범위 목록에는 남아 있음) |
 | Managed Grafana / Managed Prometheus | 관리형 대시보드 / PromQL 지표 저장 |
 | Well-Architected Tool | 6개 기둥 검토 |
 

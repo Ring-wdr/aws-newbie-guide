@@ -36,6 +36,7 @@ class StructuredLogger:
     logs: Any
     group: str
     stream: str
+    run_id: str = ""  # 실행마다 바뀌는 EMF 차원 값 (지표는 지울 수 없어서, 이전 실행의 지표로 단언이 통과하지 않게)
     batch_size: int = 50
     _buffer: list[dict[str, Any]] = field(default_factory=list)
     sent: int = 0
@@ -57,14 +58,15 @@ class StructuredLogger:
             "route": route,
             "status": status,
             "latency_ms": latency_ms,
+            "run": self.run_id,
             **extra,
-            # EMF: 이 블록이 있으면 CloudWatch가 latency_ms 값을 지표로 만든다(차원: route).
+            # EMF: 이 블록이 있으면 CloudWatch가 latency_ms 값을 지표로 만든다(차원: route, run).
             "_aws": {
                 "Timestamp": now_ms,
                 "CloudWatchMetrics": [
                     {
                         "Namespace": EMF_NAMESPACE,
-                        "Dimensions": [["route"]],
+                        "Dimensions": [["route", "run"]],
                         "Metrics": [{"Name": "latency_ms", "Unit": "Milliseconds"}],
                     }
                 ],
@@ -103,11 +105,13 @@ def run_insights(logs: Any, group: str, query: str, timeout_s: float = 30) -> li
     return [{f["field"]: f["value"] for f in row if f["field"] != "@ptr"} for row in r["results"]]
 
 
-def wait_for_emf_metric(cw: Any, route: str, timeout_s: float = 30) -> bool:
+def wait_for_emf_metric(cw: Any, route: str, run_id: str, timeout_s: float = 30) -> bool:
     deadline = time.time() + timeout_s
     while time.time() < deadline:
         metrics = cw.list_metrics(
-            Namespace=EMF_NAMESPACE, MetricName="latency_ms", Dimensions=[{"Name": "route", "Value": route}]
+            Namespace=EMF_NAMESPACE,
+            MetricName="latency_ms",
+            Dimensions=[{"Name": "route", "Value": route}, {"Name": "run", "Value": run_id}],
         )["Metrics"]
         if metrics:
             return True
@@ -120,8 +124,9 @@ def main() -> None:
 
     logs = boto3.client("logs")
     cw = boto3.client("cloudwatch")
-    stream = f"api-{uuid.uuid4().hex[:8]}"  # 실행마다 새 스트림
-    logger = StructuredLogger(logs=logs, group=LOG_GROUP, stream=stream, batch_size=4)
+    run_id = uuid.uuid4().hex[:8]
+    stream = f"api-{run_id}"  # 실행마다 새 스트림
+    logger = StructuredLogger(logs=logs, group=LOG_GROUP, stream=stream, run_id=run_id, batch_size=4)
     logger.setup()
     print(f"로그 그룹 {LOG_GROUP} / 스트림 {stream}")
 
@@ -144,8 +149,8 @@ def main() -> None:
     print("Insights(레벨별):", json.dumps(rows, ensure_ascii=False))
     by_level = {r["level"]: r for r in rows}
 
-    has_metric = wait_for_emf_metric(cw, "POST /orders")
-    print(f"EMF 지표 {EMF_NAMESPACE}/latency_ms(route=POST /orders) 생성: {has_metric}")
+    has_metric = wait_for_emf_metric(cw, "POST /orders", run_id)
+    print(f"EMF 지표 {EMF_NAMESPACE}/latency_ms(route=POST /orders, run={run_id}) 생성: {has_metric}")
 
     assert logger.sent == 7, logger.sent
     assert by_level["ERROR"]["n"] == "2" and by_level["ERROR"]["max_ms"] == "3000", by_level

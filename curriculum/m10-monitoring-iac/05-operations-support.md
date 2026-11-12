@@ -9,13 +9,13 @@ TodayOrder가 계정 여러 개, 서버 수십 대 규모가 되자 질문이 �
 
 | 서비스 | 한 줄 용도 | "이런 문장이 나오면" |
 |---|---|---|
-| **AWS Trusted Advisor** | 비용·성능·보안·내결함성·서비스 한도·운영 우수성 점검과 권고 | "열린 보안 그룹, 사용하지 않는 EIP, 한도 근접을 자동 점검" — 전체 점검은 **Business 이상 지원 플랜** |
+| **AWS Trusted Advisor** | 비용·성능·보안·내결함성·서비스 한도·운영 우수성 점검과 권고 | "열린 보안 그룹, 사용하지 않는 EIP, 한도 근접을 자동 점검" — 전체 점검·API는 **유료 지원 플랜**: Business Support+ · Enterprise Support · Unified Operations(기존 Business·Developer 플랜은 2027-01-01 종료, Enterprise On-Ramp는 2026년 중 Enterprise로 전환) |
 | **AWS Health Dashboard** | AWS 서비스 상태(공용)와 **내 계정 리소스에 영향을 주는 이벤트**(계정별) | "예정된 EC2 유지 관리·리전 장애가 내 리소스에 영향이 있는지", EventBridge로 자동 대응 |
 | **Service Quotas** | 서비스 한도(할당량) 조회·증가 요청·사용량 알람 | "리전당 EIP 5개 한도에 가까워지면 알림" |
 | **AWS Compute Optimizer** | 사용 지표를 ML로 분석해 EC2·ASG·EBS·Lambda·ECS(Fargate) 적정 크기 권고 | "과다 프로비저닝된 인스턴스를 찾아 적정 크기로" (M13) |
 | **AWS License Manager** | 소프트웨어 라이선스(Windows·SQL Server·Oracle 등) 사용량 추적·한도 강제 | "BYOL 라이선스 위반을 막기" |
 | **AWS Service Catalog** | 승인된 CloudFormation 템플릿을 "제품"으로 등록, 사용자는 셀프서비스로 배포 | "개발팀이 승인된 구성만 스스로 띄우게" |
-| **AWS Proton** | 플랫폼 팀이 만든 환경·서비스 템플릿으로 컨테이너·서버리스 앱 배포 표준화 | "플랫폼 팀 템플릿 + 개발팀 셀프 배포(코드 → 인프라)" |
+| **AWS Proton** | 플랫폼 팀이 만든 환경·서비스 템플릿으로 컨테이너·서버리스 앱 배포 표준화 | "플랫폼 팀 템플릿 + 개발팀 셀프 배포(코드 → 인프라)" — ⚠️ **2026-10-07 지원 종료**(2025-10-07 신규 가입 중단). 시험 범위 목록에는 아직 있어 이름과 용도만 알아 둔다. 대안: Service Catalog, Backstage 기반 Harmonix 등 |
 | **Amazon Managed Grafana** | 관리형 Grafana 대시보드 (CloudWatch·Prometheus·X-Ray 등 데이터 소스) | "Grafana를 직접 운영하지 않고" |
 | **Amazon Managed Service for Prometheus** | Prometheus 호환 지표 저장·쿼리(PromQL), 주로 EKS/컨테이너 지표 | "EKS 지표를 PromQL로, 서버 운영 없이" |
 | **AWS Well-Architected Tool** | 6개 기둥(운영 우수성·보안·안정성·성능 효율성·비용 최적화·지속 가능성) 질문으로 워크로드 검토 | "아키텍처를 모범 사례 기준으로 점검" (M14) |
@@ -61,11 +61,11 @@ Lambda 타임아웃 900초(15분), 리전당 동시 실행 기본 1,000(M07).
 
 ```
 aws: [ERROR]: An error occurred (SubscriptionRequiredException) when calling the DescribeTrustedAdvisorChecks operation: Amazon Web Services Premium Support Subscription is required to use this service.
-== 4. AWS Health API — Business 이상 지원 플랜 필요
+== 4. AWS Health API — 유료 지원 플랜(Business Support+ 등) 필요
 aws: [ERROR]: An error occurred (SubscriptionRequiredException) when calling the DescribeEvents operation: You must have a Business, Enterprise On-Ramp, or Enterprise Support plan from Amazon Web Services Support to use the Health API.
 ```
 
-방금 본 것: Trusted Advisor의 API(Support API)와 Health API는 **유료 지원 플랜**이 있어야 쓸 수 있다 — 실제 AWS와 같은 오류다. (콘솔의 Health Dashboard와 Trusted Advisor 기본 점검은 모든 계정이 볼 수 있다.)
+방금 본 것: Trusted Advisor의 API(Support API)와 Health API는 **유료 지원 플랜**이 있어야 쓸 수 있다 — 실제 AWS와 같은 오류다. 오류 메시지의 플랜 이름(Business, Enterprise On-Ramp)은 예전 이름이고, AWS 문서는 이제 Business Support+ · Enterprise Support · Unified Operations를 적는다(기존 Business·Developer 플랜은 2027-01-01 종료). (콘솔의 Health Dashboard와 Trusted Advisor 기본 점검은 모든 계정이 볼 수 있다.)
 
 ```
 == 5. Compute Optimizer 가입 상태
@@ -80,16 +80,16 @@ aws: [ERROR]: An error occurred (SubscriptionRequiredException) when calling the
   aws grafana list-workspaces                   0개
   aws amp list-workspaces                       0개
   aws servicecatalog list-portfolios            0개
-  aws proton list-environments                  0개
+  aws proton list-environments                  0개  ← 실제 AWS: 2026-10-07 지원 종료 (에뮬레이터 관찰만)
   aws license-manager list-license-configurations 0개
 ```
 
-방금 본 것: Compute Optimizer는 **옵트인(가입)** 해야 분석을 시작한다. 나머지는 API가 응답하지만 비어 있다.
+방금 본 것: Compute Optimizer는 **옵트인(가입)** 해야 분석을 시작한다. 나머지는 API가 응답하지만 비어 있다. Proton은 에뮬레이터가 응답할 뿐, 실제 AWS에서는 지원이 끝난 서비스다.
 
 ## 실제 AWS에서는
 
 > **실제 AWS에서 해 보려면** (🟡: 설정값 읽기만 재현)
-> - 프리 티어·요금: Service Quotas 조회, Trusted Advisor 기본 점검, Health Dashboard, Well-Architected Tool, Compute Optimizer 기본 권고는 **무료**. Trusted Advisor 전체 점검·Health API는 Business 이상 지원 플랜(월 요금) 필요. Managed Grafana·Prometheus·Service Catalog·Proton은 쓰는 만큼 과금.
+> - 프리 티어·요금: Service Quotas 조회, Trusted Advisor 기본 점검, Health Dashboard, Well-Architected Tool, Compute Optimizer 기본 권고는 **무료**. Trusted Advisor 전체 점검·Health API는 유료 지원 플랜(월 요금, Business Support+ · Enterprise Support · Unified Operations(기존 Business·Developer 플랜은 2027-01-01 종료, Enterprise On-Ramp는 2026년 중 Enterprise로 전환)) 필요. Managed Grafana·Prometheus·Service Catalog는 쓰는 만큼 과금. Proton은 2026-10-07 지원이 종료되어 실습할 수 없다.
 > - 순서: 콘솔 → Service Quotas → Amazon EC2 → "EC2-VPC Elastic IPs" 사용량 확인 · Trusted Advisor → 보안 점검 결과 · Health Dashboard → "Your account health" · `aws compute-optimizer update-enrollment-status --status Active` 후 (지표가 쌓이는) 하루 이상 뒤 `get-ec2-instance-recommendations`.
 > - 정리: Compute Optimizer 해지 `update-enrollment-status --status Inactive`. 나머지는 만든 리소스가 없다.
 

@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # M10 lab07 — 운영 지원 서비스의 "설정값 읽기" (🟡)
-# Service Quotas·Compute Optimizer·Well-Architected Tool·Managed Grafana/Prometheus·Service Catalog·Proton·License Manager 는
-# 조회 API가 응답한다. Trusted Advisor(Support API)·Health API 는 실제 AWS처럼 "Business 이상 지원 플랜 필요"로 거부된다.
+# Service Quotas·Compute Optimizer·Well-Architected Tool·Managed Grafana/Prometheus·Service Catalog·License Manager 는
+# 조회 API가 응답한다. Trusted Advisor(Support API)·Health API 는 실제 AWS처럼 "유료 지원 플랜 필요"로 거부된다.
+# AWS Proton 은 2026-10-07 실제 AWS에서 지원이 종료됐다 — 아래 proton 호출은 에뮬레이터 응답을 관찰할 뿐이다.
 # 에뮬레이터에는 실제 사용량·추천·장애 이벤트가 없으므로 값을 "읽는" 데까지만 한다.
 set -euo pipefail
 source "$(git rev-parse --show-toplevel)/scripts/env.sh"
@@ -24,7 +25,7 @@ echo "== 3. Trusted Advisor (Support API) — Basic 지원 플랜이면 거부"
 set +e
 ta="$(aws support describe-trusted-advisor-checks --language en 2>&1)"
 echo "$ta"
-echo "== 4. AWS Health API — Business 이상 지원 플랜 필요"
+echo "== 4. AWS Health API — 유료 지원 플랜(Business Support+ 등) 필요"
 health="$(aws health describe-events 2>&1)"
 echo "$health"
 set -e
@@ -43,7 +44,9 @@ for svc in "grafana list-workspaces" "amp list-workspaces" "servicecatalog list-
   "proton list-environments" "license-manager list-license-configurations"; do
   # shellcheck disable=SC2086 # 서비스·오퍼레이션 이름을 단어로 나누려는 의도
   n="$(aws $svc --output json | py -c 'import json,sys; d=json.load(sys.stdin); print(sum(len(v) for v in d.values() if isinstance(v, list)))')"
-  printf '  %-45s %s개\n' "aws $svc" "$n"
+  note=""
+  [[ "$svc" == proton* ]] && note="  ← 실제 AWS: 2026-10-07 지원 종료 (에뮬레이터 관찰만)"
+  printf '  %-45s %s개%s\n' "aws $svc" "$n" "$note"
 done
 
 # ---- 단언
