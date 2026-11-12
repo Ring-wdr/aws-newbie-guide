@@ -2,17 +2,18 @@
 
 두 "리전"은 포트가 다른 두 에뮬레이터다(둘 다 기술적으로는 us-east-1). 코드에는 엔드포인트가 없다.
     주 리전  : scripts/env.sh 가 만든 AWS_ENDPOINT_URL · AWS_CA_BUNDLE · AWS_SHARED_CREDENTIALS_FILE · AWS_CONFIG_FILE
-    DR 리전  : labs/dr-env.sh 가 만든 DR_AWS_ENDPOINT_URL · DR_AWS_CA_BUNDLE · DR_AWS_SHARED_CREDENTIALS_FILE · DR_AWS_CONFIG_FILE
+    DR 리전  : scripts/dr-env.sh 가 만든 DR_AWS_ENDPOINT_URL · DR_AWS_CA_BUNDLE · DR_AWS_SHARED_CREDENTIALS_FILE · DR_AWS_CONFIG_FILE
 
-DR 쪽 클라이언트를 만들 때는 위 네 변수를 잠시 기본 이름(AWS_...)으로 바꿔 끼운 상태에서
-require_emulator() 를 **한 번 더** 호출한다. 그래서 안전 장치(127.0.0.1 엔드포인트 + 계정
-000000000000 확인)가 두 리전 모두에 똑같이 적용되고, boto3 는 평소처럼 환경 변수만 읽는다.
-실제 AWS에서라면 DR_... 변수 대신 리전만 다른 두 세션(region_name="ap-northeast-2"/"ap-northeast-1")을 쓴다.
+사이트마다 emulator_guard.emulator_site() 를 부른다. 각 호출이 그 사이트의 변수만으로 안전 장치
+(127.0.0.1 엔드포인트 검사 → 그 사이트의 자격 증명·CA로 STS, 계정 000000000000 확인)를 돌고,
+그 사이트로 고정된 클라이언트 공장(.client())을 돌려준다. 클라이언트는 반드시 그 공장으로만 만든다.
+실제 AWS에서(TODAYORDER_ALLOW_REAL_AWS=1, env.sh 없는 새 셸) 돌리면 real_aws_region 으로
+서울(ap-northeast-2)·도쿄(ap-northeast-1) 두 리전 세션이 된다.
 
 실행 (저장소 루트에서):
     export EMULATOR_PORT=9297 DR_EMULATOR_PORT=9298   # 두 포트 모두 명시
     source scripts/env.sh
-    source curriculum/m12-resilience-dr-migration/labs/dr-env.sh
+    source scripts/dr-env.sh
     uv run python curriculum/m12-resilience-dr-migration/sdk/dr_replicate.py          # = sync
     uv run python curriculum/m12-resilience-dr-migration/sdk/dr_replicate.py status
 
@@ -25,69 +26,37 @@ require_emulator() 를 **한 번 더** 호출한다. 그래서 안전 장치(127
 from __future__ import annotations
 
 import json
-import os
 import sys
 import time
-from collections.abc import Iterator
-from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
 
-import boto3
 from botocore.exceptions import ClientError
 
-from emulator_guard import require_emulator
+from emulator_guard import emulator_site
 
 TABLE = "todayorder-orders"
 PARAM = "/todayorder/receipts-bucket"
 CHECKPOINT_KEY = "_dr/last-sync.json"
-SITE_KEYS = ("AWS_ENDPOINT_URL", "AWS_CA_BUNDLE", "AWS_SHARED_CREDENTIALS_FILE", "AWS_CONFIG_FILE")
 
 
 @dataclass
 class Site:
     name: str
-    endpoint: str
+    endpoint: str | None  # 실제 AWS(opt-out)에서는 None
     s3: Any
     ddb: Any
     ssm: Any
 
 
-@contextmanager
-def site_environment(prefix: str) -> Iterator[None]:
-    """prefix 가 붙은 변수(DR_AWS_ENDPOINT_URL …)를 잠시 기본 이름(AWS_ENDPOINT_URL …)으로 바꿔 끼운다."""
-    if not prefix:
-        yield
-        return
-    missing = [prefix + k for k in SITE_KEYS if not os.environ.get(prefix + k)]
-    if missing:
-        raise SystemExit(f"[dr_replicate] {', '.join(missing)} 가 없습니다. "
-                         "'source curriculum/m12-resilience-dr-migration/labs/dr-env.sh' 를 먼저 실행하세요.")
-    saved = {k: os.environ.get(k) for k in SITE_KEYS}
-    try:
-        for k in SITE_KEYS:
-            os.environ[k] = os.environ[prefix + k]
-        yield
-    finally:
-        for k, v in saved.items():
-            if v is None:
-                os.environ.pop(k, None)
-            else:
-                os.environ[k] = v
-
-
-def open_site(name: str, prefix: str) -> Site:
-    with site_environment(prefix):
-        # require_emulator() 는 boto3 기본 세션으로 STS 를 부른다. 기본 세션은 자격 증명을 캐시하므로
-        # 리전(=에뮬레이터)을 바꿀 때마다 새로 만들게 비워 둔다.
-        boto3.DEFAULT_SESSION = None
-        endpoint = require_emulator()  # 이 사이트의 엔드포인트가 에뮬레이터가 아니면 여기서 종료
-        session = boto3.Session()  # 지금 환경 변수(이 사이트의 엔드포인트·자격 증명·CA)로 클라이언트를 만든다
-        site = Site(name, endpoint, session.client("s3"), session.client("dynamodb"), session.client("ssm"))
-        boto3.DEFAULT_SESSION = None
-    print(f"[{name}] {endpoint} (리전 이름 {site.s3.meta.region_name} — 에뮬레이터라 둘 다 us-east-1)")
-    return site
+def open_site(name: str, prefix: str, real_aws_region: str) -> Site:
+    """emulator_site() 로 사이트를 검사하고, 그 사이트로 고정된 클라이언트만 만든다."""
+    site = emulator_site(prefix, real_aws_region=real_aws_region)  # 에뮬레이터가 아니면 여기서 종료
+    s3 = site.client("s3")
+    print(f"[{name}] {site.endpoint or '실제 AWS'} (리전 이름 {s3.meta.region_name}"
+          f"{' — 에뮬레이터라 둘 다 us-east-1' if site.endpoint else ''})")
+    return Site(name, site.endpoint, s3, site.client("dynamodb"), site.client("ssm"))
 
 
 def receipts_bucket(site: Site) -> str | None:
@@ -208,10 +177,9 @@ def status(primary: Site, dr: Site) -> None:
 
 
 def main(argv: list[str]) -> None:
-    primary = open_site("서울", "")  # 주 리전: 기본 환경 변수 그대로. 여기서 첫 안전 장치가 돈다
-    dr = open_site("도쿄", "DR_")    # DR 리전: DR_ 변수로 바꿔 끼우고 안전 장치를 다시 돈다
-    if primary.endpoint.rstrip("/") == dr.endpoint.rstrip("/"):
-        raise SystemExit("주 리전과 DR 리전이 같은 에뮬레이터입니다. DR_EMULATOR_PORT 를 확인하세요.")
+    primary = open_site("서울", "", "ap-northeast-2")  # 주 리전: AWS_* 변수 (scripts/env.sh)
+    dr = open_site("도쿄", "DR_", "ap-northeast-1")    # DR 리전: DR_AWS_* 변수 (scripts/dr-env.sh)
+    # (같은 포트면 emulator_site("DR_") 가 이미 거부한다)
     cmd = argv[0] if argv else "sync"
     if cmd == "sync":
         sync(primary, dr)

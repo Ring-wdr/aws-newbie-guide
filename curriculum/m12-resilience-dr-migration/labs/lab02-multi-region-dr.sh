@@ -2,7 +2,7 @@
 # M12 lab02 — 에뮬레이터 두 개로 "리전 2개" 흉내 내기: 파일럿 라이트 + 장애 조치 런북 (🟡)
 #
 #   주 리전 "서울" = $EMULATOR_PORT 의 에뮬레이터 (scripts/env.sh)
-#   DR 리전 "도쿄" = $DR_EMULATOR_PORT 의 에뮬레이터 (labs/dr-env.sh)
+#   DR 리전 "도쿄" = $DR_EMULATOR_PORT 의 에뮬레이터 (scripts/dr-env.sh)
 #     비대화형 실행에서는 DR_EMULATOR_PORT 필수. 대화형 터미널에서만 생략 가능(EMULATOR_PORT+1)
 #   ※ 둘 다 기술적으로는 us-east-1 이다. 리전을 흉내 낼 뿐, 실제 리전 간 네트워크·복제는 없다.
 #
@@ -32,7 +32,7 @@ cd "$ROOT"
 # DR 리전 에뮬레이터가 꺼져 있으면 켠다 (이미 떠 있으면 그대로).
 "$ROOT/scripts/emulator-up.sh" "$DR_PORT" >/dev/null
 export DR_EMULATOR_PORT="$DR_PORT"
-source "$MOD/labs/dr-env.sh"
+source "$ROOT/scripts/dr-env.sh"
 
 # 서울을 pause 한 채로 스크립트가 중간에 죽어도 반드시 되살린다.
 PRIMARY_CONTAINER="aws-emulator-$PRIMARY_PORT"

@@ -32,7 +32,7 @@ export DR_EMULATOR_PORT="${DR_EMULATOR_PORT:-$((EMULATOR_PORT + 1))}"
 trap 'rm -rf "$LOG_DIR"; "$ROOT/scripts/emulator-down.sh" "$DR_EMULATOR_PORT" >/dev/null 2>&1 || true' EXIT
 "$ROOT/scripts/emulator-reset.sh" "$DR_EMULATOR_PORT"
 source "$ROOT/scripts/env.sh"
-source "$MOD_DIR/labs/dr-env.sh"
+source "$ROOT/scripts/dr-env.sh"
 
 pass=0
 fail=0
@@ -67,7 +67,7 @@ guard_refuses() {
 }
 
 # DR 쪽 안전 장치: 주 리전은 정상인데 DR_AWS_ENDPOINT_URL 이 실제 AWS(도쿄 리전) 주소를 가리키면,
-# DR 클라이언트를 만들기 전에 같은 emulator_guard 가 거부해야 한다. 혹시 실제 AWS로 나가는 요청이 있으면
+# DR 클라이언트를 만들기 전에 emulator_site("DR_") 가 거부해야 한다. 혹시 실제 AWS로 나가는 요청이 있으면
 # 닫힌 프록시 포트로 보내 즉시 실패하게 한다(127.0.0.1 은 프록시를 거치지 않으므로 주 리전 확인은 정상 동작).
 guard_refuses_dr() {
   local out rc
@@ -77,7 +77,7 @@ guard_refuses_dr() {
   rc=$?
   echo "$out"
   [ "$rc" -eq 1 ] || { echo "종료 코드가 1이 아님: $rc"; return 1; }
-  grep -q "^\[emulator_guard\] AWS_ENDPOINT_URL 이 로컬 에뮬레이터(https://127.0.0.1:<포트>)가 아닙니다: 'https://dynamodb.ap-northeast-1" <<<"$out" || return 1
+  grep -q "^\[emulator_guard\] DR_AWS_ENDPOINT_URL 이 로컬 에뮬레이터(https://127.0.0.1:<포트>)가 아닙니다: 'https://dynamodb.ap-northeast-1" <<<"$out" || return 1
   ! grep -qE 'Traceback|연결하지 못했습니다' <<<"$out"
 }
 

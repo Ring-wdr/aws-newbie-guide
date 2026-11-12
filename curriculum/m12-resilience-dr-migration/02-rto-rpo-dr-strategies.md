@@ -87,16 +87,16 @@ AWS의 DR 백서도 같은 순서로 RPO/RTO를 "시간 → 수십 분 → 분 �
 | 이름 | 에뮬레이터 | 연결 방법 |
 |---|---|---|
 | 서울(주 리전) | `$EMULATOR_PORT` (예: 9297) | `source scripts/env.sh` |
-| 도쿄(DR 리전) | `$DR_EMULATOR_PORT` (예: 9298) | `source curriculum/m12-resilience-dr-migration/labs/dr-env.sh` |
+| 도쿄(DR 리전) | `$DR_EMULATOR_PORT` (예: 9298) | `source scripts/dr-env.sh` |
 
 **`DR_EMULATOR_PORT`는 항상 명시하라.** `export EMULATOR_PORT=9297 DR_EMULATOR_PORT=9298`. 터미널에서 직접 실행할 때만 생략하면 `EMULATOR_PORT + 1`을 쓰고, 스크립트·CI·AI 에이전트 같은 비대화형 실행에서는 `dr-env.sh`, lab02, `verify.sh`가 모두 거부한다. lab02와 `verify.sh`는 그 포트의 에뮬레이터 데이터를 지우거나 재시작·종료하기 때문에, "다음 번호 포트"를 추측했다가 남의 에뮬레이터를 지우는 사고를 막으려는 것이다.
 
-[`labs/dr-env.sh`](./labs/dr-env.sh)는 `scripts/env.sh`가 주 리전에 하는 일을 DR 리전에 대해 한다. `~/.aws/emulator/<DR 포트>/`의 자격 증명·인증서로 `DR_AWS_ENDPOINT_URL`, `DR_AWS_CA_BUNDLE`, `DR_AWS_SHARED_CREDENTIALS_FILE`, `DR_AWS_CONFIG_FILE`을 내보낸다. 그리고 그 리전의 계정이 `000000000000`인지 확인한다(안전 장치). 셸의 기본 `aws` 명령은 계속 서울을 향하고, 도쿄에 보낼 때는 `dr_aws` 함수를 쓴다.
+공용 [`scripts/dr-env.sh`](../../scripts/dr-env.sh)(M00 레슨 3)는 `scripts/env.sh`가 주 리전에 하는 일을 DR 리전에 대해 한다. `~/.aws/emulator/<DR 포트>/`의 자격 증명·인증서로 `DR_AWS_ENDPOINT_URL`, `DR_AWS_CA_BUNDLE`, `DR_AWS_SHARED_CREDENTIALS_FILE`, `DR_AWS_CONFIG_FILE`을 내보낸다. 그리고 주 리전과 다른 포트인지, 그 리전의 계정이 `000000000000`인지 확인한다(안전 장치). 실패하면 `DR_AWS_*` 변수를 지운다. 셸의 기본 `aws` 명령은 계속 서울을 향하고, 도쿄에 보낼 때는 `dr_aws` 함수를 쓴다.
 
 등장하는 코드 두 개:
 
 - [`sdk/order_app.py`](./sdk/order_app.py) — **리전을 모르는** 주문 앱. 어디에 연결할지는 환경 변수(`EMULATOR_PORT` → `env.sh`)만으로 정해진다. 리전마다 다른 버킷 이름은 그 리전의 Parameter Store `/todayorder/receipts-bucket`에서 읽는다. 그래서 장애 조치는 코드를 바꾸는 일이 아니라 **바라볼 곳을 바꾸는 일**이 된다.
-- [`sdk/dr_replicate.py`](./sdk/dr_replicate.py) — 서울의 S3 영수증과 DynamoDB 주문을 도쿄로 복사한다. 서울 클라이언트는 기본 환경 변수로 만든다. 도쿄 클라이언트는 `DR_…` 변수를 잠시 `AWS_…` 이름으로 바꿔 끼운 상태에서 **`require_emulator()`를 한 번 더 통과한 뒤** 만든다. 코드에 엔드포인트가 하나도 없고, 두 리전 모두 같은 안전 장치를 거친다.
+- [`sdk/dr_replicate.py`](./sdk/dr_replicate.py) — 서울의 S3 영수증과 DynamoDB 주문을 도쿄로 복사한다. `emulator_guard`의 `emulator_site()`(M00 레슨 5)로 사이트를 하나씩 연다. `emulator_site(real_aws_region="ap-northeast-2")`는 `AWS_*` 변수(서울)를, `emulator_site("DR_", real_aws_region="ap-northeast-1")`는 `DR_AWS_*` 변수(도쿄)를 검사하고 STS로 계정을 확인한 뒤, **그 사이트로 고정된** `.client()`를 돌려준다. 코드에 엔드포인트가 하나도 없고, 두 리전 모두 같은 안전 장치를 거친다. `real_aws_region`은 실제 AWS에서 돌릴 때(`TODAYORDER_ALLOW_REAL_AWS=1`, env.sh 없는 새 셸)만 쓰는 리전이다.
 
 ```bash
 export EMULATOR_PORT=9297 DR_EMULATOR_PORT=9298
@@ -105,7 +105,7 @@ bash curriculum/m12-resilience-dr-migration/labs/lab02-multi-region-dr.sh
 
 ```
 [env.sh] 포트 9312 의 에뮬레이터에 연결됨: https://127.0.0.1:9312 (Account 000000000000, us-east-1)
-[dr-env.sh] DR 리전("도쿄") = 포트 9313 의 에뮬레이터: https://127.0.0.1:9313 (Account 000000000000, 기술적으로는 us-east-1)
+[dr-env.sh] 두 번째 사이트 = 포트 9313 의 에뮬레이터: https://127.0.0.1:9313 (Account 000000000000)
 == 1. 서울(주 리전) 준비: 테이블·버킷·설정
 [order_app] 연결 대상: https://127.0.0.1:9312 (리전 us-east-1)
 테이블 생성: todayorder-orders
@@ -167,7 +167,7 @@ lab이 한 일을 직접 해 보면 "장애 조치는 바라보는 곳을 바꾸
 export EMULATOR_PORT=9297 DR_EMULATOR_PORT=9298   # 두 포트를 항상 명시
 scripts/emulator-up.sh "$DR_EMULATOR_PORT"        # 도쿄 에뮬레이터
 source scripts/env.sh
-source curriculum/m12-resilience-dr-migration/labs/dr-env.sh
+source scripts/dr-env.sh
 
 # 1) 평소: 서울에 주문하고 도쿄로 복제
 uv run python curriculum/m12-resilience-dr-migration/sdk/order_app.py place A-2001 25000
