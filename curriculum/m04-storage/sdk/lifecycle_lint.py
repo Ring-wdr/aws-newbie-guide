@@ -165,7 +165,7 @@ def demo(s3: Any) -> None:
     assert not [f for f in stored if f.level == "ERROR"], stored
     assert {f.rule_id for f in stored if f.level == "WARN"} == {"logs-deep-then-delete", "menu-old-versions"}, stored
 
-    # 2) 저장 전에 걸러야 하는 규칙 (에뮬레이터·AWS 모두 InvalidArgument) — 규칙 사전으로 점검
+    # 2) 저장 전에 걸러야 하는 규칙 (에뮬레이터는 InvalidArgument. AWS는 현재 버전 기준으로 문서화) — 규칙 사전으로 점검
     rejected = [
         {"ID": "gir-4-da-20", "Transitions": [
             {"Days": 4, "StorageClass": "GLACIER_IR"}, {"Days": 20, "StorageClass": "DEEP_ARCHIVE"}]},
