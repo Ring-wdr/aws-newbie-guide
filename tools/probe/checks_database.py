@@ -403,8 +403,77 @@ def run_elasticache(p: Probe) -> None:
     p.cleanup("sl", lambda: ec.delete_serverless_cache(ServerlessCacheName=f"to-sl-{p.suffix}"))
 
 
+def run_db_gaps(p: Probe) -> None:
+    """M05 모듈 저자가 찾은 501·동작 차이를 재현한다. 501 오퍼레이션은 존재하지 않는 ID로도 501을 돌려준다."""
+    rds, ec, dax, ddb = p.client("rds"), p.client("elasticache"), p.client("dax"), p.client("dynamodb")
+    p.call("RestoreDBInstanceToPointInTime", rds.restore_db_instance_to_point_in_time,
+           SourceDBInstanceIdentifier=p.name("nodb"), TargetDBInstanceIdentifier=p.name("nodb-r"), UseLatestRestorableTime=True)
+    p.call("PromoteReadReplica", rds.promote_read_replica, DBInstanceIdentifier=p.name("nodb"))
+    p.call("CreateDBClusterEndpoint", rds.create_db_cluster_endpoint, DBClusterIdentifier=p.name("nocl"),
+           DBClusterEndpointIdentifier=p.name("ep"), EndpointType="READER")
+    p.call("DescribeDBInstanceAutomatedBackups", rds.describe_db_instance_automated_backups)
+    p.call("DeleteReplicationGroup", ec.delete_replication_group, ReplicationGroupId=p.name("norg"))
+
+    subs = _vpc_subnets(p, 45)
+    if subs:
+        try:
+            dax.create_subnet_group(SubnetGroupName=p.name("daxsng"), SubnetIds=subs)
+            p.behavior("DAX CreateSubnetGroup(유효한 서브넷) 이 성공", True, "성공")
+            p.cleanup("daxsng", lambda: dax.delete_subnet_group(SubnetGroupName=p.name("daxsng")))
+        except ClientError as e:
+            err = e.response["Error"]
+            p.behavior("DAX CreateSubnetGroup(유효한 서브넷) 이 성공", False,
+                       f"{err.get('Code')}: {err.get('Message', '')[:120]}")
+
+    # DynamoDB PITR
+    t = p.name("pitr")
+    ddb.create_table(TableName=t, BillingMode="PAY_PER_REQUEST",
+                     AttributeDefinitions=[{"AttributeName": "pk", "AttributeType": "S"}],
+                     KeySchema=[{"AttributeName": "pk", "KeyType": "HASH"}])
+    p.cleanup("pitr", lambda: ddb.delete_table(TableName=t))
+    ddb.get_waiter("table_exists").wait(TableName=t, WaiterConfig={"Delay": 1, "MaxAttempts": 30})
+    p.call("UpdateContinuousBackups(PITR on)", ddb.update_continuous_backups, TableName=t,
+           PointInTimeRecoverySpecification={"PointInTimeRecoveryEnabled": True})
+
+    def _latest() -> Any:
+        return ddb.describe_continuous_backups(TableName=t)["ContinuousBackupsDescription"][
+            "PointInTimeRecoveryDescription"].get("LatestRestorableDateTime")
+
+    l0 = _latest()
+    ddb.put_item(TableName=t, Item={"pk": {"S": "o1"}, "v": {"S": "v1"}})
+    time.sleep(2)
+    import datetime as _dt
+    between = _dt.datetime.now(_dt.timezone.utc)
+    time.sleep(2)
+    ddb.put_item(TableName=t, Item={"pk": {"S": "o1"}, "v": {"S": "v2"}})
+    time.sleep(2)
+    l1 = _latest()
+    p.behavior("PITR LatestRestorableDateTime 이 시간이 지나면 앞으로 감", l0 is not None and l1 is not None and l1 > l0,
+               f"PITR 켠 직후 {l0} → 6초 뒤 {l1}")
+
+    def _restore_value(label: str, **kw: Any) -> str:
+        tgt = p.name(f"pitr-{label}")
+        try:
+            ddb.restore_table_to_point_in_time(SourceTableName=t, TargetTableName=tgt, **kw)
+        except ClientError as e:
+            return f"오류 {e.response['Error']['Code']}: {e.response['Error'].get('Message', '')[:80]}"
+        p.cleanup(f"r-{label}", lambda: ddb.delete_table(TableName=tgt))
+        try:
+            ddb.get_waiter("table_exists").wait(TableName=tgt, WaiterConfig={"Delay": 1, "MaxAttempts": 30})
+            it = ddb.get_item(TableName=tgt, Key={"pk": {"S": "o1"}}, ConsistentRead=True).get("Item")
+            return it["v"]["S"] if it else "(항목 없음)"
+        except Exception as e:  # noqa: BLE001
+            return f"{type(e).__name__}"
+
+    v_latest = _restore_value("latest", UseLatestRestorableTime=True)
+    p.behavior("PITR UseLatestRestorableTime 복원 → 최신 데이터(v2)", v_latest == "v2", f"복원된 값 {v_latest}")
+    v_between = _restore_value("between", RestoreDateTime=between)
+    p.behavior("PITR RestoreDateTime(v1과 v2 사이) 복원 → 그 시점 데이터(v1)", v_between == "v1", f"복원 결과 {v_between}")
+
+
 CHECKS = {
     "rds": run_rds,
     "dynamodb": run_dynamodb,
     "elasticache": run_elasticache,
+    "db-gaps": run_db_gaps,
 }
