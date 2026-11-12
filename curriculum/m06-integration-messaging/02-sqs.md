@@ -221,10 +221,11 @@ A 가 처리 중일 때 받은 것:
 B-3002	{"orderId":"B-3002","status":"CREATED"}
 그룹 A 의 첫 메시지 처리 완료 → 삭제
 == 6. 그룹 A 의 나머지를 차례로 받아 처리하고 지운다
-수신 순서: {"orderId":"A-3001","status":"CREATED"}
-수신 순서: {"orderId":"B-3002","status":"CREATED"}
-수신 순서: {"orderId":"A-3001","status":"PAID"}
-수신 순서: {"orderId":"A-3001","status":"SHIPPED"}
+-- 처리를 끝낸 전체 순서 (5단계에서 처리한 2건 포함):
+  {"orderId":"A-3001","status":"CREATED"}
+  {"orderId":"B-3002","status":"CREATED"}
+  {"orderId":"A-3001","status":"PAID"}
+  {"orderId":"A-3001","status":"SHIPPED"}
 주문 A-3001 상태 순서: CREATED PAID SHIPPED 
 LAB03 OK
 ```

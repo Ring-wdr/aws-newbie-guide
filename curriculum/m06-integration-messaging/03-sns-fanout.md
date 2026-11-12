@@ -58,7 +58,7 @@ SNS가 SQS 큐에 메시지를 넣으려면 **큐의 리소스 기반 정책**�
 
 "순서가 중요한 팬아웃(예: 주문 상태 변경을 여러 시스템에 순서대로)" → **SNS FIFO → SQS FIFO**.
 
-> 메시지 크기: SNS는 오랫동안 256 KiB였고, 2026년 9월부터 토픽 속성 `MaximumMessageSize`를 올리면 최대 1 MiB까지 보낼 수 있다([SNS 대용량 페이로드](https://docs.aws.amazon.com/sns/latest/dg/large-message-payloads.html)). 더 크면 본문은 S3에 두고 참조를 보낸다.
+> 메시지 크기: 토픽의 기본 상한은 256 KiB다. 2026년 9월부터 토픽 속성 `MaximumMessageSize`를 256 KiB보다 크게(최대 1 MiB) 설정할 수 있는데, **조건이 있다** — 그 토픽의 구독은 **Amazon SQS·AWS Lambda·Amazon Data Firehose만**, 합계 **100개 이하**여야 한다(HTTP/S·이메일·SMS·모바일 푸시 구독이 있으면 설정이 거부된다). 상한은 본문 + 메시지 속성 합계로 검사한다([SNS 대용량 페이로드](https://docs.aws.amazon.com/sns/latest/dg/large-message-payloads.html)). 그보다 크면 본문은 S3에 두고 참조를 보낸다(확장 클라이언트 라이브러리).
 
 ## 직접 해 보기
 

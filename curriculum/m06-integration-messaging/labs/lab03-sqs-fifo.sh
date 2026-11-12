@@ -60,7 +60,8 @@ drain_one() {
   [ "${#order[@]}" -ge 4 ]
 }
 poll 90 "4건 모두 수신" drain_one
-printf '수신 순서: %s\n' "${order[@]}"
+echo "-- 처리를 끝낸 전체 순서 (5단계에서 처리한 2건 포함):"
+printf '  %s\n' "${order[@]}"
 a_order="$(printf '%s\n' "${order[@]}" | grep A-3001 | sed 's/.*"status":"\([A-Z]*\)".*/\1/' | tr '\n' ' ')"
 echo "주문 A-3001 상태 순서: $a_order"
 
