@@ -10,7 +10,7 @@ Cost Explorer(GetCostAndUsage)는 에뮬레이터에서 501 이고, 에뮬레이
 읽는 것 (태그 cost-lab=<값> 이 붙은 리소스만)
     EC2 인스턴스   InstanceType, 태그 workload(steady|batch), hours-per-month(없으면 730)
     EBS 볼륨       VolumeType, Size
-    NAT 게이트웨이 개수, 태그 monthly-gb(처리량 가정)
+    NAT 게이트웨이 개수, 태그 monthly-gb(처리량 가정). NAT 에 붙은 퍼블릭 IPv4 주소 요금도 이 줄에 더한다
     탄력적 IP       연결 여부
 
 실행 (저장소 루트에서, lab01 을 실행한 뒤):
@@ -91,8 +91,9 @@ def estimate(lab: str) -> list[Line]:
 
     for n in ec2.describe_nat_gateways(Filters=flt + [{"Name": "state", "Values": ["available"]}])["NatGateways"]:
         gb = float(tags_of(n).get("monthly-gb", 0))
-        now = PRICES["nat:hour"] * HOURS + PRICES["nat:gb"] * gb
-        lines.append(Line(f"NAT {n['NatGatewayId']} (월 {gb:.0f} GB 처리)", now, now,
+        # NAT 시간 + 처리 GB + NAT 의 퍼블릭 IPv4 주소(실제 AWS 에서도 따로 과금된다)
+        now = PRICES["nat:hour"] * HOURS + PRICES["nat:gb"] * gb + PRICES["ipv4:hour"] * HOURS
+        lines.append(Line(f"NAT {n['NatGatewayId']} (월 {gb:.0f} GB, IPv4 포함)", now, now,
                           "S3·DynamoDB 트래픽이면 게이트웨이 엔드포인트 검토 (lab03)"))
 
     for a in ec2.describe_addresses(Filters=flt)["Addresses"]:

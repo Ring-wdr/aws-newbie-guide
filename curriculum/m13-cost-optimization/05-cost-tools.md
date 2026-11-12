@@ -64,6 +64,7 @@ FORECASTED	100.0	OK
 EMAIL	ops@todayorder.example
 SNS	arn:aws:sns:us-east-1:000000000000:todayorder-budget-alerts
 == 4. Cost Explorer: 이번 달 비용 조회와 예측
+조회 기간 2026-11-01 ~ 2026-11-14 · 예측 기간 2026-11-14 ~ 2026-12-01
 
 aws: [ERROR]: An error occurred (NotImplemented) when calling the GetCostAndUsage operation: operation GetCostAndUsage is scaffolded but not implemented in this emulator
 
@@ -77,7 +78,7 @@ LAB04 OK
 
 - 예산과 알림 두 개, 구독자(이메일·SNS)가 **저장**됐다. 태그 필터 `user:project$todayorder`의 `user:`는 "사용자 정의 태그"라는 뜻이다(AWS가 만든 태그는 `aws:` 접두사).
 - `ActualSpend`는 `0`이다. 에뮬레이터는 과금을 하지 않으니 지출이 늘지 않고, 알림 상태도 계속 `OK`다. **알림이 울리는 장면은 볼 수 없다**(🟡).
-- Cost Explorer의 비용 조회·예측은 `501 NotImplemented`(🔴). Cost Anomaly Detection 모니터는 만들어지지만 탐지할 지출이 없다.
+- Cost Explorer의 비용 조회·예측은 `501 NotImplemented`(🔴). 조회 기간은 lab이 실행한 날짜로 계산한다(이번 달 1일 ~ 내일, `End`는 포함되지 않음). Cost Anomaly Detection 모니터는 만들어지지만 탐지할 지출이 없다.
 
 ### 실습 2: 태그 정책 감사 — [labs/lab05-tag-audit.sh](./labs/lab05-tag-audit.sh)
 

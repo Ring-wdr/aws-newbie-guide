@@ -58,7 +58,8 @@ for _ in 1 2 3 4; do
   aws ec2 create-volume --availability-zone us-east-1a --volume-type gp2 --size 200 \
     --tag-specifications "ResourceType=volume,Tags=[{$T}]" >/dev/null
 done
-# NAT 용 IP 는 NAT 요금에 포함해 계산하므로 cost-lab 대신 정리용 태그만 붙인다
+# NAT 용 퍼블릭 IP: 실제 AWS 에서는 NAT 요금과 별도로 퍼블릭 IPv4 요금이 붙는다. 추정기는 이 IP 의 요금을
+# NAT 줄에 더해 계산하므로(중복 계산 방지) cost-lab 대신 정리용 태그만 붙인다
 EIP_NAT="$(aws ec2 allocate-address --domain vpc --tag-specifications "ResourceType=elastic-ip,Tags=[{Key=cost-lab-nat,Value=$LAB}]" --query AllocationId --output text)"
 aws ec2 create-nat-gateway --subnet-id "$SUBNET" --allocation-id "$EIP_NAT" \
   --tag-specifications "ResourceType=natgateway,Tags=[{$T},{Key=monthly-gb,Value=1000}]" --query NatGateway.NatGatewayId --output text
@@ -77,5 +78,5 @@ out="$(uv run --quiet python "$EST" "$LAB")"
 echo "$out"
 
 # ---- 단언: 레슨 02 워크시트의 정답과 같아야 한다
-grep -q '^TOTAL now=721.35 optimized=391.78$' <<<"$out" || { echo "FAIL: 합계가 워크시트 정답(721.35 → 391.78)과 다름"; exit 1; }
+grep -q '^TOTAL now=725.00 optimized=395.43$' <<<"$out" || { echo "FAIL: 합계가 워크시트 정답(725.00 → 395.43)과 다름"; exit 1; }
 echo "LAB01 OK"

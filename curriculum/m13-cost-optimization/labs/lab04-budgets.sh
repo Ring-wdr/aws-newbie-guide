@@ -46,9 +46,14 @@ aws budgets describe-subscribers-for-notification --account-id "$ACCOUNT" --budg
   --query 'Subscribers[].[SubscriptionType,Address]' --output text
 
 echo "== 4. Cost Explorer: 이번 달 비용 조회와 예측"
+# 기간은 오늘 날짜로 계산한다: 조회 = 이번 달 1일 ~ 내일(End 는 포함 안 됨), 예측 = 내일 ~ 다음 달 1일
+read -r MONTH_START TOMORROW NEXT_MONTH < <(python3 -c 'import datetime as d
+t = d.date.today(); n = (t.replace(day=28) + d.timedelta(days=4)).replace(day=1)
+print(t.replace(day=1), t + d.timedelta(days=1), n)')
+echo "조회 기간 $MONTH_START ~ $TOMORROW · 예측 기간 $TOMORROW ~ $NEXT_MONTH"
 set +e
-ce_out="$(aws ce get-cost-and-usage --time-period Start=2026-11-01,End=2026-11-12 --granularity MONTHLY --metrics UnblendedCost 2>&1)"
-fc_out="$(aws ce get-cost-forecast --time-period Start=2026-11-13,End=2026-11-30 --granularity MONTHLY --metric UNBLENDED_COST 2>&1)"
+ce_out="$(aws ce get-cost-and-usage --time-period "Start=$MONTH_START,End=$TOMORROW" --granularity MONTHLY --metrics UnblendedCost 2>&1)"
+fc_out="$(aws ce get-cost-forecast --time-period "Start=$TOMORROW,End=$NEXT_MONTH" --granularity MONTHLY --metric UNBLENDED_COST 2>&1)"
 set -e
 echo "$ce_out"
 echo "$fc_out"
