@@ -12,6 +12,9 @@ REPLICA=todayorder-m05-maz-rr
 NOBACKUP=todayorder-m05-nobackup
 SNG=todayorder-m05-maz-subnets
 
+# 같은 에뮬레이터에서 다시 실행하면 이전 실행의 이벤트도 남아 있으므로, 이 실행이 시작된 뒤의 이벤트만 본다.
+RUN_START="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
 cleanup() {
   rds_delete_instance "$REPLICA"
   rds_delete_instance "$PRIMARY"
@@ -44,7 +47,7 @@ aws rds reboot-db-instance --db-instance-identifier "$PRIMARY" --force-failover 
 aws rds wait db-instance-available --db-instance-identifier "$PRIMARY"
 az_after="$(aws rds describe-db-instances --db-instance-identifier "$PRIMARY" --query 'DBInstances[0].AvailabilityZone' --output text)"
 echo "장애 조치 전 AZ=$az_before → 후 AZ=$az_after   (실제 AWS라면 대기 인스턴스의 AZ로 바뀐다)"
-aws rds describe-events --source-type db-instance --source-identifier "$PRIMARY" --duration 60 \
+aws rds describe-events --source-type db-instance --source-identifier "$PRIMARY" --start-time "$RUN_START" \
   --query 'Events[].Message'
 
 echo "== 3. 읽기 전용 복제본을 다른 AZ에 (비동기 복제, 읽기 전용, 자기 엔드포인트를 가진다)"

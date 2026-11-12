@@ -68,6 +68,7 @@ aws elasticache describe-replication-groups --replication-group-id "$RG" --query
 primary_before="$(aws elasticache describe-replication-groups --replication-group-id "$RG" \
   --query "ReplicationGroups[0].NodeGroups[0].NodeGroupMembers[?CurrentRole=='primary'].CacheClusterId | [0]" --output text)"
 
+FAILOVER_START="$(date -u +%Y-%m-%dT%H:%M:%SZ)"   # 이전 실행의 이벤트는 빼고 보기 위해
 echo "== 3. 장애 조치 테스트 (test-failover): 기본 노드를 일부러 넘긴다"
 aws elasticache test-failover --replication-group-id "$RG" --node-group-id 0001 --query 'ReplicationGroup.Status'
 poll_until 300 "장애 조치 후 available + 기본 노드 변경" bash -c \
@@ -76,7 +77,7 @@ aws elasticache describe-replication-groups --replication-group-id "$RG" \
   --query 'ReplicationGroups[0].NodeGroups[0].NodeGroupMembers[].{Id: CacheClusterId, Role: CurrentRole}'
 primary_after="$(aws elasticache describe-replication-groups --replication-group-id "$RG" \
   --query "ReplicationGroups[0].NodeGroups[0].NodeGroupMembers[?CurrentRole=='primary'].CacheClusterId | [0]" --output text)"
-aws elasticache describe-events --source-type replication-group --source-identifier "$RG" --duration 60 \
+aws elasticache describe-events --source-type replication-group --source-identifier "$RG" --start-time "$FAILOVER_START" \
   --query 'Events[].Message'
 
 echo "== 4. 잘못된 구성 ①: 복제본 0개로 자동 장애 조치?"

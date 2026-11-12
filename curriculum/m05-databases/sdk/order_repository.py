@@ -22,6 +22,7 @@ DynamoDB 타입 표기({"S": ...})와 파이썬 값 사이의 변환은 boto3 �
 
 from __future__ import annotations
 
+import time
 import uuid
 from dataclasses import dataclass
 from decimal import Decimal
@@ -308,8 +309,16 @@ def main() -> None:
     except InvalidTransition as e:
         print(f"같은 전이를 한 번 더: 거절 ({e})")
 
-    paid = [o.order_id for o in repo.orders_by_status("PAID", since="2026-11-01")]
-    shipped = [o.order_id for o in repo.orders_by_status("SHIPPED", since="2026-11-01")]
+    # GSI 는 테이블과 비동기로 맞춰진다(최종 일관). 실제 AWS에서는 방금 쓴 변경(A-1001 의 SHIPPED,
+    # A-1004 거절 등)이 인덱스에 반영되기까지 보통 1초 미만 걸릴 수 있어, 기대한 결과가 나올 때까지 짧게 재시도한다.
+    paid: list[str] = []
+    shipped: list[str] = []
+    for _ in range(10):
+        paid = sorted(o.order_id for o in repo.orders_by_status("PAID", since="2026-11-01"))
+        shipped = [o.order_id for o in repo.orders_by_status("SHIPPED", since="2026-11-01")]
+        if paid == ["A-1002", "A-1003"] and shipped == ["A-1001"]:
+            break
+        time.sleep(0.5)
     print(f"\nGSI status-index  PAID={paid}  SHIPPED={shipped}")
 
     repo.cancel_order(o2)
@@ -321,7 +330,7 @@ def main() -> None:
     print("정리 완료")
 
     assert recent[0].order_id == "A-1002"
-    assert sorted(paid) == ["A-1002", "A-1003"] and shipped == ["A-1001"], (paid, shipped)
+    assert paid == ["A-1002", "A-1003"] and shipped == ["A-1001"], (paid, shipped)
     assert cancelled is not None and cancelled.status == "CANCELLED"
     assert isinstance(from_ddb(to_ddb({"x": 1}))["x"], Decimal)  # DynamoDB 숫자는 Decimal 로 돌아온다
     print("SDK order_repository OK")

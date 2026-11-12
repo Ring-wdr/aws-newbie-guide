@@ -56,9 +56,16 @@ flowchart TB
 | **Aurora Serverless v2** | 인스턴스 클래스 대신 `db.serverless` + 용량 범위(ACU, 1 ACU ≈ 2 GiB 메모리). 부하에 따라 초 단위로 늘고 준다. 최대 256 ACU, 최소 0 ACU로 두면 유휴 시 자동 일시 중지 |
 | Serverless v1 | 2025-03-31 지원 종료(남은 클러스터는 v2로 자동 업그레이드). 새 설계에 쓰지 않는다 |
 | **Aurora 복제본 자동 조정** | Application Auto Scaling으로 리더 수를 CPU·연결 수에 맞춰 늘리고 줄인다 |
-| Backtrack (Aurora MySQL) | 새 클러스터를 만들지 않고 같은 클러스터를 과거 시점으로 "되감기" |
-| 클론(Clone) | 쓰기 시 복사(copy-on-write)로 빠르고 싸게 테스트용 클러스터 복제 |
-| 스토리지 구성 Standard / **I/O-Optimized** | I/O 요청 요금을 따로 낼지, 인스턴스·스토리지 단가에 포함할지. I/O가 많으면 I/O-Optimized |
+
+<details><summary>시험 키워드만 알아 두면 되는 기능 3개 (Backtrack · 클론 · I/O-Optimized)</summary>
+
+| 기능 | 한 줄 요약 | 이 말이 나오면 |
+|---|---|---|
+| Backtrack (Aurora MySQL) | 새 클러스터를 만들지 않고 같은 클러스터를 과거 시점으로 "되감기" | "복원 없이 몇 분 전으로 빨리 되돌리기" |
+| 클론(Clone) | 쓰기 시 복사(copy-on-write)로 빠르고 싸게 테스트용 클러스터 복제 | "운영 데이터로 테스트 환경을 빠르고 싸게" |
+| 스토리지 구성 Standard / I/O-Optimized | I/O 요청 요금을 따로 낼지, 인스턴스·스토리지 단가에 포함할지 | "I/O 요금이 Aurora 비용의 큰 몫" → I/O-Optimized |
+
+</details>
 
 ### RDS Proxy — 연결을 모아 주는 문지기
 

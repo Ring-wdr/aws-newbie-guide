@@ -145,13 +145,11 @@ aws elasticache test-failover --replication-group-id todayorder-m05-sessions --n
 ]
 [
     "Replication group status changed from modifying to available",
-    "Test Failover API called for node group 0001: failing over from primary node todayorder-m05-sessions-001 to replica node todayorder-m05-sessions-002",
-    "Replication group status changed from creating to available",
-    "Replication group created"
+    "Test Failover API called for node group 0001: failing over from primary node todayorder-m05-sessions-001 to replica node todayorder-m05-sessions-002"
 ]
 ```
 
-방금 본 것: 복제본이 기본으로 승격되고 이벤트가 남는다. 기본 엔드포인트 이름은 그대로라 앱은 재연결만 한다.
+방금 본 것: 복제본이 기본으로 승격되고 이벤트가 남는다(스크립트는 장애 조치 직전 시각 이후의 이벤트만 `--start-time`으로 본다. 복제 그룹이 남아 있어 다시 실행하면 001↔002 방향이 바뀐다). 기본 엔드포인트 이름은 그대로라 앱은 재연결만 한다.
 
 **3) 잘못된 구성은 거부된다**
 
@@ -278,7 +276,7 @@ Memcached·서버리스·DAX는 지워지지만 복제 그룹은 지울 수 없�
 - DAX도 VPC 안에서만 접근되며, DAX 전용 클라이언트 라이브러리가 필요하다.
 
 > **실제 AWS에서 해 보려면** (🟡 실습)
-> - 프리 티어: 2025-07-15 이전 계정은 12개월 동안 `cache.t3.micro`/`cache.t4g.micro` 노드 월 750시간이 무료였다(레거시). 이후 계정은 크레딧 기반. 복제 그룹(노드 2개)은 시간이 2배로 든다. 서버리스·DAX는 무료 범위 없음.
+> - 프리 티어: 2025-07-15 이전에 만든 계정(레거시 프리 티어)은 가입 후 12개월 동안 마이크로 캐시 노드 일정 시간이 무료였고, 이후 만든 계정은 크레딧을 쓰는 무료 플랜이다. 대상 노드 유형·시간은 바뀔 수 있으니 [AWS 프리 티어 페이지](https://aws.amazon.com/free/)에서 확인하자. 어느 쪽이든 복제 그룹(노드 2개)은 노드 시간이 2배로 든다. 서버리스 캐시·DAX를 무료로 쓸 수 있다고 가정하지 말자.
 > - 과금 주의: 서버리스 캐시는 저장 데이터(GB-시간) + ECPU 요금, 최소 과금 저장량이 있다. DAX는 노드 시간 요금.
 > - 정리: `aws elasticache delete-replication-group --replication-group-id <rg>`(실제 AWS에서는 동작) · `aws elasticache delete-serverless-cache --serverless-cache-name <s>` · `aws elasticache delete-cache-cluster --cache-cluster-id <mc>` · `aws dax delete-cluster --cluster-name <d>` → 서브넷 그룹·역할 삭제.
 
