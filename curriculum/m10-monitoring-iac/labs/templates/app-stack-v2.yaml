@@ -1,0 +1,45 @@
+# TodayOrder 앱 스택 v2 (M10 lab05): v1 + 주문 DLQ(재처리 대기열), 주문 큐에 RedrivePolicy 추가
+# VPC·IGW 연결이 없는 스택이라 에뮬레이터에서도 변경 세트 실행이 끝까지 된다 (README "에뮬레이터 제약" 참고).
+AWSTemplateFormatVersion: "2010-09-09"
+Description: TodayOrder app resources (S3 + SQS + DynamoDB)
+Parameters:
+  QueueVisibility:
+    Type: Number
+    Default: 45
+    MinValue: 0
+    MaxValue: 43200
+Resources:
+  ReceiptsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      VersioningConfiguration: {Status: Enabled}
+  OrdersDlq:
+    Type: AWS::SQS::Queue
+    Properties:
+      MessageRetentionPeriod: 1209600
+  OrdersQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      VisibilityTimeout: !Ref QueueVisibility
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt OrdersDlq.Arn
+        maxReceiveCount: 5
+  OrdersTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - {AttributeName: orderId, AttributeType: S}
+      KeySchema:
+        - {AttributeName: orderId, KeyType: HASH}
+Outputs:
+  BucketName:
+    Value: !Ref ReceiptsBucket
+  QueueUrl:
+    Value: !Ref OrdersQueue
+  QueueArn:
+    Value: !GetAtt OrdersQueue.Arn
+  DlqArn:
+    Value: !GetAtt OrdersDlq.Arn
+  TableName:
+    Value: !Ref OrdersTable
