@@ -5,7 +5,7 @@
 # 헬스 체크가 통과할 때까지 기다린다. 이미 떠 있으면 아무것도 바꾸지 않는다.
 #
 # 환경 변수로 바꿀 수 있는 값
-#   EMULATOR_MEMORY       컨테이너 메모리 상한 (기본 1g, 스왑 없음)
+#   EMULATOR_MEMORY       컨테이너 메모리 상한 (기본 2g, 스왑 없음)
 #   EMULATOR_TELEMETRY    on 으로 두면 텔레메트리를 끄지 않는다 (기본: 끔)
 #   EMULATOR_IDLE_TIMEOUT 지정한 초 동안 API 호출이 없으면 에뮬레이터가 스스로 종료
 set -euo pipefail
@@ -15,7 +15,9 @@ set -euo pipefail
 PORT="${1:-${EMULATOR_PORT:-9297}}"
 validate_port "$PORT"
 NAME="$(container_name "$PORT")"
-MEMORY="${EMULATOR_MEMORY:-1g}"
+# 기본 2g(공식 가이드와 같음). 동기 Lambda Invoke 한 번마다 약 7 MiB가 회수되지 않고 쌓여서
+# 1g 에서는 약 120번 호출 후 OOM(137)으로 죽었다(측정과 대처: M00 레슨 3 문제 해결). 병렬 에이전트는 줄일 수 있다.
+MEMORY="${EMULATOR_MEMORY:-2g}"
 
 require_docker
 require_image
@@ -41,6 +43,9 @@ if [ "$state" = "running" ]; then
   c_ylw "$NAME 컨테이너는 떠 있지만 아직 헬스 체크가 통과하지 않았습니다. 기다립니다..."
 elif [ -n "$state" ]; then
   # 비정상 종료 등으로 남은 컨테이너: 마지막 로그를 보여 주고 지운다.
+  if [ "$(docker container inspect -f '{{.State.OOMKilled}}' "$NAME" 2>/dev/null)" = "true" ]; then
+    c_ylw "이전 컨테이너 $NAME 는 메모리 상한($MEMORY 기준이 아닐 수 있음)을 넘어 OOM(137)으로 죽었습니다. 자주 반복되면 EMULATOR_MEMORY=3g 로 띄우세요."
+  fi
   c_ylw "멈춘 컨테이너 $NAME (상태: $state)를 정리하고 새로 띄웁니다. 마지막 로그:"
   docker logs --tail 5 "$NAME" 2>&1 | sed 's/^/    /' || true
   docker rm -f "$NAME" >/dev/null

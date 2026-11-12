@@ -62,14 +62,26 @@ def main() -> None:
     s3 = boto3.client("s3")     # 그다음에 클라이언트
 ```
 
-`require_emulator()`는 ① 네트워크 호출 없이 `AWS_ENDPOINT_URL`이 `https://127.0.0.1:`로 시작하는지(서비스별 `AWS_ENDPOINT_URL_*`도) 보고, ② 통과하면 그 엔드포인트로만 STS를 불러 계정이 `000000000000`인지 확인한다. `emulator_guard`는 이 저장소의 작은 패키지(`src/emulator_guard/`)로, `uv sync`가 설치해 두므로 `uv run python ...`에서 바로 import 된다. env.sh 없이 실행하면:
+`require_emulator()`는 ① 네트워크 호출 없이 `AWS_ENDPOINT_URL`(과 서비스별 `AWS_ENDPOINT_URL_*`)을 **URL로 해석해서** scheme이 `https`, 호스트가 정확히 `127.0.0.1`, 사용자 정보(`@`) 없음, 숫자 포트, 경로 없음인지 본다. 그래서 `https://127.0.0.1:9320@s3.amazonaws.com`(앞부분만 보면 127.0.0.1 같지만 실제 호스트는 `s3.amazonaws.com`) 같은 값도 거부된다. ② 통과하면 그 엔드포인트로만 STS를 불러 계정이 `000000000000`인지 확인한다. `emulator_guard`는 이 저장소의 작은 패키지(`src/emulator_guard/`)로, `uv sync`가 설치해 두므로 `uv run python ...`에서 바로 import 된다. env.sh 없이 실행하면:
 
 ```
 [emulator_guard] AWS_ENDPOINT_URL 이 로컬 에뮬레이터(https://127.0.0.1:<포트>)가 아닙니다: '설정 안 됨'. 이대로 실행하면 실제 AWS로 요청이 갈 수 있어 중단합니다.
                  먼저 저장소 루트에서 'source scripts/env.sh' 를 실행하세요 (에뮬레이터: scripts/emulator-up.sh).
 ```
 
-나중에 **자기 AWS 계정에서** 같은 예제를 직접 돌려 보고 싶다면 `TODAYORDER_ALLOW_REAL_AWS=1`을 설정한다. 그러면 검사를 건너뛰고 경고만 출력한다(요금 주의, 기본값은 꺼짐). `verify.sh`는 "env.sh 없이 실행하면 네트워크 호출 전에 거부되는지"를 매번 확인한다.
+**에뮬레이터 두 개(두 "리전")를 함께 쓸 때** — M12의 다중 리전 DR처럼 — 는 `scripts/dr-env.sh`가 두 번째 에뮬레이터의 접속 정보를 `DR_AWS_*` 변수로 만들고, Python에서는 사이트마다 검사된 클라이언트 공장을 받는다. 코드에 엔드포인트를 쓰지 않는다.
+
+```python
+from emulator_guard import emulator_site
+
+primary = emulator_site(real_aws_region="ap-northeast-2")    # AWS_*    (scripts/env.sh)
+dr = emulator_site("DR_", real_aws_region="ap-northeast-1")  # DR_AWS_* (scripts/dr-env.sh)
+dr.client("dynamodb").put_item(...)                          # 각 사이트의 엔드포인트·키·인증서로 고정된 클라이언트
+```
+
+`real_aws_region`은 실제 AWS에서 돌릴 때(아래 opt-out)만 쓰인다. 서비스별 `AWS_ENDPOINT_URL_*`이 있다면 그 포트도 `AWS_ENDPOINT_URL`과 같아야 한다(다른 사람의 에뮬레이터로 새는 것을 막기 위해).
+
+나중에 **자기 AWS 계정에서** 같은 예제를 직접 돌려 보고 싶다면 `TODAYORDER_ALLOW_REAL_AWS=1`을 설정한다. 그러면 검사를 건너뛰고 경고만 출력한다(요금 주의, 기본값은 꺼짐). `emulator_site()`는 이때 엔드포인트 없이 `real_aws_region` 리전의 세션을 쓴다. `verify.sh`는 "env.sh 없이 실행하면 네트워크 호출 전에 거부되는지"와 가드 자체 시험(`uv run python -m emulator_guard.selftest`: URL 우회 사례, 두 번째 사이트, opt-out)을 매번 확인한다. 이때 `DR_AWS_*`는 쓰이지 않아 **두 번째 사이트도 주 사이트와 같은 환경을 따른다**(env.sh를 source 한 셸이면 두 사이트 모두 주 에뮬레이터로 간다). 실제 AWS에서 두 리전을 쓰려면 env.sh 없이 새 셸에서 실행하고 `real_aws_region`만 다르게 준다.
 
 ## 직접 해 보기
 

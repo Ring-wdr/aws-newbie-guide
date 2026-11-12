@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "boto3>=1.40",
+    "cryptography>=44",
 ]
 
 # src/emulator_guard: 모든 boto3 예제가 클라이언트를 만들기 전에 호출하는 안전 장치.
