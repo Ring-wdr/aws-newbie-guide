@@ -2,7 +2,8 @@
 # M12 lab02 — 에뮬레이터 두 개로 "리전 2개" 흉내 내기: 파일럿 라이트 + 장애 조치 런북 (🟡)
 #
 #   주 리전 "서울" = $EMULATOR_PORT 의 에뮬레이터 (scripts/env.sh)
-#   DR 리전 "도쿄" = $DR_EMULATOR_PORT (기본 EMULATOR_PORT+1) 의 에뮬레이터 (labs/dr-env.sh)
+#   DR 리전 "도쿄" = $DR_EMULATOR_PORT 의 에뮬레이터 (labs/dr-env.sh)
+#     비대화형 실행에서는 DR_EMULATOR_PORT 필수. 대화형 터미널에서만 생략 가능(EMULATOR_PORT+1)
 #   ※ 둘 다 기술적으로는 us-east-1 이다. 리전을 흉내 낼 뿐, 실제 리전 간 네트워크·복제는 없다.
 #
 # 흐름: 양쪽 정리 → 서울 bootstrap → 도쿄 파일럿 라이트 → 주문 3건 → 동기화 → 주문 2건 더(미동기화)
@@ -15,6 +16,12 @@ MOD="$ROOT/curriculum/m12-resilience-dr-migration"
 APP="$MOD/sdk/order_app.py"
 SYNC="$MOD/sdk/dr_replicate.py"
 PRIMARY_PORT="$EMULATOR_PORT"
+# DR 포트: 이 lab 은 그 에뮬레이터의 리소스를 지우므로, 비대화형에서는 추측하지 않는다.
+if [ -z "${DR_EMULATOR_PORT:-}" ] && [ ! -t 0 ]; then
+  echo "오류: DR_EMULATOR_PORT 가 설정되지 않았습니다. 비대화형 실행에서는 'EMULATOR_PORT+1' 기본값을 쓰지 않습니다." >&2
+  echo "      'export DR_EMULATOR_PORT=<DR 리전 포트>' 후 다시 실행하세요." >&2
+  exit 1
+fi
 DR_PORT="${DR_EMULATOR_PORT:-$((PRIMARY_PORT + 1))}"
 SEOUL_BUCKET="todayorder-receipts-seoul"
 TOKYO_BUCKET="todayorder-receipts-tokyo"
@@ -109,3 +116,4 @@ dr_aws s3api head-object --bucket "$TOKYO_BUCKET" --key _dr/last-sync.json >/dev
   || { echo "FAIL: 체크포인트 없음"; exit 1; }
 echo "잃은 주문(RPO): A-1004, A-1005 — 마지막 동기화 이후 서울에만 쓰인 2건"
 echo "LAB02 OK"
+echo "참고: DR 리전 에뮬레이터(포트 $DR_PORT)는 켜 둔 채로 끝납니다. 다 썼으면 끄세요: scripts/emulator-down.sh $DR_PORT"

@@ -10,7 +10,8 @@ require_emulator() 를 **한 번 더** 호출한다. 그래서 안전 장치(127
 실제 AWS에서라면 DR_... 변수 대신 리전만 다른 두 세션(region_name="ap-northeast-2"/"ap-northeast-1")을 쓴다.
 
 실행 (저장소 루트에서):
-    export EMULATOR_PORT=9312 && source scripts/env.sh
+    export EMULATOR_PORT=9297 DR_EMULATOR_PORT=9298   # 두 포트 모두 명시
+    source scripts/env.sh
     source curriculum/m12-resilience-dr-migration/labs/dr-env.sh
     uv run python curriculum/m12-resilience-dr-migration/sdk/dr_replicate.py          # = sync
     uv run python curriculum/m12-resilience-dr-migration/sdk/dr_replicate.py status

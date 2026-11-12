@@ -2,12 +2,13 @@
 # M12 다중 리전 DR 실습용: 두 번째 에뮬레이터("DR 리전", 이 실습에서는 "도쿄")의 접속 정보를
 # DR_ 접두사 환경 변수로 내보낸다. scripts/env.sh 를 먼저 source 한 셸에서 source 한다.
 #
-#   export EMULATOR_PORT=9312            # 주 리전("서울") — scripts/env.sh 가 쓰는 포트
+#   export EMULATOR_PORT=9297 DR_EMULATOR_PORT=9298   # 주 리전("서울")·DR 리전("도쿄") 포트를 모두 명시
 #   source scripts/env.sh
 #   source curriculum/m12-resilience-dr-migration/labs/dr-env.sh   # DR 리전("도쿄")
 #
-# 포트 규칙: DR_EMULATOR_PORT 가 있으면 그 포트, 없으면 EMULATOR_PORT + 1.
-#   (학습자 기본값: 9297 → 9298. 에이전트 9312 → 9313)
+# 포트 규칙: DR_EMULATOR_PORT 가 있으면 그 포트.
+#   없으면 대화형 터미널(표준 입력이 터미널 — 학습자가 직접 친 명령)에서만 EMULATOR_PORT + 1 (9297 → 9298).
+#   비대화형(에이전트·CI·스크립트 파이프)에서는 거부한다 — 연속된 포트는 다른 사람의 에뮬레이터일 수 있다.
 #
 # 두 에뮬레이터 모두 기술적으로는 us-east-1 이다. 에뮬레이터는 리전을 나누지 않으므로
 # "포트가 다른 두 에뮬레이터 = 서로 독립된 두 리전"으로 흉내 낸다.
@@ -26,6 +27,11 @@ _dr_env_fail() {
 _dr_env_main() {
   if [ -z "${EMULATOR_PORT:-}" ] || [ -z "${AWS_ENDPOINT_URL:-}" ]; then
     _dr_env_fail "scripts/env.sh 를 먼저 source 하세요 (주 리전 연결이 없습니다)."
+    return 1
+  fi
+  if [ -z "${DR_EMULATOR_PORT:-}" ] && [ ! -t 0 ]; then
+    _dr_env_fail "DR_EMULATOR_PORT 가 설정되지 않았습니다. 비대화형 실행에서는 'EMULATOR_PORT+1' 기본값을 쓰지 않습니다." \
+      "다른 사람의 에뮬레이터일 수 있습니다. 'export DR_EMULATOR_PORT=<DR 리전 포트>' 후 다시 실행하세요."
     return 1
   fi
   local port="${DR_EMULATOR_PORT:-$((EMULATOR_PORT + 1))}"
@@ -72,7 +78,8 @@ _dr_env_main
 _dr_env_rc=$?
 unset -f _dr_env_main _dr_env_fail
 if [ "$_dr_env_rc" -ne 0 ]; then
-  unset _dr_env_rc
+  unset _dr_env_rc DR_AWS_ENDPOINT_URL DR_AWS_CA_BUNDLE DR_AWS_SHARED_CREDENTIALS_FILE DR_AWS_CONFIG_FILE
+  unset -f dr_aws
   # shellcheck disable=SC2317
   return 1 2>/dev/null || exit 1
 fi

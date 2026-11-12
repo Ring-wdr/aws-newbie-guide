@@ -37,17 +37,17 @@
 전부 한 번에 검증:
 
 ```bash
-export EMULATOR_PORT=9297          # 대화형 터미널이면 생략 가능. DR 리전은 EMULATOR_PORT+1 (9298)
+export EMULATOR_PORT=9297 DR_EMULATOR_PORT=9298   # 둘 다 명시. 비대화형 실행에서는 DR_EMULATOR_PORT 가 없으면 거부
 curriculum/m12-resilience-dr-migration/labs/verify.sh
 ```
 
-`verify.sh`는 **에뮬레이터 두 개**를 다룬다. 주 리전 `$EMULATOR_PORT`와 DR 리전 `$DR_EMULATOR_PORT`(기본 `EMULATOR_PORT + 1`)를 둘 다 재시작해 깨끗하게 만든다. 그다음 sdk 예제의 안전 장치를 확인한다. env.sh 없이 실행하면 네트워크 호출 전에 거부되는지, 그리고 DR 엔드포인트가 실제 AWS 주소면 `dr_replicate.py`가 DR 클라이언트를 만들기 전에 거부되는지 본다. 이어서 모든 lab을 **두 번씩** 실행하고 sdk 예제를 실행한다. 끝나면 성공·실패와 관계없이 **DR 리전 에뮬레이터를 끈다**. 마지막 줄이 `MODULE m12 OK`면 통과.
+`verify.sh`는 **에뮬레이터 두 개**를 다룬다. 주 리전 `$EMULATOR_PORT`와 DR 리전 `$DR_EMULATOR_PORT`를 둘 다 재시작해 깨끗하게 만든다. **`DR_EMULATOR_PORT`는 명시해야 한다**: 비대화형(에이전트·CI)에서 없으면 아무것도 지우기 전에 거부하고, 터미널에서 직접 실행할 때만 `EMULATOR_PORT + 1`을 쓴다(연속된 포트는 다른 사람의 에뮬레이터일 수 있어서). 두 포트가 같아도 거부한다. 그다음 sdk 예제의 안전 장치를 확인한다. env.sh 없이 실행하면 네트워크 호출 전에 거부되는지, 그리고 DR 엔드포인트가 실제 AWS 주소면 `dr_replicate.py`가 DR 클라이언트를 만들기 전에 거부되는지 본다. 이어서 모든 lab을 **두 번씩** 실행하고 sdk 예제를 실행한다. 끝나면 성공·실패와 관계없이 **DR 리전 에뮬레이터를 끈다**. 마지막 줄이 `MODULE m12 OK`면 통과.
 
 ### 두 번째 에뮬레이터("DR 리전")를 쓰는 방법
 
 | | 주 리전 "서울" | DR 리전 "도쿄" |
 |---|---|---|
-| 포트 | `EMULATOR_PORT` | `DR_EMULATOR_PORT` (없으면 `EMULATOR_PORT + 1`) |
+| 포트 | `EMULATOR_PORT` | `DR_EMULATOR_PORT` — 명시 필수 (대화형 터미널에서만 생략 시 `EMULATOR_PORT + 1`) |
 | 셸 연결 | `source scripts/env.sh` → `AWS_ENDPOINT_URL` 등 | `source labs/dr-env.sh` → `DR_AWS_ENDPOINT_URL`, `DR_AWS_CA_BUNDLE`, `DR_AWS_SHARED_CREDENTIALS_FILE`, `DR_AWS_CONFIG_FILE` (모두 `~/.aws/emulator/<포트>/`에서) |
 | CLI | `aws …` | `dr_aws …` (dr-env.sh가 정의하는 함수) |
 | boto3 | 평소처럼 (환경 변수) | `dr_replicate.py`가 `DR_…` 값을 잠시 `AWS_…` 이름으로 바꿔 끼우고 `require_emulator()`를 다시 통과한 뒤 클라이언트 생성 |
@@ -84,5 +84,6 @@ curriculum/m12-resilience-dr-migration/labs/verify.sh
 - CURRICULUM의 실습 4개를 모두 구현했다: 🟢 AWS Backup(lab03), 🟢 SPOF 워크시트(레슨 1 워크시트 + lab01), 🟡 DMS 구성(lab04), 🟡 다중 리전 DR(lab02).
 - AWS Backup은 🟢로 확정했다(볼트·계획·선택·온디맨드 백업 COMPLETED·복구 지점·복사·Vault Lock 집행). 단 **복원 결과에 데이터가 없어** 복원 부분만 🟡로 표시했다. 신뢰 정책 검사는 `StartBackupJob`이 아니라 `CreateBackupSelection`에서 일어남을 확인했다.
 - SPOF 찾기는 워크시트(손)에 더해, 같은 구성을 에뮬레이터에 만들고 boto3 감사 도구로 찾고 고치는 lab01로 보강했다(구성 정보 기반이라 🟢).
+- DR 리전 포트는 추측하지 않는다: `dr-env.sh`·lab02·`verify.sh`는 비대화형 실행에서 `DR_EMULATOR_PORT`가 없으면 거부한다. lab02는 단독 실행 후 DR 에뮬레이터를 켜 둔 채 끝나므로 끄는 명령을 안내한다.
 - 다중 리전 DR(lab02)은 `docker pause`로 주 리전 장애를 흉내 낸다. 학습자 자신의 에뮬레이터 컨테이너(`aws-emulator-$EMULATOR_PORT`)만 잠시 멈추며, 스크립트가 중간에 실패해도 `trap`으로 반드시 되살린다.
 - 레슨 4의 서비스 중 Migration Hub·Application Discovery Service는 2025-11-07부터 신규 고객에게 제공되지 않고(후속: AWS Transform), Snowball Edge는 기존 고객 전용이 되었다. 시험 대비를 위해 용도는 다루되 이 사실을 레슨에 명시했다.

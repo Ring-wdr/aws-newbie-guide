@@ -1,15 +1,29 @@
 #!/usr/bin/env bash
 # M12 모듈 검증: 에뮬레이터 두 개를 다룬다.
 #   주 리전 "서울" = $EMULATOR_PORT            → 재시작(깨끗한 상태)
-#   DR 리전 "도쿄" = $DR_EMULATOR_PORT (기본 EMULATOR_PORT+1) → 재시작, 끝나면(성공·실패 모두) 끈다
+#   DR 리전 "도쿄" = $DR_EMULATOR_PORT → 재시작, 끝나면(성공·실패 모두) 끈다
+#     (대화형 터미널에서만 생략 가능: 기본 EMULATOR_PORT+1. 비대화형에서는 반드시 지정 — 아니면 거부)
 # 그다음 sdk 안전 장치 확인 → 모든 lab 을 두 번씩(멱등성) → sdk 예제 순서로 실행한다.
 #
-#   export EMULATOR_PORT=9297     # 학습자는 생략 가능(대화형 터미널이면 9297, DR 은 9298)
+#   export EMULATOR_PORT=9297 DR_EMULATOR_PORT=9298
+#   (학습자가 터미널에서 직접 실행하면 생략 가능: 9297, DR 9298)
 #   curriculum/m12-resilience-dr-migration/labs/verify.sh
 set -euo pipefail
 ROOT="$(git rev-parse --show-toplevel)"
 MOD_DIR="$ROOT/curriculum/m12-resilience-dr-migration"
 LOG_DIR="$(mktemp -d)"
+
+# 0) DR 포트 확인 — 아무것도 지우기 전에. 비대화형에서 DR_EMULATOR_PORT 가 없으면
+#    EMULATOR_PORT+1 (다른 에이전트·사람의 에뮬레이터일 수 있다)을 지우지 않도록 거부한다.
+if [ -z "${DR_EMULATOR_PORT:-}" ] && [ ! -t 0 ]; then
+  echo "오류: DR_EMULATOR_PORT 가 설정되지 않았습니다. 비대화형 실행에서는 DR 리전 포트를 추측하지 않습니다." >&2
+  echo "      이 스크립트는 그 포트의 에뮬레이터를 재시작·종료합니다. 'export DR_EMULATOR_PORT=<포트>' 후 다시 실행하세요." >&2
+  exit 1
+fi
+if [ -n "${DR_EMULATOR_PORT:-}" ] && [ "$DR_EMULATOR_PORT" = "${EMULATOR_PORT:-}" ]; then
+  echo "오류: DR_EMULATOR_PORT 가 EMULATOR_PORT 와 같습니다($DR_EMULATOR_PORT). 서로 다른 에뮬레이터여야 합니다." >&2
+  exit 1
+fi
 
 # 1) 깨끗한 에뮬레이터 두 개 (EMULATOR_PORT 가 없으면 비대화형 셸에서는 거부된다)
 "$ROOT/scripts/emulator-reset.sh"

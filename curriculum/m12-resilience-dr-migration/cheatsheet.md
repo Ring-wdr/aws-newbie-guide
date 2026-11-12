@@ -30,6 +30,8 @@
 | 서버의 cron·세션·파일 | EventBridge Scheduler, DynamoDB/ElastiCache, S3/EFS |
 | 리전 | DR 전략 |
 
+RDS Multi-AZ **DB 인스턴스** 배포의 대기는 읽을 수 없다(가용성 전용). **Multi-AZ DB 클러스터** 배포는 읽기 가능한 대기 2개. 읽기 확장은 읽기 전용 복제본.
+
 ## RTO / RPO
 
 - **RPO** = 잃어도 되는 데이터의 시간 폭(백업·복제 주기). **RTO** = 멈춰 있어도 되는 시간.
