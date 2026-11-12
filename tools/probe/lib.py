@@ -151,6 +151,8 @@ class Probe:
     @contextmanager
     def service(self, name: str) -> Iterator[None]:
         self.current_service = name
+        # 서비스마다 새 접미사: 여러 checks 모듈이 같은 기본 이름(p.name("acl") 등)을 써도 충돌하지 않게
+        self.suffix = uuid.uuid4().hex[:8]
         if self.verbose:
             print(f"== {name}", flush=True)
         try:
