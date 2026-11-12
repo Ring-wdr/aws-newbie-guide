@@ -49,12 +49,15 @@ print(json.dumps({"Changes": [{"Action": "DELETE", "ResourceRecordSet": r} for r
 }
 
 # delete_health_checks <caller-reference 접두사> — 이 lab 이 만든 상태 확인을 지운다.
+# 계산된(CALCULATED) 상태 확인을 먼저 지운다. 실제 AWS는 다른 상태 확인이 참조 중인 자식을
+# 먼저 지우려 하면 HealthCheckInUse 로 거부한다.
 delete_health_checks() {
   local id
   for id in $(aws route53 list-health-checks --output json | py '
-for h in json.loads(sys.stdin.read() or "{}").get("HealthChecks", []):
-    if h["CallerReference"].startswith(sys.argv[1]):
-        print(h["Id"])' "$1"); do
+hcs = [h for h in json.loads(sys.stdin.read() or "{}").get("HealthChecks", [])
+       if h["CallerReference"].startswith(sys.argv[1])]
+for h in sorted(hcs, key=lambda h: h["HealthCheckConfig"]["Type"] != "CALCULATED"):
+    print(h["Id"])' "$1"); do
     aws route53 delete-health-check --health-check-id "$id" >/dev/null
   done
 }

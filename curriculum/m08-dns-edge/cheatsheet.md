@@ -10,7 +10,7 @@
 | TTL | 지정 | 대상의 TTL |
 | 건강 연동 | 상태 확인 별도 | `EvaluateTargetHealth` |
 
-**AWS 리소스면 Alias, apex면 무조건 Alias, AWS 밖의 이름이면 CNAME.**
+**AWS 리소스 이름이면 Alias, apex를 이름에 연결하면 Alias(CNAME 불가), AWS 밖의 이름이면 CNAME.** (apex에 고정 IP A 레코드는 가능)
 
 ## 라우팅 정책 8종 — "X가 나오면 Y"
 
@@ -39,7 +39,7 @@
 | 여러 파일, URL 유지 | 서명된 쿠키 |
 | 커스텀 도메인 HTTPS | ACM 인증서 **us-east-1** |
 | 헤더·리디렉션·캐시 키 정규화 | CloudFront Functions (뷰어 이벤트, <1ms, JS) |
-| 외부 호출·본문·오리진 이벤트 | Lambda@Edge (Node.js/Python, 최대 30초) |
+| 외부 호출·본문·오리진 이벤트 | Lambda@Edge (Node.js/Python, 최대 30초, 압축 코드 50 MB, 생성 응답 뷰어 40 KB·오리진 1 MB) |
 | 바뀐 파일 즉시 반영 | 무효화 or 버전 붙은 파일 이름 |
 | 비용 절감 | 가격 등급 `PriceClass_100/200` |
 | 국가 차단 | 지리적 제한(또는 WAF 지역 일치) |

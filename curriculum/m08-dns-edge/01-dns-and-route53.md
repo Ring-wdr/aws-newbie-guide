@@ -30,7 +30,7 @@ sequenceDiagram
 
 ### Alias 레코드 — Route 53만의 확장
 
-| | CNAME | Alias (A/AAAA 레코드의 옵션) |
+| | CNAME | Alias (레코드의 옵션 — 보통 A/AAAA. 같은 영역의 레코드를 가리킬 때는 그 레코드와 같은 유형) |
 |---|---|---|
 | 영역 꼭대기(apex)에 | ❌ 불가 | ✅ 가능 |
 | 가리킬 수 있는 대상 | 아무 DNS 이름 | AWS 리소스(CloudFront, ELB, S3 정적 웹 사이트, API Gateway, Global Accelerator, VPC 인터페이스 엔드포인트, Elastic Beanstalk 등)와 **같은 영역의 다른 레코드** |
@@ -40,7 +40,7 @@ sequenceDiagram
 | 상태 확인 연동 | 별도 | `EvaluateTargetHealth`로 대상의 건강을 따를 수 있음 |
 | EC2 인스턴스의 퍼블릭 DNS 이름 | 가능 | ❌ 대상이 아님 |
 
-> 한 줄 규칙: **AWS 리소스를 가리키면 Alias, apex면 무조건 Alias, AWS 밖의 이름이면 CNAME.**
+> 한 줄 규칙: **AWS 리소스(의 이름)를 가리키면 Alias, apex를 다른 이름에 연결하려면 Alias(CNAME 불가), AWS 밖의 이름이면 CNAME.** apex에 고정 IP를 직접 적는 평범한 A 레코드는 물론 가능하다 — Alias가 필요한 것은 대상이 IP가 아니라 이름(CloudFront·ELB 등)일 때다.
 
 ## 직접 해 보기
 

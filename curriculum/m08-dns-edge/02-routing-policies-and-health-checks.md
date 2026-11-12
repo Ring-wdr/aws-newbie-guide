@@ -232,7 +232,7 @@ LAB03 OK
 4. **kr (203.0.113.1).** 국가 일치(KR)가 대륙 일치(AS)보다 구체적이다.
 5. **빈 응답(NOERROR, 값 없음)** → 브라질 사용자는 접속하지 못한다. 기본 레코드가 없으면 일치하지 않는 위치는 답을 받지 못한다(lab02 8단계와 같은 상황).
 6. **secondary(S3 점검 페이지).**
-7. Route 53은 PRIMARY의 상태 확인이 실패해도 **대체할 레코드가 없으면 PRIMARY를 그대로 준다**(모든 레코드가 비정상이면 건강하지 않은 것이라도 응답한다). 장애 조치 정책은 SECONDARY까지 만들어야 의미가 있다.
+7. **PRIMARY를 그대로 준다.** 근거는 AWS 문서의 규칙 "**If no record is healthy, all records are healthy**" — 같은 이름·유형 묶음에 건강한 레코드가 하나도 없으면 Route 53은 아무것도 고를 근거가 없으므로 모두 건강하다고 보고 정책대로 하나를 고른다. 여기서는 PRIMARY 하나뿐이니 PRIMARY다(PRIMARY·SECONDARY가 둘 다 비정상일 때도 PRIMARY). 장애 조치 정책은 SECONDARY까지 만들어야 의미가 있다.
 8. **a, c 두 값만**(.31, .33). 다중값 응답은 건강한 레코드만 돌려준다. 상태 확인이 없는 다중값 레코드는 항상 건강한 것으로 친다.
 9. **0번.** 가중치 0은 다른 레코드에 0이 아닌 가중치가 있는 한 응답되지 않는다. 10%로 시작하려면 예를 들어 blue 90 : green 10(또는 225 : 25). 가중치는 합에 대한 비율이다.
 10. 지연 시간 레코드 두 개(seoul, virginia)를 만들고, 각각을 **Alias로 리전별 가중치 레코드 묶음**(예: `seoul.api` 의 blue 90 / green 10)에 연결한다. 같은 이름에 정책을 섞을 수 없으므로 이름을 나눠 트리를 만든다.
@@ -250,7 +250,7 @@ LAB03 OK
 - 비용: 호스팅 영역은 월 요금이 붙고(영역 생성 후 12시간 안에 지우면 청구되지 않는다), 표준 쿼리·상태 확인도 과금된다. AWS 엔드포인트를 검사하는 기본 상태 확인 일부는 무료 범위가 있지만 프리 티어에 Route 53 전체가 포함되는 것은 아니다. 최신 요금은 Route 53 요금 페이지에서 확인한다.
 - 도메인이 없어도 된다. 호스팅 영역만 만들고 `aws route53 test-dns-answer`로 응답을 확인할 수 있다(위임하지 않은 영역도 응답을 시험할 수 있다).
 - 장애 조치를 실제로 보려면 상태 확인 대상으로 내 웹 서버(또는 일부러 없는 경로 `/does-not-exist`)를 지정하고 `aws route53 get-health-check-status`로 Failure를 확인한 뒤 `test-dns-answer`를 다시 해 본다.
-- 정리: 레코드 삭제 → `aws route53 delete-health-check --health-check-id <ID>` → `aws route53 delete-hosted-zone --id <영역 ID>`.
+- 정리: 레코드 삭제 → 상태 확인 삭제(**계산된 상태 확인을 먼저**, 그다음 자식 — 순서가 반대면 `HealthCheckInUse`로 거부된다) `aws route53 delete-health-check --health-check-id <ID>` → `aws route53 delete-hosted-zone --id <영역 ID>`.
 
 ## 시험 포인트
 
