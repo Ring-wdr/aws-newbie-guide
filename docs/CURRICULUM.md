@@ -30,7 +30,7 @@
 
 aws-emulator는 **컨트롤 플레인(리소스 생성·조회·수정·삭제)** 충실도가 가장 높고, 데이터 플레인과 서비스 간 연동은 서비스마다 다르다. 알려진 주요 제약:
 
-- IAM 정책 평가는 **서비스마다 다르다**. 사용자·역할에 붙인 정책을 IAM·EC2·KMS와 STS(신뢰 정책)는 평가해 거부하고(명시적 Deny 우선도 재현), S3·SQS·DynamoDB는 무시한다. 반면 S3 버킷 정책의 명시적 Deny, KMS 키 정책, 서비스 역할의 신뢰 정책은 집행된다. `iam simulate-*-policy`는 올바르게 판정한다. 공식 문서는 "보안 테스트에 쓰지 말라"고 하며, 이 동작은 버전에 따라 바뀔 수 있다.
+- IAM 정책 평가는 **서비스마다 다르다**. IAM 사용자에게 붙인 정책을 IAM·EC2·KMS는 평가해 거부하고(명시적 Deny 우선도 재현), S3·SQS·DynamoDB는 무시한다. 단 Step Functions 실행 역할처럼 서비스가 역할을 맡아 호출할 때는 SQS도 그 역할의 권한을 평가했다. STS는 역할의 신뢰 정책을, S3는 버킷 정책의 명시적 Deny를, KMS는 키 정책을 집행하며, 서비스 역할의 신뢰 정책(Step Functions·Pipes·Glue·Backup)도 검사한다. `iam simulate-*-policy`는 올바르게 판정한다. 공식 문서는 "보안 테스트에 쓰지 말라"고 하며, 이 동작은 버전에 따라 바뀔 수 있다.
 - 리전·계정을 **분리하지 않는다**. 어떤 리전·계정 ID로 요청해도 받아 주지만 리소스를 나눠 보관하지 않는다. 계정은 `000000000000`으로 보이며, 이 커리큘럼은 리전을 `us-east-1` 하나로 고정한다.
 - S3 Control API(액세스 포인트, 계정 수준 퍼블릭 액세스 차단 등)는 SDK가 호스트명에 계정 ID를 붙이기 때문에 에뮬레이터에 **도달하지 않는다** → 🔴.
 - 엔드포인트는 반드시 `127.0.0.1` (`localhost`를 쓰면 일부 SDK(JS·Java·Go)가 S3 버킷명을 호스트명에 넣어 실패한다). `AWS_DISABLE_HOST_PREFIX_INJECTION=true`는 에뮬레이터 전용 설정이다.
@@ -124,7 +124,7 @@ aws-emulator는 **컨트롤 플레인(리소스 생성·조회·수정·삭제)*
   5. 로드 밸런서 (ALB/NLB/GWLB, 대상 그룹, 헬스체크, 스티키 세션, 교차 영역)
   6. Auto Scaling (시작 템플릿, 조정 정책: 대상 추적·단계·단순·예약 + 예측 조정, 쿨다운, 수명 주기 후크), EC2 Auto Scaling vs AWS Auto Scaling(여러 서비스의 조정 계획) vs Application Auto Scaling(ECS·DynamoDB·Aurora 등의 조정)
   7. 그 밖의 컴퓨트 한눈에 (Elastic Beanstalk, Lightsail, Batch, Outposts, VMware Cloud on AWS, Serverless Application Repository)
-- 실습: 🟢 인스턴스 시작·상태 전이 관찰(부팅·사용자 데이터 실행은 없음) · 🟢 EBS 볼륨·스냅샷 / 🔴 AMI 생성·스냅샷에서 볼륨 복원 — `describe-images` 읽기로 대체 · 🟡 ALB + 대상 그룹 + 리스너 규칙(규칙 동작은 `docker exec`로 컨테이너 안에서만 확인) · 🟢 시작 템플릿(버전) + ASG 생성·희망 용량 변경 / 🔴 조정 정책·수명 주기 후크·자가 치유(501) — 정책 JSON 작성과 "이 지표면 몇 대?" 워크시트 · 🟢 boto3: 태그 없는 리소스 찾기(서비스별 describe/list 응답의 태그 사용 — `DescribeTags`·Tagging API는 쓰지 않는다)
+- 실습: 🟢 인스턴스 시작·상태 전이 관찰(`describe-instances`의 State로 확인. 부팅·사용자 데이터 실행은 없음) · 🟢 EBS 볼륨·스냅샷 / 🔴 AMI 생성·스냅샷에서 볼륨 복원 — `describe-images` 읽기로 대체 · 🟡 ALB + 대상 그룹 + 리스너 규칙(규칙 동작 확인은 `docker exec`를 쓰는 선택 과제) · 🟢 시작 템플릿(버전) + ASG 생성·희망 용량 변경 / 🔴 조정 정책·예약 작업·수명 주기 후크(501)와 자가 치유(종료해도 대체 인스턴스가 안 뜸) — 정책 JSON 작성과 "이 지표면 몇 대?" 워크시트 · 🟢 boto3: 태그 없는 리소스 찾기(서비스별 describe/list 응답의 태그 사용 — `DescribeTags`·Tagging API는 쓰지 않는다)
 - 시험 포인트: 스팟 적합 워크로드, ALB vs NLB, 조정 정책 선택, EBS 유형 선택
 
 ### M04. 스토리지 — `m04-storage` · D1, D3, D4
@@ -137,7 +137,7 @@ aws-emulator는 **컨트롤 플레인(리소스 생성·조회·수정·삭제)*
   5. S3 성능·기능 (멀티파트, Transfer Acceleration, 이벤트 알림, 정적 웹 호스팅, 요청자 지불(Requester Pays)) — S3 Select는 신규 고객에게 제공되지 않으므로 Athena로 대체됨을 한 줄로만 언급
   6. 파일 스토리지 (EFS, FSx 4종) 와 블록과의 선택 기준
   7. 하이브리드·이전 (Storage Gateway: S3 File / Volume / Tape Gateway, DataSync, Snow 패밀리, Transfer Family)
-- 실습: 🟢 객체 CRUD·버전 관리·삭제 마커 · 🟢 수명 주기 규칙 구성(전환은 일어나지 않고 잘못된 규칙도 받아 줌 — 비용 계산은 워크시트) · 🟢 미리 서명된 URL(curl로 검증) · 🟢 멀티파트 업로드 · 🟢 버킷 정책 명시적 Deny·퍼블릭 액세스 차단·SSE 설정 · 🟢 복제(대상 버킷에 실제 복사)·이벤트 알림(SQS에 실제 도착) · 🔴 액세스 포인트·계정 수준 퍼블릭 액세스 차단(S3 Control 도달 불가) · 🟡 EFS 파일 시스템·마운트 타깃 · 🟢 boto3: 영수증 업로드 서비스
+- 실습: 🟢 객체 CRUD·버전 관리·삭제 마커 · 🟢 수명 주기 규칙 구성(전환은 일어나지 않고 잘못된 규칙도 받아 줌 — 비용 계산은 워크시트) · 🟢 미리 서명된 URL(curl로 검증) · 🟢 멀티파트 업로드 · 🟢 버킷 정책 명시적 Deny·퍼블릭 액세스 차단·SSE 설정(KMS 키를 꺼도 객체가 읽힘 — 키 의존성 시연은 M09) · 🟢 복제(대상 버킷에 실제 복사)·이벤트 알림(SQS에 실제 도착) · 🔴 액세스 포인트·계정 수준 퍼블릭 액세스 차단(S3 Control 도달 불가) · 🟡 EFS 파일 시스템·마운트 타깃 · 🟢 boto3: 영수증 업로드 서비스
 - 시험 포인트: 클래스 선택(검색 시간·최소 보관 기간), SSE 종류, EFS vs EBS vs S3, Snow vs DataSync vs DX
 
 ### M05. 데이터베이스 — `m05-databases` · D2, D3
@@ -162,7 +162,7 @@ aws-emulator는 **컨트롤 플레인(리소스 생성·조회·수정·삭제)*
   4. EventBridge (버스, 규칙, 패턴, 스케줄러, Pipes)
   5. Step Functions (표준 vs 익스프레스, 상태 유형, 오류 처리)
   6. 스트리밍 (Kinesis Data Streams vs Amazon Data Firehose vs SQS, MSK), Amazon MQ는 언제, SaaS 연동은 AppFlow
-- 실습: 🟢 SQS 송수신·가시성 타임아웃 관찰 · 🟢 DLQ와 재처리(redrive) · 🟢 FIFO 순서·중복 제거 · 🟢 SNS→SQS 팬아웃과 필터 정책(큐 정책이 없으면 조용히 전달 안 됨을 먼저 관찰) · 🟢 EventBridge 규칙·패턴·SQS 대상 · 🟢 Step Functions 주문 워크플로 실행(Choice/오류 처리, SQS 서비스 통합) · 🟢 Kinesis 스트림 put/get, 파티션 키와 샤드 · 🟢 boto3: 주문 워커(컨슈머) 구현
+- 실습: 🟢 SQS 송수신·가시성 타임아웃 관찰 · 🟢 DLQ와 재처리(redrive) · 🟢 FIFO 순서·중복 제거 · 🟢 SNS→SQS 팬아웃과 필터 정책(큐 정책이 없으면 조용히 전달 안 됨을 먼저 관찰) · 🟢 EventBridge 규칙·패턴·SQS 대상 · 🟢 Step Functions 주문 워크플로 실행(Choice/Fail, SQS 서비스 통합. Retry/Catch는 탐침 미검증 — 저자 확인) · 🟢 Kinesis 스트림 put/get, 파티션 키와 샤드 · 🟢 boto3: 주문 워커(컨슈머) 구현
 - 시험 포인트: SQS vs SNS vs EventBridge vs Kinesis 선택, FIFO 처리량, DLQ, 정확히 한 번
 
 ### M07. 서버리스와 컨테이너 — `m07-serverless-containers` · D2, D3
@@ -174,7 +174,7 @@ aws-emulator는 **컨트롤 플레인(리소스 생성·조회·수정·삭제)*
   4. Cognito (사용자 풀 vs 자격 증명 풀)
   5. 컨테이너 (ECR, ECS 작업 정의/서비스, EC2 vs Fargate 시작 유형, EKS 개요, App Runner, 온프레미스용 ECS Anywhere·EKS Anywhere·EKS Distro)
   6. 서버리스 아키텍처 패턴 (API+Lambda+DynamoDB, S3 이벤트 처리), 프런트엔드·모바일 한눈에 (Amplify, Device Farm)
-- 실습: 🟢 Lambda 함수 생성·구성·버전·별칭과 Invoke(동기/비동기/DryRun, 오류 응답) · 🟢 이벤트 소스 매핑(SQS→Lambda)이 메시지를 실제 소비 · 🟢 API Gateway REST(MOCK)·HTTP API→Lambda 프록시를 `https://127.0.0.1:$EMULATOR_PORT/_aws/execute-api/...`로 호출 · 🟢 서버리스 주문 API(HTTP API + Lambda + DynamoDB) · 🟡 ECR 저장소·ECS 클러스터·작업 정의·서비스(태스크는 이미지 풀 실패로 STOPPED) · 🟢 Cognito 사용자 풀 가입·로그인으로 JWT 받기
+- 실습: 🟢 Lambda 함수 생성·구성·버전·별칭과 Invoke(동기/비동기/DryRun, 오류 응답) · 🟢 이벤트 소스 매핑(SQS→Lambda)이 메시지를 실제 소비 · 🟢 API Gateway REST(MOCK)·HTTP API→Lambda 프록시를 `https://127.0.0.1:$EMULATOR_PORT/_aws/execute-api/...`로 호출 · 🟢 서버리스 주문 API(HTTP API + Lambda + DynamoDB — Lambda 안에서의 DynamoDB 호출은 탐침 미검증, 저자 확인 후 확정) · 🟡 ECR 저장소·ECS 클러스터·작업 정의·서비스(태스크는 이미지 풀 실패로 STOPPED) · 🟢 Cognito 사용자 풀 가입·로그인으로 JWT 받기
 - 시험 포인트: Lambda 한계값, Fargate vs EC2, API 유형 선택, 사용자 풀 vs 자격 증명 풀
 - 주의: 에뮬레이터는 Lambda 리소스 정책(`AddPermission`) 없이도 API Gateway 호출을 통과시킨다. 실습 스크립트에는 실제 AWS에 필요한 권한 설정을 빠짐없이 넣는다.
 
@@ -198,7 +198,7 @@ aws-emulator는 **컨트롤 플레인(리소스 생성·조회·수정·삭제)*
   4. 감사와 규정 준수 (CloudTrail, Config, Audit Manager, Artifact)
   5. 위협 탐지 (GuardDuty, Inspector, Macie, Security Hub, Detective) — 한 줄 구분법
   6. 네트워크·앱 방어 (WAF, Shield, Network Firewall) 복습과 심층 방어
-- 실습: 🟢 KMS 키 생성·Encrypt/Decrypt·데이터 키로 봉투 암호화(boto3)·키 비활성화 시 Decrypt 실패·키 정책 Deny · 🟢 Secrets Manager 비밀·버전 스테이지 · 🟢 Parameter Store 계층·SecureString · 🟡 ACM: 자체 서명 인증서 import(DNS 검증 발급은 🔴) · 🟡 CloudTrail 추적(IAM 이벤트로 확인) · 🟢 Config 관리형 규칙의 NON_COMPLIANT 판정 · 🟡 GuardDuty 탐지기·샘플 결과 · 🟢 boto3: 앱 설정 로더(Parameter Store + Secrets Manager)
+- 실습: 🟢 KMS 키 생성·Encrypt/Decrypt·데이터 키로 봉투 암호화(boto3)·삭제 예약된 키 사용 실패(`KMSInvalidStateException`)·키 정책 Deny (키 비활성화 시 Decrypt 실패는 탐침 미검증 — 저자 확인 후 확정) · 🟢 Secrets Manager 비밀·버전 스테이지 · 🟢 Parameter Store 계층·SecureString · 🟢 ACM 자체 서명 인증서 import(ISSUED) · 🟡 DNS 검증 요청과 검증 레코드 확인 / 🔴 발급 · 🟡 CloudTrail 추적(IAM 이벤트로 확인) · 🟢 Config 관리형 규칙의 NON_COMPLIANT 판정 · 🟡 GuardDuty 탐지기·샘플 결과 · 🟢 boto3: 앱 설정 로더(Parameter Store + Secrets Manager)
 - 시험 포인트: SSE-KMS vs SSE-S3, Secrets Manager vs Parameter Store, GuardDuty vs Inspector vs Macie, CloudTrail vs Config
 
 ### M10. 모니터링·운영·IaC — `m10-monitoring-iac` · D2
@@ -220,7 +220,7 @@ aws-emulator는 **컨트롤 플레인(리소스 생성·조회·수정·삭제)*
   3. 카탈로그·변환 (Glue 크롤러/ETL/Data Catalog)
   4. 조회 (Athena, Redshift/Spectrum, EMR, OpenSearch, QuickSight — 시험 가이드 표기는 Amazon Quick)
   5. AI/ML 서비스 한눈에 🔴 (Comprehend, Lex, Polly, Rekognition, SageMaker AI, Textract, Transcribe, Translate) — "요구 사항 → 서비스" 한 줄 매칭
-- 실습: 🟢 Data Firehose 전송 스트림 → S3 객체 생성(버퍼 시간은 무시됨) · 🟢 Glue 데이터베이스·테이블 직접 정의 / 🔴 크롤러(501) · 🟢 Athena로 S3의 주문 JSON에 SQL 실행 · 🟢 boto3: 주문 이벤트를 S3 파티션 경로로 적재
+- 실습: 🟢 Data Firehose 전송 스트림 → S3 객체 생성(버퍼 시간은 무시됨) · 🟢 Glue 데이터베이스·테이블 직접 정의 / 🔴 크롤러(501) · 🟢 Athena로 S3의 주문 JSON에 SQL 실행(파티션은 `BatchCreatePartition`으로 등록, 결과는 `GetQueryResults`로 확인) · 🟢 boto3: 주문 이벤트를 S3 파티션 경로로 적재
 - 시험 포인트: Athena vs Redshift vs EMR, Firehose는 거의 실시간, Glue 역할
 
 ### M12. 고가용성·DR·마이그레이션 — `m12-resilience-dr-migration` · D2
