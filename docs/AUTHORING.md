@@ -19,7 +19,7 @@ curriculum/mNN-<slug>/
 └── quiz.md                # 시나리오형 문제 10문항 이상 + 해설
 ```
 
-공용 파일(`scripts/`, `tools/`, `docs/`, 루트 `README.md`, `pyproject.toml`)은 **자기 역할이 아니면 수정하지 않는다.** 필요하면 PR 본문에 요청 사항으로 적는다.
+공용 파일(`scripts/`, `tools/`, `src/`, `docs/`, 루트 `README.md`, `pyproject.toml`)은 **자기 역할이 아니면 수정하지 않는다.** 필요하면 PR 본문에 요청 사항으로 적는다.
 
 ## 2. 레슨 문서 형식
 
@@ -50,7 +50,7 @@ curriculum/mNN-<slug>/
 5. **`verify.sh`** 는 `$EMULATOR_PORT`의 에뮬레이터를 재시작해(`scripts/emulator-reset.sh`) 깨끗한 상태로 만든 뒤, 그 하나의 에뮬레이터에서 모듈의 모든 lab과 sdk 예제를 순서대로 실행한다. 전부 통과하면 `MODULE mNN OK`를 출력하며 0으로 종료한다. 🔴 등 실행 불가 항목은 `SKIP(사유)`로 표시한다.
    - **포트**: `scripts/env.sh`는 `EMULATOR_PORT`를 읽는다(학습자 기본값 9297). 에이전트는 반드시 [AGENTS.md](./AGENTS.md)에 배정된 포트를 `export EMULATOR_PORT=<port>`로 지정하고 작업한다. 스크립트 안에 포트를 하드코딩하지 않는다.
 6. **리소스 이름**은 `todayorder-` 접두사. 리전은 `us-east-1` 고정. 계정 ID는 `000000000000`.
-7. **boto3 예제**는 타입 힌트와 `if __name__ == "__main__":`을 갖춘 실행 가능한 단일 파일. 엔드포인트·자격 증명을 코드에 하드코딩하지 않는다(환경 변수로 주입 — 실제 AWS에서도 그대로 동작하는 코드여야 한다).
+7. **boto3 예제**는 타입 힌트와 `if __name__ == "__main__":`을 갖춘 실행 가능한 단일 파일. 엔드포인트·자격 증명을 코드에 하드코딩하지 않는다(환경 변수로 주입 — 실제 AWS에서도 그대로 동작하는 코드여야 한다). 모든 예제는 boto3 클라이언트를 만들기 **전에** `from emulator_guard import require_emulator` 의 `require_emulator()`를 호출한다(엔드포인트가 에뮬레이터가 아니면 종료. 학습자가 의도적으로 실제 AWS에서 돌릴 때만 `TODAYORDER_ALLOW_REAL_AWS=1`). 모듈 `verify.sh`는 M00의 가드 거부 테스트(`guard_refuses`)를 자기 sdk 예제에도 적용한다.
 8. **정책을 실제처럼 쓴다.** SNS→SQS·S3→SQS(큐 정책), Step Functions·Pipes·Glue·Backup(역할 신뢰 정책·권한), CloudFront OAC·Config(버킷 정책)는 정책이 없으면 실패하거나 조용히 아무 일도 일어나지 않는다. 반대로 에뮬레이터가 검사하지 않는 권한(예: API Gateway→Lambda의 `AddPermission`)도 실제 AWS에 필요하면 스크립트에 넣는다.
 9. **리소스 엔드포인트(RDS·ALB·CloudFront)는 컨테이너 안에만 있다.** 호스트에서 접속하는 실습을 설계하지 않는다. 꼭 필요하면 `docker exec aws-emulator-$EMULATOR_PORT ...`로 보여 주되 선택 과제로 둔다.
 10. **시간에 기대지 않는다.** 비동기 상태는 waiter/폴링으로 기다리고(넉넉한 상한 시간을 두고, 실패하면 마지막으로 관찰한 상태를 출력) "몇 초 뒤"를 단언하지 않는다. 에뮬레이터의 타이밍(TTL 수 초, Firehose 버퍼 무시 등)을 실제 AWS의 특성처럼 설명하지 않는다.
@@ -73,6 +73,7 @@ curriculum/mNN-<slug>/
 ## 6. 검증 통과 기준 (검증 에이전트 체크리스트)
 
 - [ ] 깨끗한 에뮬레이터에서 `verify.sh`가 0으로 종료한다.
+- [ ] 모든 sdk 예제가 클라이언트 생성 전에 `require_emulator()`를 호출하고, 셸 스크립트는 `scripts/env.sh`를 source한다(실제 AWS로 나갈 경로가 없다).
 - [ ] 문서에 실린 출력이 실제 실행 결과와 일치한다(표본 3개 이상 대조). 실행마다 바뀌는 값(무작위 ID, ARN 접미사, 타임스탬프, 액세스 키 ID)은 비교에서 제외하고 구조·필드·상태 값·오류 코드와 메시지를 대조한다.
 - [ ] 🟡/🔴 실습에 "실제 AWS에서 해 보려면" 메모가 있다.
 - [ ] CURRICULUM.md가 요구한 레슨·실습이 모두 있거나, 대체 사유가 README에 있다.
