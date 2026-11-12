@@ -23,10 +23,10 @@ TodayOrder 개발자 한 명에게 정책이 세 개 붙어 있다: 그룹의 "�
 flowchart TD
   A[요청] --> B{어느 정책이든<br/>명시적 Deny?}
   B -- 예 --> D1[거부: explicit deny]
-  B -- 아니오 --> C{조직 SCP가<br/>허용? (모든 계층)}
+  B -- 아니오 --> C{"조직 SCP가 허용?<br/>(주체 쪽, 모든 계층)<br/>+ RCP가 허용?<br/>(리소스 쪽, 모든 계층)"}
   C -- 아니오 --> D2[거부: implicit deny]
   C -- 예 --> E{리소스 기반 정책이<br/>이 주체를 허용?}
-  E -- 예 --> OK1[허용 *]
+  E -- 예 --> OK1["허용 *"]
   E -- 아니오 --> F{자격 증명 기반 정책이<br/>허용?}
   F -- 아니오 --> D3[거부: implicit deny]
   F -- 예 --> G{권한 경계가 있으면<br/>경계도 허용?}
@@ -36,7 +36,9 @@ flowchart TD
   H -- 예 --> OK2[허용]
 ```
 
-\* 같은 계정에서 리소스 기반 정책이 **IAM 사용자나 역할 세션 ARN**을 직접 허용하면, 자격 증명 정책 없이도 허용될 수 있다(권한 경계·세션 정책이 있으면 세부 규칙이 달라진다). 시험 수준에서는 "같은 계정이면 둘 중 하나만 허용해도 된다, 다른 계정이면 양쪽 모두 허용해야 한다"로 기억하면 된다.
+\* 같은 계정에서 리소스 기반 정책이 **IAM 사용자나 역할 세션 ARN**을 직접 허용하면, 자격 증명 정책 없이도 허용될 수 있다(권한 경계·세션 정책이 있으면 세부 규칙이 달라진다). 시험 수준에서는 "같은 계정이면 둘 중 하나만 허용해도 된다, 다른 계정이면 양쪽 모두 허용해야 한다"로 기억하면 된다. **예외**: KMS 키는 **키 정책**이 계정(또는 그 주체)을 허용하지 않으면 같은 계정의 IAM 정책만으로는 키를 쓸 수 없다(상세는 M09). 역할도 신뢰 정책이 계정 루트만 지정했다면 맡는 쪽에 `sts:AssumeRole` 허용이 필요하다([레슨 04](./04-roles-and-sts.md)).
+
+**RCP(Resource Control Policy)** 는 SCP의 짝이다. SCP가 "조직 안 **주체**가 할 수 있는 최대치"라면, RCP는 "조직 안 **리소스**(S3·SQS·KMS·Secrets Manager·STS 등 지원 서비스)에 누구든 할 수 있는 최대치"다. 조직 밖 주체가 우리 리소스에 접근할 때도 적용된다. RCP도 권한을 주지 않고, 관리 계정의 리소스와 서비스 연결 역할에는 적용되지 않는다([레슨 05](./05-organizations-scp.md)).
 
 핵심은 **교집합(∩)과 합집합(∪)** 이다.
 
@@ -46,12 +48,13 @@ flowchart TD
 | 리소스 기반 정책 | 준다 | 자격 증명 정책과 합집합(같은 계정) |
 | **권한 경계 (Permissions boundary)** | **주지 않는다** — 상한선 | 자격 증명 정책 **∩** 경계 |
 | **SCP (Service Control Policy)** | **주지 않는다** — 계정 전체의 상한선 | (모든 계층의 SCP) **∩** 나머지 |
+| **RCP (Resource Control Policy)** | **주지 않는다** — 조직 리소스의 상한선 | (모든 계층의 RCP) **∩** 나머지 |
 | **세션 정책 (Session policy)** | **주지 않는다** — 이번 세션의 상한선 | 역할 권한 **∩** 세션 정책 |
 
 ```mermaid
 flowchart LR
   subgraph 최종["실제로 할 수 있는 일"]
-    X(("IAM 정책 ∩ 권한 경계 ∩ SCP ∩ 세션 정책<br/>— 명시적 Deny"))
+    X(("IAM 정책 ∩ 권한 경계 ∩ SCP ∩ RCP ∩ 세션 정책<br/>— 명시적 Deny"))
   end
 ```
 
@@ -219,7 +222,8 @@ ec2:TerminateInstances	explicitDeny
 ## 실제 AWS에서는
 
 - 실제 AWS의 S3·SQS·DynamoDB는 모든 API에 IAM 정책을 평가한다. Part B에서 통과한 `CreateBucket`·`ListBuckets`는 실제로는 `AccessDenied`다.
-- 에뮬레이터는 EC2에 대해 **세션 정책을 적용하지 않았다**(IAM API에는 적용). 또 **`aws:RequestedRegion` 조건 키를 실제 요청에 채우지 않아**, 이 키로 리전을 제한하는 Deny 정책은 `us-east-1` 요청까지 막았다. 리전 제한은 시뮬레이터에 `--context-entries`로 리전을 넣어 확인한다(레슨 05 SCP 워크시트).
+- 에뮬레이터는 EC2에 대해 **세션 정책을 적용하지 않았다**(IAM API에는 적용. 세션 정책 안의 명시적 Deny도 EC2에서는 무시됨).
+- **조건(Condition)이 붙은 자격 증명 정책 문장을 실제 호출에서 올바르게 평가하지 않는다.** `Allow *`에 조건 하나짜리 Deny(`ec2:DescribeVpcs`, `iam:ListUsers`)를 더해 `us-east-1`로 호출했더니, `StringEquals aws:RequestedRegion=us-east-1`·`=eu-west-1`, `StringNotEquals ...=us-east-1`, `Null aws:RequestedRegion=true`와 `=false`, `Bool aws:SecureTransport=false`, `StringEquals aws:PrincipalAccount=999999999999` 모두에서 Deny가 적용됐다(서로 모순되는 조건도 전부). 같은 조건을 Allow 쪽에 걸면 한 번도 허용되지 않았다. 유일한 예외는 IAM API의 `aws:username`(자기 이름과 같을 때만 정확히 판정)이고, EC2에서는 `aws:username=nobody` 같은 Deny도 적용됐다. 즉 **이 에뮬레이터 버전에서는 이런 키에 조건을 걸면 Deny는 항상 적용되고 Allow는 절대 적용되지 않는다.** 반대로 정책 시뮬레이터(`simulate-*-policy --context-entries`)는 같은 조건을 올바르게 판정한다. 그래서 이 모듈은 조건이 있는 정책을 실제 호출로 시험하지 않고, 조건 판정은 모두 시뮬레이터로 확인한다(Part D, 레슨 05 SCP 워크시트). 실제 AWS에서는 키가 없을 때 `StringEquals`는 거짓, `StringNotEquals`·`...IfExists`는 참이다.
 - 시뮬레이터(`simulate-principal-policy`)는 정책 변수 `${aws:username}`을 채우지 않았다(실제 호출에서는 동작). 변수 정책은 실제 호출로 확인한다.
 - 실제 계정에서 이 레슨을 해 보려면: IAM 사용자·정책은 무료다. 인턴 사용자에 키를 만들어 시험한 뒤 `aws iam delete-access-key`, `delete-user-policy`, `delete-user-permissions-boundary`, `delete-user`로 정리한다. S3 버킷을 만들었다면 `aws s3 rb --force`.
 
@@ -229,7 +233,7 @@ ec2:TerminateInstances	explicitDeny
 - **권한 경계·SCP·세션 정책은 권한을 주지 않는다** — 상한선(교집합)일 뿐. "SCP로 S3를 허용했는데 사용자가 접근 못 함" → 자격 증명 정책에 Allow가 없다.
 - "개발자에게 역할 생성 권한을 주되 자기보다 강한 역할은 못 만들게" → **권한 경계** + `iam:PermissionsBoundary` 조건으로 경계 부착 강제.
 - "계정 전체(루트 포함)에서 특정 서비스·리전 금지" → **SCP** (경계는 사용자·역할 단위, SCP는 계정·OU 단위).
-- 교차 계정 접근은 **양쪽 모두 허용**(내 자격 증명 정책 + 상대 리소스 정책 또는 역할 신뢰 정책). 같은 계정이면 어느 한쪽 허용으로 충분.
+- 교차 계정 접근은 **양쪽 모두 허용**(내 자격 증명 정책 + 상대 리소스 정책 또는 역할 신뢰 정책). 같은 계정이면 어느 한쪽 허용으로 충분(단 KMS 키 정책은 예외 — 키 정책이 허용해야 한다).
 - 정책 디버깅 → **IAM 정책 시뮬레이터**(`simulate-principal-policy`), 오류 메시지의 `explicit deny in ...`/`no ... policy allows` 문구.
 
 ## 스스로 확인

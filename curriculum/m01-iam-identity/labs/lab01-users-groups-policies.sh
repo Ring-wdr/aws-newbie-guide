@@ -103,6 +103,9 @@ for _ in $(seq 1 30); do
   sleep 1
 done
 echo "보고서 상태: $state"
+case "$state" in
+  *기존*) echo "(주의: 이전 실행 때 만든 보고서다 — 사용자 행이 지금 상태와 다를 수 있다. 생성 시각: $(aws iam get-credential-report --query GeneratedTime --output text))" ;;
+esac
 report="$(aws iam get-credential-report --query Content --output text | base64 --decode)"
 printf '%s\n' "$report" | cut -d, -f1,4,8,9 | grep -E '^(user|<root_account>|todayorder-dev-)'
 

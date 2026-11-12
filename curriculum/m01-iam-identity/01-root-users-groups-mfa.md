@@ -191,6 +191,8 @@ todayorder-dev-lee,false,false,false
 
 방금 본 것: 계정의 모든 사용자(루트 포함)에 대해 암호·MFA·액세스 키 상태를 CSV로 준다. 감사 때 "MFA 없는 콘솔 사용자", "오래 안 쓴 키"를 찾는 표준 도구다.
 
+> lab01을 4시간 안에 다시 실행하면 에뮬레이터가 새 보고서 생성을 거부하므로(`LimitExceeded`), 스크립트는 `보고서 상태: COMPLETE(기존 보고서)`를 출력하고 **이전 실행 때 만든 보고서**를 읽는다. 그래서 사용자 행이 지금 상태와 다를 수 있다(예: 이미 지운 사용자가 보임). 스크립트의 단언은 언제나 있는 `<root_account>` 행만 확인한다.
+
 ### 9) 가상 MFA — 여기서 멈춘다 (🔴)
 
 ```bash
@@ -224,10 +226,30 @@ IAM은 연결이 남아 있으면 지우지 않는다. 사용자는 그룹 탈�
 
 - 실제로는 `EnableMFADevice`에 MFA 앱이 보여 주는 **연속된 두 코드**를 넣어 활성화한다. 그 뒤 MFA로 얻은 세션(`sts get-session-token --serial-number ... --token-code ...`)에만 `aws:MultiFactorAuthPresent=true`가 붙는다.
 - 실제 액세스 키 ID는 `AKIA`로, 임시 키는 `ASIA`로 시작한다. 에뮬레이터는 둘 다 `EMULATOR`로 시작한다.
-- 에뮬레이터에서는 **비활성(Inactive)으로 바꾼 키로도 요청이 통과**했다(삭제한 키는 `InvalidClientTokenId`로 거부). 실제 AWS는 비활성 키를 거부한다.
+- 에뮬레이터에서 **비활성(Inactive)으로 바꾼 키**는 IAM API만 거부했다(`iam list-users` → `InvalidClientTokenId`). STS(`get-caller-identity`, **`assume-role`도 성공해 임시 자격 증명을 받을 수 있었다**), EC2, S3, SQS, KMS, DynamoDB, Lambda는 그 키를 그대로 받아들였다. 삭제한 키는 STS도 `InvalidClientTokenId`로 거부했다. 실제 AWS는 비활성 키로 서명한 요청을 모든 서비스에서 거부한다.
 - 에뮬레이터는 `GetAccountSummary`, `GetAccountPasswordPolicy`를 모른다(`InvalidAction`). 실제 AWS에서는 둘 다 동작하며, 계정 요약에서 루트 MFA 여부(`AccountMFAEnabled`)를 볼 수 있다.
 - 자격 증명 보고서는 실제 AWS에서 4시간마다 새로 만들 수 있다. 에뮬레이터는 4시간 안에 다시 생성을 요청하면 `LimitExceeded`로 거부한다(lab01은 이때 기존 보고서를 읽는다).
-- IAM 사용자·그룹·정책 자체에는 요금이 없다. 프리 티어와 무관하게 실습해도 비용은 0이지만, 만든 액세스 키는 실습 직후 반드시 지운다.
+- IAM 사용자·그룹·정책 자체에는 요금이 없다. 만든 액세스 키는 실습 직후 반드시 지운다.
+
+**실제 AWS에서 해 보려면 (MFA 부분 🔴)**
+
+- 비용: IAM 사용자·그룹·정책·가상 MFA 장치는 **무료**다(프리 티어와 무관). 하드웨어 보안 키만 직접 사야 한다.
+- 루트 사용자 MFA로 연습하지 말 것 — 잘못 설정하면 계정 복구 절차가 필요하다. **연습용 IAM 사용자**를 따로 만든다.
+- 순서:
+  1. 연습용 사용자 생성, 콘솔 암호(`create-login-profile`)와 액세스 키(`create-access-key`) 발급.
+  2. `aws iam create-virtual-mfa-device --virtual-mfa-device-name <사용자> --outfile qr.png --bootstrap-method QRCodePNG` 후 휴대폰 인증 앱으로 QR 코드를 스캔.
+  3. 앱이 보여 주는 연속된 두 코드로 `aws iam enable-mfa-device --user-name <사용자> --serial-number arn:aws:iam::<계정>:mfa/<사용자> --authentication-code1 <코드1> --authentication-code2 <코드2>`.
+  4. MFA 세션 받기: `aws sts get-session-token --serial-number arn:aws:iam::<계정>:mfa/<사용자> --token-code <현재 코드>`. 이 임시 자격 증명으로 호출한 요청에만 `aws:MultiFactorAuthPresent=true`가 붙는다. 레슨 03의 "MFA 없으면 TerminateInstances Deny" 같은 정책을 이 세션과 장기 키로 각각 시험해 보면 차이가 보인다(EC2를 실제로 종료하지 않으려면 `--dry-run`을 쓴다).
+- 정리(순서대로):
+  ```bash
+  aws iam deactivate-mfa-device --user-name <사용자> --serial-number arn:aws:iam::<계정>:mfa/<사용자>
+  aws iam delete-virtual-mfa-device --serial-number arn:aws:iam::<계정>:mfa/<사용자>
+  aws iam delete-login-profile --user-name <사용자>
+  aws iam delete-access-key --user-name <사용자> --access-key-id <키 ID>
+  aws iam remove-user-from-group --user-name <사용자> --group-name <그룹>   # 그룹에 넣었다면
+  aws iam delete-user-policy --user-name <사용자> --policy-name <정책>      # 인라인 정책이 있다면
+  aws iam delete-user --user-name <사용자>
+  ```
 
 ## 시험 포인트
 

@@ -70,7 +70,7 @@ flowchart LR
 | 다른 계정에 권한 주기 | 혼자서는 불가 | 가능 — 다른 계정·서비스(`sns.amazonaws.com`)를 Principal로 |
 | 관리형/인라인 | 둘 다 | 항상 인라인(리소스에 박혀 있음) |
 
-같은 계정 안에서는 **둘 중 하나만 허용해도** 통과한다(명시적 Deny가 없다면). 다른 계정 사이에서는 **양쪽 모두**(내 계정의 자격 증명 정책 + 상대 리소스 정책) 허용해야 한다 → [레슨 03](./03-policy-evaluation.md), [04](./04-roles-and-sts.md).
+같은 계정 안에서는 **둘 중 하나만 허용해도** 통과한다(명시적 Deny가 없다면. 예외: KMS 키는 키 정책이 허용해야 한다 — M09). 다른 계정 사이에서는 **양쪽 모두**(내 계정의 자격 증명 정책 + 상대 리소스 정책) 허용해야 한다 → [레슨 03](./03-policy-evaluation.md), [04](./04-roles-and-sts.md).
 
 ### 관리형 vs 인라인, AWS 관리형 vs 고객 관리형
 
@@ -125,6 +125,20 @@ aws: [ERROR]: An error occurred (MalformedPolicyDocument) when calling the Creat
 ```
 
 방금 본 것: `Effect`는 `Allow`/`Deny`만, 자격 증명 기반 정책 문장에는 `Resource`가 필수다. 문법 오류는 모두 `MalformedPolicyDocument`.
+
+에뮬레이터가 놓치는 검사도 있다. `Principal`이 들어간 문서를 관리형 정책으로 만들면:
+
+```bash
+aws iam create-policy --policy-name t-withprincipal --policy-document \
+  '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"AWS":"*"},"Action":"s3:GetObject","Resource":"*"}]}' \
+  --query Policy.Arn --output text
+```
+
+```
+arn:aws:iam::000000000000:policy/t-withprincipal
+```
+
+에뮬레이터는 받아 준다. **실제 AWS는 `MalformedPolicyDocument`로 거부한다** — 자격 증명 기반 정책에는 `Principal`을 쓸 수 없다(아래 "스스로 확인" 2번).
 
 ### 3) 관리형 정책의 버전은 5개까지
 
