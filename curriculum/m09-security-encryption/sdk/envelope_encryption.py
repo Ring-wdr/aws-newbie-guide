@@ -46,6 +46,9 @@ def aad_of(context: dict[str, str]) -> bytes:
 def seal(kms, key_id: str, plaintext: bytes, context: dict[str, str]) -> dict[str, Any]:  # type: ignore[no-untyped-def]
     """봉투 암호화. 평문 데이터 키는 이 함수 안에서만 쓰고 바깥으로 돌려주지 않는다.
 
+    호출할 때마다 KMS 에서 새 데이터 키를 받으므로 데이터 키 하나가 암호화하는 메시지는 객체 하나뿐이다.
+    그래서 무작위 96비트 nonce 가 같은 키에서 겹칠 걱정이 없다(nonce 재사용 금지 규칙을 이 구조가 지켜 준다).
+
     솔직하게: 파이썬은 bytes 객체를 덮어쓸 수 없고 언제 메모리에서 지워질지(GC)도 보장하지 않는다.
     응답 dict(dk) 에도 같은 평문이 들어 있으므로 `del` 로 지워지는 것은 없다. 할 수 있는 것은
     평문 키를 반환·저장·로그하지 않고, 짧은 범위에서만 쓰는 것뿐이다.
