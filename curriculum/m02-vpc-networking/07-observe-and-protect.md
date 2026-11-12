@@ -26,8 +26,8 @@ version account-id interface-id srcaddr dstaddr srcport dstport protocol packets
 아래는 **AWS 문서의 기본 형식을 따라 만든 예시**다(에뮬레이터에는 트래픽이 없어 실제 레코드가 생기지 않는다 — 아래 lab09 출력 참고). 주문 API(`10.0.10.25`)가 DB(`10.0.20.30:5432`)에 접속한 기록이 **DB 쪽 ENI**에서 이렇게 찍혔다.
 
 ```
-2 123456789012 eni-0db000000000000a1 10.0.10.25 10.0.20.30 49152 5432 6 5 400 1767225600 1767225660 ACCEPT OK
-2 123456789012 eni-0db000000000000a1 10.0.20.30 10.0.10.25 5432 49152 6 4 320 1767225600 1767225660 REJECT OK
+2 000000000000 eni-0db000000000000a1 10.0.10.25 10.0.20.30 49152 5432 6 5 400 1767225600 1767225660 ACCEPT OK
+2 000000000000 eni-0db000000000000a1 10.0.20.30 10.0.10.25 5432 49152 6 4 320 1767225600 1767225660 REJECT OK
 ```
 
 - 1행: 들어오는 요청(5432)은 **ACCEPT**.
@@ -54,11 +54,12 @@ version account-id interface-id srcaddr dstaddr srcport dstport protocol packets
 ```mermaid
 flowchart LR
   subgraph old["배스천 방식"]
-    op1["운영자"] -- "SSH 22<br/>(회사 IP만 허용)" --> bastion["배스천 호스트<br/>퍼블릭 서브넷"] -- "SSH 22" --> app1["앱 서버<br/>프라이빗"]
+    op1["운영자"] -->|"SSH 22<br/>(회사 IP만 허용)"| bastion["배스천 호스트<br/>퍼블릭 서브넷"]
+    bastion -->|"SSH 22"| app1["앱 서버<br/>프라이빗"]
   end
   subgraph new["Session Manager 방식"]
-    op2["운영자<br/>(IAM 인증)"] -- "HTTPS" --> ssm["Systems Manager"]
-    agent["앱 서버의 SSM 에이전트<br/>프라이빗, 인바운드 포트 없음"] -- "HTTPS 443 아웃바운드<br/>(NAT 또는 ssm·ssmmessages·ec2messages 인터페이스 엔드포인트)" --> ssm
+    op2["운영자<br/>(IAM 인증)"] -->|"HTTPS"| ssm["Systems Manager"]
+    agent["앱 서버의 SSM 에이전트<br/>프라이빗, 인바운드 포트 없음"] -->|"HTTPS 443 아웃바운드<br/>(NAT 또는 ssm·ssmmessages·ec2messages 인터페이스 엔드포인트)"| ssm
   end
 ```
 

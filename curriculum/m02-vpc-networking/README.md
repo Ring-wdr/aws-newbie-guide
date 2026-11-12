@@ -7,7 +7,7 @@
 
 - CIDR을 손으로 계산하고, 겹치지 않는 VPC·서브넷 주소 계획을 세울 수 있다.
 - 2-AZ 3-티어 VPC(퍼블릭·앱·DB 서브넷, IGW, AZ별 NAT 게이트웨이)를 CLI로 직접 만들 수 있다.
-- **라우팅 테이블·보안 그룹·NACL 출력만 보고** 패킷이 인터넷에서 프라이빗 DB까지 어떻게 가는지(또는 왜 못 가는지) 설명할 수 있다.
+- **라우팅 테이블·보안 그룹·NACL 출력만 보고** 패킷이 인터넷에서 프라이빗 DB까지 어떻게 가는지(또는 왜 못 가는지) 설명할 수 있다 — 이 모듈의 중심 목표이며, [레슨 4의 "한 요청을 끝까지 따라가기" 표](./04-security-group-vs-nacl.md#4-한-요청을-끝까지-따라가기)가 그 종합이다.
 - VPC 엔드포인트, 피어링, Transit Gateway, VPN, Direct Connect 중 요구에 맞는 것을 고를 수 있다.
 
 ## 레슨
@@ -49,7 +49,7 @@ export EMULATOR_PORT=9297          # 대화형 터미널이면 생략 가능
 curriculum/m02-vpc-networking/labs/verify.sh
 ```
 
-`verify.sh`는 에뮬레이터를 재시작해 깨끗한 상태로 만든 뒤, sdk 예제의 안전 장치를 확인하고, 모든 lab을 **두 번씩**(멱등성 확인) 실행하고, sdk 예제를 실행한다. 마지막 줄이 `MODULE m02 OK`면 통과.
+`verify.sh`는 에뮬레이터를 재시작해 깨끗한 상태로 만든 뒤, sdk 예제의 안전 장치를 확인하고, 모든 lab을 두 번 — 1회차는 번호 순(01→10), 2회차는 **역순**(10→01) — 실행해 멱등성과 순서 독립성을 확인하고, sdk 예제를 실행한다. 마지막 줄이 `MODULE m02 OK`면 통과.
 
 정리 자료: [cheatsheet.md](./cheatsheet.md) · [quiz.md](./quiz.md)
 
@@ -119,8 +119,8 @@ flowchart TB
   igw --> pa & pb
   pa --> aa --> da
   pb --> ab --> db
-  aa -. 0.0.0.0/0 .-> pa
-  ab -. 0.0.0.0/0 .-> pb
+  aa -.->|"0.0.0.0/0"| pa
+  ab -.->|"0.0.0.0/0"| pb
 ```
 
 ## 에뮬레이터 제약
@@ -138,7 +138,7 @@ flowchart TB
 | `ssm StartSession` | 501 | lab10, 레슨 7 개념 |
 | `ReplaceRoute` **(신규)** | 501. 경로를 바꾸려면 `delete-route` 후 `create-route` | lab07의 `ensure_route`가 그렇게 한다 |
 | `CreateTransitGatewayRoute`, `SearchTransitGatewayRoutes`, `GetTransitGatewayAttachmentPropagations` **(신규)** | 501. 정적 경로·TGW 경로 조회 불가. 연결(association)·전파(propagation)와 그 조회(`get-transit-gateway-route-table-associations/-propagations`)는 동작 | lab07은 전파만 사용 |
-| `DeleteTransitGatewayVpcAttachment`, `DisassociateTransitGatewayRouteTable` **(신규)** | 501 → 한 번 VPC를 연결한 TGW는 지울 수 없다(`IncorrectState`). 연결된 서브넷·VPC 삭제는 막지 않는다 | lab07은 "있으면 재사용" 방식으로 멱등. `teardown_vpc`는 501을 건너뛴다 |
+| `DeleteTransitGatewayVpcAttachment`, `DisassociateTransitGatewayRouteTable` **(신규)** | 501 → 한 번 VPC를 연결한 TGW는 지울 수 없다(`IncorrectState`). 연결된 서브넷·VPC 삭제는 막지 않는다 | lab07은 "있으면 재사용" 방식으로 멱등. `teardown_vpc`는 501을 건너뛴다. **부작용**: lab02(또는 lab07의 정산 VPC 재생성)가 VPC를 다시 만들 때마다 옛 VPC의 TGW 연결이 `available`로 남아 `todayorder-tgw-rt`에 연결·전파된 채 쌓이고, 지워진 옛 주문 VPC의 연결도 `10.0.0.0/16`을 계속 전파한다(실제 AWS라면 같은 CIDR이 두 연결에서 전파되는 충돌 상태). lab07은 현재 VPC ID의 연결만 확인하므로 결과에는 영향이 없다. 깨끗하게 하려면 `scripts/emulator-reset.sh` |
 | TGW 기본 연결·전파 **(신규)** | `DefaultRouteTableAssociation/Propagation=enable`이어도 새 연결이 기본 라우팅 테이블에 자동으로 연결·전파되지 않는다 | 기본값을 끄고 명시적으로 연결·전파(실제 AWS에서도 같은 결과) |
 | 블랙홀 경로 **(신규)** | NAT 게이트웨이를 지워도 그 경로의 `State`가 `blackhole`이 아니라 `active`로 남는다 | 레슨 3 "실제 AWS에서는" |
 | 기본 VPC **(신규)** | 기본 VPC(`172.31.0.0/16`)와 기본 서브넷 3개는 있지만 **IGW와 `0.0.0.0/0` 경로가 없다**(실제 기본 VPC에는 있다) | 레슨 2 "실제 AWS에서는" |

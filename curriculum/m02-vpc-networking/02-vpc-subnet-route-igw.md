@@ -53,17 +53,20 @@ flowchart TB
       db[("PostgreSQL :5432")]
     end
   end
-  user -- "① HTTPS 443" --> igw -- "②" --> alb
-  alb -- "③ local 경로 :8080" --> api
-  api -- "④ local 경로 :5432" --> db
-  api -. "⑤ 0.0.0.0/0" .-> nat -. "⑥ public-rt 0.0.0.0/0" .-> igw -. "⑦" .-> pg
+  user -->|"① HTTPS 443"| igw
+  igw -->|"②"| alb
+  alb -->|"③ local 경로 :8080"| api
+  api -->|"④ local 경로 :5432"| db
+  api -.->|"⑤ 0.0.0.0/0"| nat
+  nat -.->|"⑥ public-rt 0.0.0.0/0"| igw
+  igw -.->|"⑦"| pg
 ```
 
 - **들어오는 길(실선)**: 고객 → IGW → 퍼블릭 서브넷의 ALB → (VPC 안이므로 `local`) → 앱 → (`local`) → DB. 앱·DB 서브넷에는 IGW 경로가 없으므로 인터넷에서 **직접** 닿을 길이 없다. 들어올 수 있는 유일한 입구는 퍼블릭 서브넷의 ALB다.
 - **나가는 길(점선)**: 앱이 외부 결제 API를 부르면 앱 서브넷 라우팅 테이블의 `0.0.0.0/0`이 NAT 게이트웨이를 가리키고, NAT가 있는 퍼블릭 서브넷의 라우팅 테이블이 다시 IGW를 가리킨다. 응답은 같은 길로 돌아온다. 인터넷 쪽에서 **먼저** 앱에 연결을 걸 수는 없다(NAT의 성질 — 레슨 3).
 - **DB는 나가는 길도 없다.** DB 라우팅 테이블에는 `local`뿐이다. RDS처럼 AWS가 패치를 관리하는 DB라면 인터넷 경로가 필요 없다.
 
-에뮬레이터에서는 이 패킷들이 실제로 흐르지 않는다. 그래서 ①~⑦을 **라우팅 테이블을 읽어** 추적하는 것이 이 레슨의 실습이다.
+에뮬레이터에서는 이 패킷들이 실제로 흐르지 않는다. 그래서 ①~⑦을 **라우팅 테이블을 읽어** 추적하는 것이 이 레슨의 실습이다. 각 홉에서 NACL·보안 그룹 판정까지 더한 완성판은 레슨 4의 ["한 요청을 끝까지 따라가기"](./04-security-group-vs-nacl.md#4-한-요청을-끝까지-따라가기) 표다.
 
 ### 왜 AZ마다 같은 구조를 두 벌 만드나
 
@@ -260,39 +263,39 @@ uv run python curriculum/m02-vpc-networking/sdk/vpc_to_mermaid.py
 ```mermaid
 flowchart TB
   internet(("인터넷"))
-  igw_000000000000000a4["todayorder-igw<br/>IGW"]
-  internet <--> igw_000000000000000a4
-  subgraph vpc_00000000000000090["todayorder-vpc 10.0.0.0/16"]
+  igw_00000000000000114["todayorder-igw<br/>IGW"]
+  internet <--> igw_00000000000000114
+  subgraph vpc_00000000000000100["todayorder-vpc 10.0.0.0/16"]
     subgraph us_east_1a["us-east-1a"]
-      subnet_00000000000000098["todayorder-public-a<br/>10.0.0.0/24 · public"]
-      subnet_0000000000000009c["todayorder-app-a<br/>10.0.10.0/24 · private"]
-      subnet_000000000000000a0["todayorder-db-a<br/>10.0.20.0/24 · isolated"]
-      nat_000000000000000aa{{"todayorder-nat-a<br/>NAT GW"}}
+      subnet_00000000000000108["todayorder-public-a<br/>10.0.0.0/24 · public"]
+      subnet_0000000000000010c["todayorder-app-a<br/>10.0.10.0/24 · private"]
+      subnet_00000000000000110["todayorder-db-a<br/>10.0.20.0/24 · isolated"]
+      nat_0000000000000011a{{"todayorder-nat-a<br/>NAT GW"}}
     end
     subgraph us_east_1b["us-east-1b"]
-      subnet_0000000000000009a["todayorder-public-b<br/>10.0.1.0/24 · public"]
-      subnet_0000000000000009e["todayorder-app-b<br/>10.0.11.0/24 · private"]
-      subnet_000000000000000a2["todayorder-db-b<br/>10.0.21.0/24 · isolated"]
-      nat_000000000000000ae{{"todayorder-nat-b<br/>NAT GW"}}
+      subnet_0000000000000010a["todayorder-public-b<br/>10.0.1.0/24 · public"]
+      subnet_0000000000000010e["todayorder-app-b<br/>10.0.11.0/24 · private"]
+      subnet_00000000000000112["todayorder-db-b<br/>10.0.21.0/24 · isolated"]
+      nat_0000000000000011e{{"todayorder-nat-b<br/>NAT GW"}}
     end
-    vpce_000000000000000c8[/"s3 Gateway 엔드포인트"/]
-    vpce_000000000000000ce[/"sqs Interface 엔드포인트"/]
+    vpce_00000000000000140[/"s3 Gateway 엔드포인트"/]
+    vpce_00000000000000146[/"sqs Interface 엔드포인트"/]
   end
-  tgw_000000000000000e0(["tgw-000000000000000e0<br/>Transit Gateway"])
-  subnet_00000000000000098 -->|0.0.0.0/0| igw_000000000000000a4
-  subnet_0000000000000009a -->|0.0.0.0/0| igw_000000000000000a4
-  subnet_0000000000000009c -->|0.0.0.0/0| nat_000000000000000aa
-  subnet_0000000000000009c -->|pl-e9da6b72| vpce_000000000000000c8
-  subnet_0000000000000009c -->|10.20.0.0/16| tgw_000000000000000e0
-  subnet_0000000000000009e -->|0.0.0.0/0| nat_000000000000000ae
-  subnet_0000000000000009e -->|pl-e9da6b72| vpce_000000000000000c8
-  subnet_0000000000000009e -->|10.20.0.0/16| tgw_000000000000000e0
-  nat_000000000000000aa -.- subnet_00000000000000098
-  nat_000000000000000ae -.- subnet_0000000000000009a
+  tgw_000000000000000b6(["tgw-000000000000000b6<br/>Transit Gateway"])
+  subnet_00000000000000108 -->|"0.0.0.0/0"| igw_00000000000000114
+  subnet_0000000000000010a -->|"0.0.0.0/0"| igw_00000000000000114
+  subnet_0000000000000010c -->|"0.0.0.0/0"| nat_0000000000000011a
+  subnet_0000000000000010c -->|"pl-e9da6b72"| vpce_00000000000000140
+  subnet_0000000000000010c -->|"10.20.0.0/16"| tgw_000000000000000b6
+  subnet_0000000000000010e -->|"0.0.0.0/0"| nat_0000000000000011e
+  subnet_0000000000000010e -->|"pl-e9da6b72"| vpce_00000000000000140
+  subnet_0000000000000010e -->|"10.20.0.0/16"| tgw_000000000000000b6
+  nat_0000000000000011a -.- subnet_00000000000000108
+  nat_0000000000000011e -.- subnet_0000000000000010a
   subgraph sgchain["보안 그룹 체이닝"]
-    anywhere(("0.0.0.0/0")) ==>|tcp 443| sg_000000000000000b9["todayorder-alb-sg"]
-    sg_000000000000000b9["todayorder-alb-sg"] ==>|tcp 8080| sg_000000000000000bb["todayorder-app-sg"]
-    sg_000000000000000bb["todayorder-app-sg"] ==>|tcp 5432| sg_000000000000000bd["todayorder-db-sg"]
+    anywhere(("0.0.0.0/0")) ==>|"tcp 443"| sg_00000000000000137["todayorder-alb-sg"]
+    sg_00000000000000137["todayorder-alb-sg"] ==>|"tcp 8080"| sg_00000000000000139["todayorder-app-sg"]
+    sg_00000000000000139["todayorder-app-sg"] ==>|"tcp 5432"| sg_0000000000000013b["todayorder-db-sg"]
   end
 ```
 서브넷 6개 · 티어: isolated, isolated, private, private, public, public
@@ -305,7 +308,7 @@ SDK vpc_to_mermaid OK
 
 - 라우팅 테이블·서브넷·IGW의 구성과 조회는 에뮬레이터와 같다. 다만 실제로는 이 경로를 따라 **패킷이 흐르고**, 에뮬레이터에서는 흐르지 않는다. 워크시트의 판정이 실제 AWS에서 일어나는 일이다.
 - 실제 계정의 **기본 VPC**에는 IGW가 붙어 있고 main 라우팅 테이블에 `0.0.0.0/0 → igw`가 있어, 기본 서브넷 3개가 모두 퍼블릭이다. 에뮬레이터의 기본 VPC(`172.31.0.0/16`)에는 **IGW도 그 경로도 없다**(직접 확인: `aws ec2 describe-internet-gateways`가 빈 목록). 이 모듈은 기본 VPC를 쓰지 않는다.
-- 2024년 2월부터 AWS는 **모든 공인 IPv4 주소**(EIP, 자동 할당 공인 IP 포함)에 시간당 요금을 받는다. 퍼블릭 서브넷의 "공인 IP 자동 할당"은 꼭 필요한 곳(ALB는 AWS가 관리)만 켜고, 서버는 프라이빗 서브넷에 두는 것이 비용 면에서도 맞다.
+- 2024년 2월부터 AWS는 **모든 공인 IPv4 주소**(EIP, 자동 할당 공인 IP 포함)에 시간당 요금을 받는다. 퍼블릭 서브넷의 "공인 IP 자동 할당"은 꼭 필요한 곳만 켜고, 서버는 프라이빗 서브넷에 두는 것이 비용 면에서도 맞다. 인터넷 연결(internet-facing) ALB도 AZ마다 공인 IPv4를 쓰며 **그 주소도 같은 요금 대상**이다 — AWS가 주소를 관리해 줄 뿐 무료는 아니다.
 - **VPC Block Public Access**(VPC의 `BlockPublicAccessStates`)를 켜면 계정·리전 단위로 IGW를 통한 트래픽을 일괄 차단할 수 있다. 에뮬레이터 응답에도 이 필드(`InternetGatewayBlockMode: off`)가 보인다.
 - 실제 AWS에서 해 보려면: VPC·서브넷·라우팅 테이블·IGW는 **무료**다. 이 레슨의 lab02는 NAT 게이트웨이 2개와 EIP 2개도 만들므로 **시간당 요금이 붙는다**(레슨 3 참고). NAT 없이 VPC·서브넷·IGW·라우팅 테이블까지만 만들어 보고, 끝나면 역순으로 지운다: `aws ec2 disassociate-route-table` → `delete-route-table` → `detach-internet-gateway` → `delete-internet-gateway` → `delete-subnet` → `delete-vpc`.
 

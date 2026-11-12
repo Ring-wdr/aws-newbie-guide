@@ -19,12 +19,14 @@ flowchart LR
   end
   hq["본사 IDC<br/>192.168.0.0/16<br/>(고객 게이트웨이 장비)"]
   dev["재택 개발자 노트북"]
-  order <-- "VPC 연결" --> tgw
-  settle <-- "VPC 연결" --> tgw
-  order <-. "VPC 피어링(1:1)" .-> ana
-  hq <-- "Site-to-Site VPN<br/>(인터넷 위 IPsec 터널 2개)" --> tgw
-  hq <== "Direct Connect<br/>(전용 회선)" ==> tgw
-  dev -- "Client VPN" --> order
+  order <-->|"VPC 연결"| tgw
+  settle <-->|"VPC 연결"| tgw
+  order <-.->|"VPC 피어링(1:1)"| ana
+  hq <-->|"Site-to-Site VPN<br/>(인터넷 위 IPsec 터널 2개)"| tgw
+  dxgw(["Direct Connect 게이트웨이<br/>(글로벌)"])
+  hq <==>|"Direct Connect 전용 회선<br/>Transit VIF"| dxgw
+  dxgw <==>|"연결"| tgw
+  dev -->|"Client VPN"| order
 ```
 
 ### VPC 피어링(VPC Peering)
@@ -49,7 +51,7 @@ flowchart LR
 
 - 온프렘과 AWS를 **인터넷 위의 IPsec 터널**로 잇는다. 몇 분~몇 시간이면 구성된다.
 - 온프렘 쪽 장비를 AWS에 등록한 것이 **고객 게이트웨이(CGW)**, AWS 쪽 종단은 VPC 하나에 붙는 **가상 프라이빗 게이트웨이(VGW)** 또는 **TGW**다.
-- VPN 연결 하나에 **터널 2개**(AWS 쪽 서로 다른 엔드포인트)가 있어 한쪽이 유지 보수 중이어도 이어진다. 표준 터널 하나는 최대 **1.25 Gbps**, 대역폭 큰(large bandwidth) 터널은 최대 5 Gbps. 더 필요하면 TGW + 여러 VPN + **ECMP**(동적 라우팅·BGP 필요)로 묶는다.
+- VPN 연결 하나에 **터널 2개**(AWS 쪽 서로 다른 엔드포인트)가 있어 한쪽이 유지 보수 중이어도 이어진다. 표준 터널 하나는 최대 **1.25 Gbps**, 대역폭 큰 터널(Large Bandwidth Tunnel)은 최대 5 Gbps인데 **TGW 또는 Cloud WAN에 연결한 VPN에서만** 쓸 수 있다(VGW에 붙인 VPN은 1.25 Gbps 터널뿐). 더 필요하면 TGW + 여러 VPN + **ECMP**(동적 라우팅·BGP 필요)로 묶는다.
 - 인터넷 품질에 따라 지연·대역폭이 흔들린다. **Accelerated VPN**은 AWS Global Accelerator 네트워크로 진입시켜 개선한다(TGW 연결에서).
 - VGW에서 **경로 전파**를 켜면 온프렘이 BGP로 알려 준 경로가 VPC 라우팅 테이블에 자동으로 들어온다.
 

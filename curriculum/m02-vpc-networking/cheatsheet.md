@@ -74,7 +74,7 @@ S3 버킷 정책에서 `aws:SourceVpce`(특정 엔드포인트) / `aws:SourceVpc
 |---|---|
 | VPC 2~3개, 단순·저렴, 대역폭 제한 없음 | VPC 피어링 (전이적 라우팅 없음, CIDR 겹침 불가, 리전·계정 간 가능) |
 | VPC 수십 개 + 온프렘, 허브·스포크, 전이적 라우팅 | Transit Gateway |
-| 온프렘 ↔ VPC를 빨리, 인터넷 위로 암호화 | Site-to-Site VPN (터널 2개, 표준 터널당 최대 1.25 Gbps, 대역폭 큰 터널은 5 Gbps) |
+| 온프렘 ↔ VPC를 빨리, 인터넷 위로 암호화 | Site-to-Site VPN (터널 2개, 표준 터널당 최대 1.25 Gbps, 대역폭 큰 터널은 5 Gbps — TGW·Cloud WAN 연결에서만) |
 | VPN 대역폭을 늘리고 싶다 | TGW + VPN + ECMP(동적 라우팅·BGP 필요) |
 | 직원 노트북 → VPC | Client VPN |
 | 일정한 대역폭·낮은 지연, 인터넷 안 거침 | Direct Connect (전용 1/10/100/400 Gbps, 호스티드 50 Mbps~25 Gbps). 개통에 수 주 |

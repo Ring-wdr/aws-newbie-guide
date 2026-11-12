@@ -18,8 +18,8 @@ flowchart LR
     end
     rt["app-rt-a<br/>pl-(S3) → vpce-(게이트웨이)<br/>0.0.0.0/0 → nat-a"]
   end
-  api -- "S3 요청: 라우팅 테이블의<br/>prefix list 경로" --> gw["S3 게이트웨이 엔드포인트"] --> s3[(S3)]
-  api -- "sqs.us-east-1.amazonaws.com<br/>→ 사설 DNS가 10.0.10.4 반환" --> eni --> sqs[[SQS]]
+  api -->|"S3 요청: 라우팅 테이블의<br/>prefix list 경로"| gw["S3 게이트웨이 엔드포인트"] --> s3[(S3)]
+  api -->|"sqs.us-east-1.amazonaws.com<br/>→ 사설 DNS가 10.0.10.4 반환"| eni --> sqs[[SQS]]
 ```
 
 | | 게이트웨이 엔드포인트 | 인터페이스 엔드포인트 |
@@ -57,10 +57,10 @@ bash curriculum/m02-vpc-networking/labs/lab06-vpc-endpoints.sh
 ```
 
 ```
-(준비) 3-티어 VPC vpc-00000000000000090 를 그대로 씁니다
+(준비) 3-티어 VPC vpc-00000000000000100 를 그대로 씁니다
 == 0. 엔드포인트가 없을 때: app-a 에서 S3(의 공인 IP)로 가는 길은 NAT 게이트웨이
    S3 접두사 목록 pl-e9da6b72 = 198.18.8.0/21  (예로 쓸 S3 주소: 198.18.8.10)
-   app-rt-a 에서 198.18.8.10 의 다음 홉: nat-000000000000000aa
+   app-rt-a 에서 198.18.8.10 의 다음 홉: nat-0000000000000011a
 == 1. 어떤 서비스가 '게이트웨이' 엔드포인트를 지원하나?
 -----------------------------------------------------------
 |               DescribeVpcEndpointServices               |
@@ -70,7 +70,7 @@ bash curriculum/m02-vpc-networking/labs/lab06-vpc-endpoints.sh
 |  com.amazonaws.us-east-1.sqs      |  Interface          |
 +-----------------------------------+---------------------+
 == 2. S3 게이트웨이 엔드포인트를 앱 라우팅 테이블 2개에 연결
-   vpce-000000000000000c8
+   vpce-00000000000000140
 [
     {
         "DestinationCidrBlock": "10.0.0.0/16",
@@ -80,20 +80,20 @@ bash curriculum/m02-vpc-networking/labs/lab06-vpc-endpoints.sh
     },
     {
         "DestinationCidrBlock": "0.0.0.0/0",
-        "NatGatewayId": "nat-000000000000000aa",
+        "NatGatewayId": "nat-0000000000000011a",
         "Origin": "CreateRoute",
         "State": "active"
     },
     {
         "DestinationPrefixListId": "pl-e9da6b72",
-        "GatewayId": "vpce-000000000000000c8",
+        "GatewayId": "vpce-00000000000000140",
         "Origin": "CreateRoute",
         "State": "active"
     }
 ]
 == 3. 다시 추적: 같은 S3 주소로 가는 다음 홉
-   app-rt-a → 198.18.8.10 : vpce-000000000000000c8   (prefix list 경로가 0.0.0.0/0 보다 구체적)
-   app-rt-a → 203.0.113.50 : nat-000000000000000aa   (S3가 아닌 곳은 여전히 NAT)
+   app-rt-a → 198.18.8.10 : vpce-00000000000000140   (prefix list 경로가 0.0.0.0/0 보다 구체적)
+   app-rt-a → 203.0.113.50 : nat-0000000000000011a   (S3가 아닌 곳은 여전히 NAT)
    db-rt    → 198.18.8.10 : DROP(경로 없음)   (엔드포인트를 연결하지 않은 라우팅 테이블에는 경로가 안 생긴다)
 == 4. SQS는 게이트웨이 엔드포인트가 없다 (S3·DynamoDB 둘뿐)
 aws: [ERROR]: An error occurred (InvalidServiceName) when calling the CreateVpcEndpoint operation: The Vpc Endpoint Service 'com.amazonaws.us-east-1.sqs' does not exist
@@ -103,25 +103,27 @@ aws: [ERROR]: An error occurred (InvalidServiceName) when calling the CreateVpcE
     "State": "available",
     "PrivateDns": true,
     "ENIs": [
-        "eni-000000000000000cc",
-        "eni-000000000000000cd"
+        "eni-00000000000000144",
+        "eni-00000000000000145"
     ],
     "DnsNames": [
         "sqs.us-east-1.amazonaws.com",
-        "vpce-000000000000000ce.sqs.us-east-1.vpce.amazonaws.com",
-        "vpce-000000000000000ce-us-east-1a.sqs.us-east-1.vpce.amazonaws.com",
-        "vpce-000000000000000ce-us-east-1b.sqs.us-east-1.vpce.amazonaws.com"
+        "vpce-00000000000000146.sqs.us-east-1.vpce.amazonaws.com",
+        "vpce-00000000000000146-us-east-1a.sqs.us-east-1.vpce.amazonaws.com",
+        "vpce-00000000000000146-us-east-1b.sqs.us-east-1.vpce.amazonaws.com"
     ]
 }
    ENI 가 놓인 서브넷과 사설 IP:
-   subnet-0000000000000009c	10.0.10.4
-   subnet-0000000000000009e	10.0.11.4
+   subnet-0000000000000010c	10.0.10.4
+   subnet-0000000000000010e	10.0.11.4
 == 6. 라우팅 테이블은? 인터페이스 엔드포인트는 경로를 추가하지 않는다 (DNS가 ENI의 사설 IP를 돌려준다)
-   app-rt-a 경로 수: 3 (local, 0.0.0.0/0→NAT, S3 prefix list→게이트웨이 엔드포인트)
-  ✔ 엔드포인트 후 S3 다음 홉: vpce-000000000000000c8
+   app-rt-a 경로 수: 인터페이스 엔드포인트 생성 전 3 → 후 3 (변화 없음)
+   그중 vpce-* 를 가리키는 경로: 1 개 (S3 게이트웨이 엔드포인트의 prefix list 경로 하나뿐)
+  ✔ 엔드포인트 후 S3 다음 홉: vpce-00000000000000140
   ✔ db-rt 의 S3 경로: DROP(경로 없음)
   ✔ 인터페이스 엔드포인트 ENI 수(서브넷 2개): 2
-  ✔ app-rt-a 경로 수: 3
+  ✔ 인터페이스 엔드포인트 생성 전후 app-rt-a 경로 수: 3
+  ✔ app-rt-a 에서 vpce-* 를 가리키는 경로 수: 1
 LAB06 OK
 ```
 
@@ -130,7 +132,7 @@ LAB06 OK
 - 엔드포인트를 연결하지 않은 `db-rt`에는 경로가 생기지 않는다. 게이트웨이 엔드포인트는 **지정한 라우팅 테이블에만** 작용한다.
 - **1번 표**: S3는 Gateway·Interface 둘 다, SQS는 Interface만. SQS로 게이트웨이 엔드포인트를 만들면 `InvalidServiceName`(4번). 에뮬레이터 목록에서 DynamoDB는 Gateway만 보이지만, 실제 AWS의 DynamoDB는 2024년부터 Interface 엔드포인트(PrivateLink)도 지원한다.
 - **5번**: 인터페이스 엔드포인트는 서브넷마다 ENI 하나(앱 서브넷 2개 → ENI 2개, 각 서브넷의 사설 IP). DNS 이름은 서비스 기본 이름(`sqs.us-east-1.amazonaws.com` — 사설 DNS), 엔드포인트 전용 이름, AZ별 이름이 함께 나온다.
-- **6번**: 인터페이스 엔드포인트는 라우팅 테이블을 건드리지 않는다. 앱이 평소처럼 `sqs.us-east-1.amazonaws.com`에 요청하면 **DNS가** ENI의 사설 IP를 돌려주어 VPC 안에서 끝난다.
+- **6번**: 인터페이스 엔드포인트는 라우팅 테이블을 건드리지 않는다(만들기 전후 경로 수가 같고, `vpce-`로 가는 경로는 게이트웨이 엔드포인트의 것 하나뿐 — lab07을 먼저 실행했다면 TGW 경로가 하나 더 있어 경로 수는 4로 보인다). 앱이 평소처럼 `sqs.us-east-1.amazonaws.com`에 요청하면 **DNS가** ENI의 사설 IP를 돌려주어 VPC 안에서 끝난다.
 - 접두사 목록의 CIDR `198.18.8.0/21`은 에뮬레이터가 만든 테스트용 대역이다. 실제 S3 접두사 목록에는 실제 S3 공인 대역이 여러 개 들어 있다.
 
 ## 실제 AWS에서는
