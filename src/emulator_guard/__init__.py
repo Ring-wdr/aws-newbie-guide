@@ -22,7 +22,10 @@
 
 실제 AWS에서 같은 코드를 돌리고 싶을 때만 TODAYORDER_ALLOW_REAL_AWS=1 을 설정한다(기본 꺼짐).
 그러면 검사를 건너뛰고 경고만 출력하며, emulator_site() 는 엔드포인트를 지정하지 않은
-boto3.Session(region_name=real_aws_region) 을 쓰는 사이트를 돌려준다.
+boto3.Session(region_name=real_aws_region) 을 쓰는 사이트를 돌려준다. 주의: 이때 DR_AWS_* 변수는
+쓰이지 않으므로 **두 번째 사이트도 주 사이트와 같은 환경(AWS_ENDPOINT_URL·자격 증명)을 따른다** —
+env.sh 를 source 한 셸에서 opt-out 을 켜면 DR 요청도 주 에뮬레이터로 간다. 실제 AWS에서 두 리전을
+쓰려면 env.sh 없이(새 셸) 실제 자격 증명으로 실행해 real_aws_region 만 다르게 한다.
 """
 
 from __future__ import annotations
@@ -108,11 +111,16 @@ def _stage1(prefix: str) -> dict[str, str]:
         _fail(f"{name} 이 로컬 에뮬레이터(https://{_HOST}:<포트>)가 아닙니다: '{endpoint or '설정 안 됨'}' — {why}. "
               "이대로 실행하면 실제 AWS로 요청이 갈 수 있어 중단합니다.", hint)
     if not prefix:
+        main_port = urlsplit(endpoint).port
         for key, value in os.environ.items():
             if key.startswith("AWS_ENDPOINT_URL_"):
                 why = validate_endpoint(value)
                 if why:
                     _fail(f"{key}={value} 가 에뮬레이터가 아닌 곳을 가리킵니다 — {why}. 중단합니다.", hint)
+                # 같은 컴퓨터의 다른 에뮬레이터(다른 사람·에이전트의 포트)로 새는 것도 막는다.
+                if urlsplit(value).port != main_port:
+                    _fail(f"{key}={value} 의 포트가 AWS_ENDPOINT_URL({endpoint})과 다릅니다. "
+                          "다른 에뮬레이터로 요청이 갈 수 있어 중단합니다.", hint)
         if os.environ.get("AWS_IGNORE_CONFIGURED_ENDPOINT_URLS", "").lower() == "true":
             _fail("AWS_IGNORE_CONFIGURED_ENDPOINT_URLS=true 이면 엔드포인트 설정이 무시됩니다. 중단합니다.", hint)
     values = {k: _env(prefix, k) for k in _SITE_KEYS}
@@ -155,7 +163,8 @@ def emulator_site(prefix: str = "", *, real_aws_region: str | None = None) -> Em
 
     prefix=""     : scripts/env.sh 의 AWS_* 변수 (주 사이트)
     prefix="DR_"  : scripts/dr-env.sh 의 DR_AWS_* 변수 (두 번째 에뮬레이터)
-    real_aws_region: TODAYORDER_ALLOW_REAL_AWS=1 로 실제 AWS에서 실행할 때 쓸 리전 (에뮬레이터에서는 쓰지 않음)
+    real_aws_region: TODAYORDER_ALLOW_REAL_AWS=1 로 실제 AWS에서 실행할 때 쓸 리전 (에뮬레이터에서는 쓰지 않음).
+                     opt-out 일 때는 prefix 와 무관하게 주 사이트의 환경(AWS_*)을 따른다.
     """
     if os.environ.get(OPT_OUT_ENV) == "1":
         import boto3
