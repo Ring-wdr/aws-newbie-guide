@@ -1,0 +1,16 @@
+{
+  "tags": {
+    "project": {
+      "tag_key": {"@@assign": "project"},
+      "tag_value": {"@@assign": ["todayorder"]}
+    },
+    "cost-center": {
+      "tag_key": {"@@assign": "cost-center"},
+      "tag_value": {"@@assign": ["orders", "payments", "platform"]}
+    },
+    "env": {
+      "tag_key": {"@@assign": "env"},
+      "tag_value": {"@@assign": ["prod", "staging", "dev"]}
+    }
+  }
+}
