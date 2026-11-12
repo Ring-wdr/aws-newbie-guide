@@ -46,14 +46,18 @@ aws budgets describe-subscribers-for-notification --account-id "$ACCOUNT" --budg
   --query 'Subscribers[].[SubscriptionType,Address]' --output text
 
 echo "== 4. Cost Explorer: 이번 달 비용 조회와 예측"
-# 기간은 오늘 날짜로 계산한다: 조회 = 이번 달 1일 ~ 내일(End 는 포함 안 됨), 예측 = 내일 ~ 다음 달 1일
-read -r MONTH_START TOMORROW NEXT_MONTH < <(python3 -c 'import datetime as d
-t = d.date.today(); n = (t.replace(day=28) + d.timedelta(days=4)).replace(day=1)
-print(t.replace(day=1), t + d.timedelta(days=1), n)')
-echo "조회 기간 $MONTH_START ~ $TOMORROW · 예측 기간 $TOMORROW ~ $NEXT_MONTH"
+# 기간은 오늘 날짜(**UTC** — Cost Explorer 의 날짜 기준)로 계산한다:
+#   조회 = 이번 달 1일 ~ 내일(End 는 포함 안 됨), 예측 = 내일 ~ 다음 달 1일.
+#   달의 마지막 날에는 내일이 곧 다음 달 1일이라 예측 기간이 비므로(Start == End → 실제 AWS 는 ValidationException)
+#   예측 끝을 그다음 달 1일로 미룬다.
+read -r MONTH_START TOMORROW FORECAST_END < <(python3 -c 'import datetime as d
+first_of_next = lambda x: (x.replace(day=28) + d.timedelta(days=4)).replace(day=1)
+t = d.datetime.now(d.timezone.utc).date(); tom = t + d.timedelta(days=1); n = first_of_next(t)
+print(t.replace(day=1), tom, n if tom < n else first_of_next(n))')
+echo "조회 기간 $MONTH_START ~ $TOMORROW · 예측 기간 $TOMORROW ~ $FORECAST_END"
 set +e
 ce_out="$(aws ce get-cost-and-usage --time-period "Start=$MONTH_START,End=$TOMORROW" --granularity MONTHLY --metrics UnblendedCost 2>&1)"
-fc_out="$(aws ce get-cost-forecast --time-period "Start=$TOMORROW,End=$NEXT_MONTH" --granularity MONTHLY --metric UNBLENDED_COST 2>&1)"
+fc_out="$(aws ce get-cost-forecast --time-period "Start=$TOMORROW,End=$FORECAST_END" --granularity MONTHLY --metric UNBLENDED_COST 2>&1)"
 set -e
 echo "$ce_out"
 echo "$fc_out"
