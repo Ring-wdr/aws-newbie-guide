@@ -115,10 +115,38 @@ def run_s3(p: Probe) -> None:
     if glc:
         p.behavior("수명 주기 규칙 왕복(전환은 시간이 지나도 실제로 일어나지 않음 — 확인 불가)",
                    glc["Rules"][0].get("Transitions", [{}])[0].get("StorageClass") == "STANDARD_IA", "")
-    lc_bad = {"Rules": [{"ID": "bad", "Status": "Enabled", "Filter": {"Prefix": ""},
-                         "Transitions": [{"Days": 10, "StorageClass": "STANDARD_IA"}]}]}
-    p.expect_error("PutBucketLifecycleConfiguration(IA 30일 미만)", s3.put_bucket_lifecycle_configuration, "InvalidArgument",
-                   Bucket=b, LifecycleConfiguration=lc_bad, what="STANDARD_IA 전환 30일 미만 → InvalidArgument")
+    # 2026-07-16 AWS 발표("Amazon S3 removes 30-day minimum for transitions to S3 Standard-IA and S3 One Zone-IA"):
+    # STANDARD_IA·ONEZONE_IA 로의 전환에 "STANDARD 에서 30일" 제한이 없어졌다(30일 최소 보관 요금은 그대로).
+    def _lc(rules: list[dict]) -> dict:
+        return {"Rules": rules}
+
+    def _rule(rid: str, transitions: list[dict], **extra: object) -> dict:
+        return {"ID": rid, "Status": "Enabled", "Filter": {"Prefix": "lc/"}, "Transitions": transitions, **extra}
+
+    for days, cls in ((10, "STANDARD_IA"), (7, "ONEZONE_IA"), (0, "STANDARD_IA")):
+        try:
+            s3.put_bucket_lifecycle_configuration(Bucket=b, LifecycleConfiguration=_lc([_rule("ia", [{"Days": days, "StorageClass": cls}])]))
+            p.behavior(f"{cls} {days}일 전환 규칙 수락 (2026-07 이후 AWS와 같음)", True)
+        except ClientError as e:
+            p.behavior(f"{cls} {days}일 전환 규칙 수락 (2026-07 이후 AWS와 같음)", False, e.response["Error"]["Code"])
+    p.expect_error("PutBucketLifecycleConfiguration(GLACIER_IR 4일 → DEEP_ARCHIVE 20일)", s3.put_bucket_lifecycle_configuration,
+                   "InvalidArgument", Bucket=b,
+                   LifecycleConfiguration=_lc([_rule("chain", [{"Days": 4, "StorageClass": "GLACIER_IR"},
+                                                              {"Days": 20, "StorageClass": "DEEP_ARCHIVE"}])]),
+                   what="최소 보관 기간(Glacier IR 90일)보다 빠른 연쇄 전환 → InvalidArgument")
+    p.expect_error("PutBucketLifecycleConfiguration(GLACIER 30일 → STANDARD_IA 60일)", s3.put_bucket_lifecycle_configuration,
+                   "InvalidArgument", Bucket=b,
+                   LifecycleConfiguration=_lc([_rule("reverse", [{"Days": 30, "StorageClass": "GLACIER"},
+                                                                {"Days": 60, "StorageClass": "STANDARD_IA"}])]),
+                   what="거꾸로 된 전환(GLACIER → STANDARD_IA) → InvalidArgument")
+    p.expect_error("PutBucketLifecycleConfiguration(규칙 ID 중복)", s3.put_bucket_lifecycle_configuration, "InvalidArgument",
+                   Bucket=b, LifecycleConfiguration=_lc([_rule("dup", [{"Days": 30, "StorageClass": "STANDARD_IA"}]),
+                                                          _rule("dup", [{"Days": 60, "StorageClass": "GLACIER"}])]),
+                   what="같은 규칙 ID 두 개 → InvalidArgument")
+    p.expect_error("PutBucketLifecycleConfiguration(만료 0일)", s3.put_bucket_lifecycle_configuration, "InvalidArgument",
+                   Bucket=b, LifecycleConfiguration=_lc([{"ID": "exp0", "Status": "Enabled", "Filter": {"Prefix": "lc/"},
+                                                           "Expiration": {"Days": 0}}]),
+                   what="만료 0일 → InvalidArgument")
 
     # 미리 서명된 URL
     s3.put_object(Bucket=b, Key="presigned.txt", Body=b"presigned-ok")
