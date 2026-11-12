@@ -99,24 +99,24 @@ bash curriculum/m02-vpc-networking/labs/lab02-three-tier-vpc.sh
 
 ```
 == VPC todayorder-vpc (10.0.0.0/16)
-   vpc-00000000000000090
+   vpc-00000000000000080
 == 서브넷 6개 (2 AZ × 3 티어)
-   todayorder-public-a  10.0.0.0/24   us-east-1a subnet-00000000000000098
-   todayorder-public-b  10.0.1.0/24   us-east-1b subnet-0000000000000009a
-   todayorder-app-a     10.0.10.0/24  us-east-1a subnet-0000000000000009c
-   todayorder-app-b     10.0.11.0/24  us-east-1b subnet-0000000000000009e
-   todayorder-db-a      10.0.20.0/24  us-east-1a subnet-000000000000000a0
-   todayorder-db-b      10.0.21.0/24  us-east-1b subnet-000000000000000a2
+   todayorder-public-a  10.0.0.0/24   us-east-1a subnet-00000000000000088
+   todayorder-public-b  10.0.1.0/24   us-east-1b subnet-0000000000000008a
+   todayorder-app-a     10.0.10.0/24  us-east-1a subnet-0000000000000008c
+   todayorder-app-b     10.0.11.0/24  us-east-1b subnet-0000000000000008e
+   todayorder-db-a      10.0.20.0/24  us-east-1a subnet-00000000000000090
+   todayorder-db-b      10.0.21.0/24  us-east-1b subnet-00000000000000092
 == 인터넷 게이트웨이 + 퍼블릭 라우팅 테이블 (0.0.0.0/0 → IGW)
-   igw-000000000000000a4 → rtb-000000000000000a5
+   igw-00000000000000094 → rtb-00000000000000095
 == NAT 게이트웨이 2개 (AZ마다 하나, 각자 퍼블릭 서브넷에)
-   todayorder-nat-a nat-000000000000000aa (EIP eipalloc-000000000000000a8)
-   todayorder-nat-b nat-000000000000000ae (EIP eipalloc-000000000000000ac)
+   todayorder-nat-a nat-0000000000000009a (EIP eipalloc-00000000000000098)
+   todayorder-nat-b nat-0000000000000009e (EIP eipalloc-0000000000000009c)
 == 앱 라우팅 테이블 (AZ별: 0.0.0.0/0 → 같은 AZ의 NAT)
-   todayorder-app-rt-a rtb-000000000000000b0 → nat-000000000000000aa
-   todayorder-app-rt-b rtb-000000000000000b2 → nat-000000000000000ae
+   todayorder-app-rt-a rtb-000000000000000a0 → nat-0000000000000009a
+   todayorder-app-rt-b rtb-000000000000000a2 → nat-0000000000000009e
 == DB 라우팅 테이블 (local 경로만 — 인터넷으로 나가는 길이 없다)
-   todayorder-db-rt rtb-000000000000000b4
+   todayorder-db-rt rtb-000000000000000a4
 == 결과 1. 서브넷 (이름·CIDR·AZ·사용 가능 IP·퍼블릭 IP 자동 할당)
 -----------------------------------------------------------------------
 |                           DescribeSubnets                           |
@@ -143,7 +143,7 @@ bash curriculum/m02-vpc-networking/labs/lab02-three-tier-vpc.sh
         "Main": false,
         "Routes": [
             "10.0.0.0/16 -> local",
-            "0.0.0.0/0 -> igw-000000000000000a4"
+            "0.0.0.0/0 -> igw-00000000000000094"
         ],
         "Subnets": 2
     },
@@ -152,7 +152,7 @@ bash curriculum/m02-vpc-networking/labs/lab02-three-tier-vpc.sh
         "Main": false,
         "Routes": [
             "10.0.0.0/16 -> local",
-            "0.0.0.0/0 -> nat-000000000000000aa"
+            "0.0.0.0/0 -> nat-0000000000000009a"
         ],
         "Subnets": 1
     },
@@ -161,7 +161,7 @@ bash curriculum/m02-vpc-networking/labs/lab02-three-tier-vpc.sh
         "Main": false,
         "Routes": [
             "10.0.0.0/16 -> local",
-            "0.0.0.0/0 -> nat-000000000000000ae"
+            "0.0.0.0/0 -> nat-0000000000000009e"
         ],
         "Subnets": 1
     },
@@ -178,14 +178,14 @@ bash curriculum/m02-vpc-networking/labs/lab02-three-tier-vpc.sh
 -----------------------------------------------------------------------------------------
 |                                  DescribeNatGateways                                  |
 +------------------+------------+----------------------------+-------------+------------+
-|  todayorder-nat-a|  available |  subnet-00000000000000098  |  us-east-1a |  54.0.0.2  |
-|  todayorder-nat-b|  available |  subnet-0000000000000009a  |  us-east-1b |  54.0.0.3  |
+|  todayorder-nat-a|  available |  subnet-00000000000000088  |  us-east-1a |  54.0.0.2  |
+|  todayorder-nat-b|  available |  subnet-0000000000000008a  |  us-east-1b |  54.0.0.3  |
 +------------------+------------+----------------------------+-------------+------------+
   ✔ 서브넷 수: 6
   ✔ /24 서브넷의 사용 가능 IP (256 - 예약 5): 251
   ✔ NAT 게이트웨이 available 수: 2
-  ✔ public-a 의 기본 경로: igw-000000000000000a4
-  ✔ app-a 의 기본 경로 = 같은 AZ의 NAT(nat-a): nat-000000000000000aa
+  ✔ public-a 의 기본 경로: igw-00000000000000094
+  ✔ app-a 의 기본 경로 = 같은 AZ의 NAT(nat-a): nat-0000000000000009a
   ✔ db-a 에서 인터넷으로: DROP(경로 없음)
 LAB02 OK
 ```
@@ -203,10 +203,10 @@ LAB02 OK
 ```
 == 0. 재료: 서브넷별로 '실제로 적용되는' 라우팅 테이블과 그 경로
    (명시적으로 연결된 테이블이 없으면 VPC의 기본(main) 라우팅 테이블이 적용된다)
-   todayorder-public-a  10.0.0.0/24   todayorder-public-rt  10.0.0.0/16->local 0.0.0.0/0->igw-000000000000000a4
-   todayorder-public-b  10.0.1.0/24   todayorder-public-rt  10.0.0.0/16->local 0.0.0.0/0->igw-000000000000000a4
-   todayorder-app-a     10.0.10.0/24  todayorder-app-rt-a   10.0.0.0/16->local 0.0.0.0/0->nat-000000000000000aa
-   todayorder-app-b     10.0.11.0/24  todayorder-app-rt-b   10.0.0.0/16->local 0.0.0.0/0->nat-000000000000000ae
+   todayorder-public-a  10.0.0.0/24   todayorder-public-rt  10.0.0.0/16->local 0.0.0.0/0->igw-00000000000000094
+   todayorder-public-b  10.0.1.0/24   todayorder-public-rt  10.0.0.0/16->local 0.0.0.0/0->igw-00000000000000094
+   todayorder-app-a     10.0.10.0/24  todayorder-app-rt-a   10.0.0.0/16->local 0.0.0.0/0->nat-0000000000000009a
+   todayorder-app-b     10.0.11.0/24  todayorder-app-rt-b   10.0.0.0/16->local 0.0.0.0/0->nat-0000000000000009e
    todayorder-db-a      10.0.20.0/24  todayorder-db-rt      10.0.0.0/16->local
    todayorder-db-b      10.0.21.0/24  todayorder-db-rt      10.0.0.0/16->local
 ```
@@ -239,9 +239,9 @@ bash curriculum/m02-vpc-networking/labs/lab03-route-trace.sh
 == 문제 6. 10.0.0.0/16 과 0.0.0.0/0 이 둘 다 10.0.21.10 에 일치한다. 왜 local 이 이기는가?
    정답: 최장 접두사 일치 — /16 이 /0 보다 구체적(접두사가 길다)이므로 local 경로가 선택된다.
 == 문제 7. 연결이 없는 새 서브넷을 만들면 어느 라우팅 테이블을 쓰나? (실제로 만들어 확인)
-   정답: 기본(main) 라우팅 테이블 rtb-00000000000000093 — 경로: DROP(경로 없음) (인터넷 경로가 없으니 '프라이빗'으로 시작한다)
+   정답: 기본(main) 라우팅 테이블 rtb-00000000000000083 — 경로: DROP(경로 없음) (인터넷 경로가 없으니 '프라이빗'으로 시작한다)
   ✔ 퍼블릭 서브넷:  todayorder-public-a todayorder-public-b
-  ✔ 새 서브넷에 적용되는 테이블 = main: rtb-00000000000000093
+  ✔ 새 서브넷에 적용되는 테이블 = main: rtb-00000000000000083
 LAB03 OK
 ```
 
@@ -263,39 +263,39 @@ uv run python curriculum/m02-vpc-networking/sdk/vpc_to_mermaid.py
 ```mermaid
 flowchart TB
   internet(("인터넷"))
-  igw_00000000000000114["todayorder-igw<br/>IGW"]
-  internet <--> igw_00000000000000114
-  subgraph vpc_00000000000000100["todayorder-vpc 10.0.0.0/16"]
+  igw_00000000000000094["todayorder-igw<br/>IGW"]
+  internet <--> igw_00000000000000094
+  subgraph vpc_00000000000000080["todayorder-vpc 10.0.0.0/16"]
     subgraph us_east_1a["us-east-1a"]
-      subnet_00000000000000108["todayorder-public-a<br/>10.0.0.0/24 · public"]
-      subnet_0000000000000010c["todayorder-app-a<br/>10.0.10.0/24 · private"]
-      subnet_00000000000000110["todayorder-db-a<br/>10.0.20.0/24 · isolated"]
-      nat_0000000000000011a{{"todayorder-nat-a<br/>NAT GW"}}
+      subnet_00000000000000088["todayorder-public-a<br/>10.0.0.0/24 · public"]
+      subnet_0000000000000008c["todayorder-app-a<br/>10.0.10.0/24 · private"]
+      subnet_00000000000000090["todayorder-db-a<br/>10.0.20.0/24 · isolated"]
+      nat_0000000000000009a{{"todayorder-nat-a<br/>NAT GW"}}
     end
     subgraph us_east_1b["us-east-1b"]
-      subnet_0000000000000010a["todayorder-public-b<br/>10.0.1.0/24 · public"]
-      subnet_0000000000000010e["todayorder-app-b<br/>10.0.11.0/24 · private"]
-      subnet_00000000000000112["todayorder-db-b<br/>10.0.21.0/24 · isolated"]
-      nat_0000000000000011e{{"todayorder-nat-b<br/>NAT GW"}}
+      subnet_0000000000000008a["todayorder-public-b<br/>10.0.1.0/24 · public"]
+      subnet_0000000000000008e["todayorder-app-b<br/>10.0.11.0/24 · private"]
+      subnet_00000000000000092["todayorder-db-b<br/>10.0.21.0/24 · isolated"]
+      nat_0000000000000009e{{"todayorder-nat-b<br/>NAT GW"}}
     end
-    vpce_00000000000000140[/"s3 Gateway 엔드포인트"/]
-    vpce_00000000000000146[/"sqs Interface 엔드포인트"/]
+    vpce_000000000000000b8[/"s3 Gateway 엔드포인트"/]
+    vpce_000000000000000be[/"sqs Interface 엔드포인트"/]
   end
-  tgw_000000000000000b6(["tgw-000000000000000b6<br/>Transit Gateway"])
-  subnet_00000000000000108 -->|"0.0.0.0/0"| igw_00000000000000114
-  subnet_0000000000000010a -->|"0.0.0.0/0"| igw_00000000000000114
-  subnet_0000000000000010c -->|"0.0.0.0/0"| nat_0000000000000011a
-  subnet_0000000000000010c -->|"pl-e9da6b72"| vpce_00000000000000140
-  subnet_0000000000000010c -->|"10.20.0.0/16"| tgw_000000000000000b6
-  subnet_0000000000000010e -->|"0.0.0.0/0"| nat_0000000000000011e
-  subnet_0000000000000010e -->|"pl-e9da6b72"| vpce_00000000000000140
-  subnet_0000000000000010e -->|"10.20.0.0/16"| tgw_000000000000000b6
-  nat_0000000000000011a -.- subnet_00000000000000108
-  nat_0000000000000011e -.- subnet_0000000000000010a
+  tgw_000000000000000d0(["tgw-000000000000000d0<br/>Transit Gateway"])
+  subnet_00000000000000088 -->|"0.0.0.0/0"| igw_00000000000000094
+  subnet_0000000000000008a -->|"0.0.0.0/0"| igw_00000000000000094
+  subnet_0000000000000008c -->|"0.0.0.0/0"| nat_0000000000000009a
+  subnet_0000000000000008c -->|"pl-e9da6b72"| vpce_000000000000000b8
+  subnet_0000000000000008c -->|"10.20.0.0/16"| tgw_000000000000000d0
+  subnet_0000000000000008e -->|"0.0.0.0/0"| nat_0000000000000009e
+  subnet_0000000000000008e -->|"pl-e9da6b72"| vpce_000000000000000b8
+  subnet_0000000000000008e -->|"10.20.0.0/16"| tgw_000000000000000d0
+  nat_0000000000000009a -.- subnet_00000000000000088
+  nat_0000000000000009e -.- subnet_0000000000000008a
   subgraph sgchain["보안 그룹 체이닝"]
-    anywhere(("0.0.0.0/0")) ==>|"tcp 443"| sg_00000000000000137["todayorder-alb-sg"]
-    sg_00000000000000137["todayorder-alb-sg"] ==>|"tcp 8080"| sg_00000000000000139["todayorder-app-sg"]
-    sg_00000000000000139["todayorder-app-sg"] ==>|"tcp 5432"| sg_0000000000000013b["todayorder-db-sg"]
+    anywhere(("0.0.0.0/0")) ==>|"tcp 443"| sg_000000000000000a9["todayorder-alb-sg"]
+    sg_000000000000000a9["todayorder-alb-sg"] ==>|"tcp 8080"| sg_000000000000000ab["todayorder-app-sg"]
+    sg_000000000000000ab["todayorder-app-sg"] ==>|"tcp 5432"| sg_000000000000000ad["todayorder-db-sg"]
   end
 ```
 서브넷 6개 · 티어: isolated, isolated, private, private, public, public

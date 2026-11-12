@@ -95,24 +95,24 @@ NAT 게이트웨이는 만든 직후 `pending`이고, waiter가 `available`이 �
 {
     "NatGateways": [
         {
-            "CreateTime": "2026-11-12T12:30:30.960709+00:00",
+            "CreateTime": "2026-11-12T20:38:05.059648+00:00",
             "NatGatewayAddresses": [
                 {
-                    "AllocationId": "eipalloc-000000000000000a8",
-                    "NetworkInterfaceId": "eni-000000000000000a9",
+                    "AllocationId": "eipalloc-00000000000000098",
+                    "NetworkInterfaceId": "eni-00000000000000099",
                     "PrivateIp": "10.0.0.4",
                     "PublicIp": "54.0.0.2",
-                    "AssociationId": "eipassoc-000000000000000ab",
+                    "AssociationId": "eipassoc-0000000000000009b",
                     "IsPrimary": true,
                     "Status": "succeeded",
                     "AvailabilityZone": "us-east-1a",
                     "AvailabilityZoneId": "use1-az1"
                 }
             ],
-            "NatGatewayId": "nat-000000000000000aa",
+            "NatGatewayId": "nat-0000000000000009a",
             "State": "available",
-            "SubnetId": "subnet-00000000000000098",
-            "VpcId": "vpc-00000000000000090",
+            "SubnetId": "subnet-00000000000000088",
+            "VpcId": "vpc-00000000000000080",
             "Tags": [
                 {
                     "Key": "Name",
@@ -137,14 +137,14 @@ lab02의 결과 표 3과 단언(레슨 2에서 본 출력):
 -----------------------------------------------------------------------------------------
 |                                  DescribeNatGateways                                  |
 +------------------+------------+----------------------------+-------------+------------+
-|  todayorder-nat-a|  available |  subnet-00000000000000098  |  us-east-1a |  54.0.0.2  |
-|  todayorder-nat-b|  available |  subnet-0000000000000009a  |  us-east-1b |  54.0.0.3  |
+|  todayorder-nat-a|  available |  subnet-00000000000000088  |  us-east-1a |  54.0.0.2  |
+|  todayorder-nat-b|  available |  subnet-0000000000000008a  |  us-east-1b |  54.0.0.3  |
 +------------------+------------+----------------------------+-------------+------------+
   ✔ 서브넷 수: 6
   ✔ /24 서브넷의 사용 가능 IP (256 - 예약 5): 251
   ✔ NAT 게이트웨이 available 수: 2
-  ✔ public-a 의 기본 경로: igw-000000000000000a4
-  ✔ app-a 의 기본 경로 = 같은 AZ의 NAT(nat-a): nat-000000000000000aa
+  ✔ public-a 의 기본 경로: igw-00000000000000094
+  ✔ app-a 의 기본 경로 = 같은 AZ의 NAT(nat-a): nat-0000000000000009a
   ✔ db-a 에서 인터넷으로: DROP(경로 없음)
 LAB02 OK
 ```
