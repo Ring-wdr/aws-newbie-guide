@@ -1,0 +1,72 @@
+# M00. 오리엔테이션과 실습 환경
+
+> 시나리오: TodayOrder 입사 첫날. 서버 한 대짜리 주문 서비스를 AWS로 옮기기 전에, 내 노트북에 "AWS처럼 대답하는 서버"를 띄우고 도구 사용법을 익힌다.
+> 예상 시간: 약 3시간 (설치 포함)
+
+## 목표
+
+- 에뮬레이터를 띄우고, CLI·boto3가 실제 AWS가 아니라 **에뮬레이터를 향하는지 확인**할 수 있다.
+- 리전·가용 영역·엣지 로케이션·Local Zones·Wavelength와 공동 책임 모델을 설명할 수 있다.
+- 에뮬레이터가 무엇을 재현하고 무엇을 재현하지 않는지 알고, 충실도 등급(🟢/🟡/🔴)을 읽을 수 있다.
+- AWS CLI의 `--query`·`--output`·페이지네이션·`wait`, boto3의 client·paginator·waiter를 쓸 수 있다.
+
+## 레슨
+
+| # | 레슨 | 시간 | 등급 |
+|---|---|---|---|
+| 1 | [클라우드와 AWS 글로벌 인프라](./01-cloud-and-global-infrastructure.md) | 35분 | 🟢 |
+| 2 | [aws-emulator란 무엇이고 무엇이 아닌가](./02-what-is-aws-emulator.md) | 30분 | 🟢 |
+| 3 | [환경 설치](./03-environment-setup.md) | 40분 | 🟢 |
+| 4 | [첫 요청 해부: sts get-caller-identity, SigV4, --debug](./04-first-request-anatomy.md) | 35분 | 🟢 |
+| 5 | [AWS CLI 생존 기술과 boto3 기본기](./05-cli-and-boto3-survival.md) | 45분 | 🟢 |
+
+**레슨 3부터 시작해도 된다.** 환경을 먼저 만들어 두면 레슨 1·2의 "직접 해 보기"도 바로 따라 할 수 있다.
+
+## 실습
+
+| 실습 | 스크립트 | 레슨 | 등급 |
+|---|---|---|---|
+| 에뮬레이터 기동·헬스 체크 | [labs/lab01-emulator-health.sh](./labs/lab01-emulator-health.sh) | 3 | 🟢 |
+| S3 버킷 왕복 | [labs/lab02-s3-roundtrip.sh](./labs/lab02-s3-roundtrip.sh) | 3, 5 | 🟢 |
+| 검증 오류 관찰 (DynamoDB 테이블명 2글자) | [labs/lab03-validation-error.sh](./labs/lab03-validation-error.sh) | 4 | 🟢 |
+| CLI 생존 기술 (`--query`, `--output`, 페이지네이션, `wait`) | [labs/lab04-cli-survival.sh](./labs/lab04-cli-survival.sh) | 5 | 🟢 |
+| 에뮬레이터가 AWS와 다른 곳 (501, IAM 부분 평가) | [labs/lab05-emulator-limits.sh](./labs/lab05-emulator-limits.sh) | 2 | 🟢 |
+| 같은 작업을 boto3로 (S3 왕복) | [sdk/s3_roundtrip.py](./sdk/s3_roundtrip.py) | 5 | 🟢 |
+| boto3 client·resource·paginator·waiter | [sdk/client_resource_paginator_waiter.py](./sdk/client_resource_paginator_waiter.py) | 5 | 🟢 |
+
+전부 한 번에 검증:
+
+```bash
+export EMULATOR_PORT=9297          # 대화형 터미널이면 생략 가능
+curriculum/m00-orientation/labs/verify.sh
+```
+
+`verify.sh`는 에뮬레이터를 재시작해 깨끗한 상태로 만든 뒤, 모든 lab을 **두 번씩**(멱등성 확인) 실행하고 sdk 예제를 실행한다. 마지막 줄이 `MODULE m00 OK`면 통과.
+
+정리 자료: [cheatsheet.md](./cheatsheet.md) · [quiz.md](./quiz.md)
+
+## 이 모듈이 만든 공용 환경
+
+| 경로 | 내용 |
+|---|---|
+| [`scripts/install.sh`](../../scripts/install.sh) | 필수 프로그램 확인·설치, Colima 시작, 이미지 빌드, `uv sync` |
+| [`scripts/emulator-up.sh`](../../scripts/emulator-up.sh) `[포트]` | 포트별 에뮬레이터 컨테이너(`aws-emulator-<포트>`) 시작 |
+| [`scripts/emulator-down.sh`](../../scripts/emulator-down.sh) `[포트\|--all]` · [`emulator-reset.sh`](../../scripts/emulator-reset.sh) `[포트]` · [`emulator-status.sh`](../../scripts/emulator-status.sh) | 끄기 · 재시작(초기화) · 상태 |
+| [`scripts/env.sh`](../../scripts/env.sh) | `source` 해서 쓰는 환경 설정 + 안전 장치(계정 `000000000000` 확인) |
+| [`tools/probe/`](../../tools/probe/) · [`docs/FIDELITY.md`](../../docs/FIDELITY.md) | 충실도 탐침과 그 결과 보고서 |
+
+## 에뮬레이터 제약
+
+이 모듈의 실습은 모두 🟢이다. 다만 이 모듈에서 관찰한 다음 차이는 다른 모듈에도 영향을 준다(상세는 [FIDELITY.md](../../docs/FIDELITY.md)).
+
+| 오퍼레이션 / 동작 | 증상 |
+|---|---|
+| `organizations:CreatePolicy` | `501 NotImplemented` (SCP 생성 불가) |
+| IAM 정책 평가 | IAM·EC2·KMS 등은 평가하지만 S3·SQS·DynamoDB는 평가하지 않는다. 정책 없는 사용자가 S3 버킷을 만들 수 있다 |
+| `DescribeAvailabilityZones`, `DescribeRegions` | 고정 목록(리전 17개, 리전당 AZ 3개). 실제 AWS의 숫자와 다르다 |
+| DynamoDB `CreateTable` | boto3로 만들면 곧바로 `ACTIVE`. 실제 AWS는 잠시 `CREATING` |
+
+## 설계 대비 대체 사유
+
+- CURRICULUM.md의 M00 실습 4개(기동·헬스 체크, S3 왕복, boto3, 검증 오류)를 모두 그대로 구현했다.
+- 추가: lab04(CLI 생존 기술, 레슨 5의 실습)와 lab05(에뮬레이터 한계 관찰, 레슨 2의 실습). 레슨 내용을 직접 실행해 보게 하려는 것으로, 대체가 아니라 보강이다.
