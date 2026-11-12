@@ -124,14 +124,15 @@ aws: [ERROR]: An error occurred (InsufficientDeliveryPolicyException) when calli
 기록 중: True
 == 3. 평가 대상: 버전 관리를 켠 버킷 1개, 끈 버킷 1개
 == 4. AWS 관리형 규칙 S3_BUCKET_VERSIONING_ENABLED
-todayorder-m09-unversioned-1794496757   NON_COMPLIANT
-todayorder-m09-versioned-1794496757     COMPLIANT
+todayorder-m09-unversioned-1794498333   NON_COMPLIANT
+todayorder-m09-versioned-1794498333     COMPLIANT
 규칙 전체 판정(하나라도 위반이면 NON_COMPLIANT): NON_COMPLIANT
 == 5. 고친다 → 다시 평가 → COMPLIANT
-todayorder-m09-unversioned-1794496757: NON_COMPLIANT → COMPLIANT
+todayorder-m09-unversioned-1794498333: NON_COMPLIANT → COMPLIANT
 == 6. 구성 이력 — 이 버킷의 구성 항목(configuration item)이 시간순으로 쌓인다
-2026-11-13T00:19:38.628578+09:00	OK
-2026-11-13T00:19:33.487814+09:00	ResourceDiscovered
+2026-11-13T00:45:53.241914+09:00	OK
+2026-11-13T00:45:49.698437+09:00	OK
+2026-11-13T00:45:48.808302+09:00	ResourceDiscovered
 ```
 
 방금 본 것:
@@ -142,14 +143,21 @@ todayorder-m09-unversioned-1794496757: NON_COMPLIANT → COMPLIANT
 ```
 == 7. 자동 수정(remediation): 위반 리소스에 SSM Automation 문서 AWS-ConfigureS3BucketVersioning 실행
 0
--- 버전 관리 없이 새 버킷을 만든다: todayorder-m09-autofix-1794496757
-todayorder-m09-autofix-1794496757	SUCCEEDED
-todayorder-m09-autofix-1794496757 버전 관리: Enabled (사람이 켜지 않았다)
--- 정리: 자동 수정은 계정의 모든 버킷에 적용되므로 실습이 끝나면 지운다
+-- 버전 관리 없이 새 버킷을 만든다: todayorder-m09-autofix-1794498333
+todayorder-m09-autofix-1794498333	SUCCEEDED
+todayorder-m09-autofix-1794498333 버전 관리: Enabled (사람이 켜지 않았다)
+태그 없는 todayorder-m09-config-logs 버전 관리: None (규칙 범위 밖이라 건드리지 않음)
+-- 정리: 자동 수정 설정은 실습이 끝나면 지운다 (범위를 태그로 좁혔어도, 남겨 두면 이후 태그 붙은 버킷에 계속 손을 댄다)
 LAB08 OK
 ```
 
-방금 본 것: 자동 수정을 켜 두면 **새로 만든 위반 버킷의 버전 관리를 Config가 SSM Automation으로 직접 켠다.** 수정이 쓸 역할은 `ssm.amazonaws.com`이 맡고 `s3:PutBucketVersioning`만 할 수 있게 최소 권한으로 만들었다. 이 실습을 만들면서 겪은 함정: 자동 수정 설정을 지우지 않고 규칙만 지웠다가 다시 만들자, **이후 만든 모든 버킷에 버전 관리가 저절로 켜져** 실습이 엉뚱하게 COMPLIANT를 냈다. 그래서 스크립트는 시작과 끝에 자동 수정 설정을 먼저 지운다.
+방금 본 것: 자동 수정을 켜 두면 **새로 만든 위반 버킷의 버전 관리를 Config가 SSM Automation으로 직접 켠다.** 수정이 쓸 역할은 `ssm.amazonaws.com`이 맡고 `s3:PutBucketVersioning`만 할 수 있게 최소 권한으로 만들었다.
+
+이 실습을 만들면서 겪은 함정 두 가지:
+1. 처음에는 규칙 범위를 "모든 S3 버킷"으로 두었더니, 자동 수정이 **CloudTrail 로그 버킷 같은 다른 실습의 버킷까지 버전 관리를 켜 버렸다.** 그 버킷은 `aws s3 rb --force`로 지워지지 않게 됐다(옛 버전이 남으므로). 그래서 규칙 범위를 **태그 `lab=m09-lab08`** 인 버킷으로 좁혔다(`Scope.TagKey/TagValue`) — 태그 없는 로그 버킷은 그대로 `None`이다.
+2. 규칙만 지우고 자동 수정 설정을 남겨 두면, 같은 이름으로 규칙을 다시 만들었을 때 수정이 다시 붙어 버린다. 스크립트는 시작과 끝에 **자동 수정 설정부터** 지운다.
+
+운영에서도 똑같다. 자동 수정은 범위를 좁게, 먼저 수동 수정으로 검증한 뒤 자동으로 바꾼다.
 
 ## 실제 AWS에서는
 

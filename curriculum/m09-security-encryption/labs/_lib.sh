@@ -50,6 +50,23 @@ for a in json.loads(sys.stdin.read() or "{}").get("Aliases", []):
   fi
 }
 
+# nuke_bucket <버킷> — 버전 관리가 켜진 버킷까지 모든 객체 버전·삭제 마커를 지우고 버킷을 지운다.
+# (aws s3 rb --force 는 옛 버전을 지우지 못해 버전 관리 버킷에서는 실패한다)
+nuke_bucket() {
+  aws s3api head-bucket --bucket "$1" >/dev/null 2>&1 || return 0
+  aws s3 rm "s3://$1" --recursive >/dev/null 2>&1 || true
+  local batch
+  while :; do
+    batch="$(aws s3api list-object-versions --bucket "$1" --max-items 500 --output json | py '
+d = json.loads(sys.stdin.read() or "{}")
+objs = [{"Key": o["Key"], "VersionId": o["VersionId"]} for o in d.get("Versions", []) + d.get("DeleteMarkers", [])]
+print(json.dumps({"Objects": objs, "Quiet": True}) if objs else "")')"
+    [ -n "$batch" ] || break
+    aws s3api delete-objects --bucket "$1" --delete "$batch" >/dev/null
+  done
+  aws s3api delete-bucket --bucket "$1"
+}
+
 # delete_iam_user <이름> — 액세스 키·인라인/관리형 정책을 정리하고 사용자를 지운다.
 delete_iam_user() {
   aws iam get-user --user-name "$1" >/dev/null 2>&1 || return 0

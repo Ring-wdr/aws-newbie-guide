@@ -16,8 +16,8 @@ cd "$WORK"
 
 # ---- 이전 실행 정리 (멱등)
 aws cloudtrail delete-trail --name "$TRAIL" >/dev/null 2>&1 || true
-aws s3 rb "s3://$BUCKET" --force >/dev/null 2>&1 || true
-aws s3 rb "s3://$PROBE_BUCKET" --force >/dev/null 2>&1 || true
+nuke_bucket "$BUCKET"
+nuke_bucket "$PROBE_BUCKET"
 delete_iam_user "$SUSPECT"
 
 echo "== 1. 로그 버킷 — 정책 없이 추적을 만들면? (실패해야 정상)"

@@ -15,7 +15,7 @@ WORK="$TMP_LIB"
 cd "$WORK"
 command -v openssl >/dev/null || fail "openssl 이 필요합니다 (macOS·Linux 기본 포함)"
 reset_alias "$ALIAS"
-aws s3 rb "s3://$BUCKET" --force >/dev/null 2>&1 || true
+nuke_bucket "$BUCKET"
 
 KEY="$(aws kms create-key --description "TodayOrder 내보내기 파일 키" --query KeyMetadata.KeyId --output text)"
 aws kms create-alias --alias-name "$ALIAS" --target-key-id "$KEY"

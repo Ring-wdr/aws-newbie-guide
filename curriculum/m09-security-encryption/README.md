@@ -69,12 +69,11 @@ curriculum/m09-security-encryption/labs/verify.sh
 | SSM 공개 파라미터 `/aws/service/global-infrastructure/...` | 비어 있음 | 사용 안 함 |
 | ACM DNS 검증 | Route 53에 검증 CNAME을 넣어도 `PENDING_VALIDATION`에서 바뀌지 않음. `.example`·`.test`·`.local` 도메인은 곧 `FAILED`(`ADDITIONAL_VERIFICATION_REQUIRED`) | 요청 🟡 / 발급 🔴. DNS 검증 요청은 `todayorder.kr`로 |
 | CloudTrail `LookupEvents` | IAM 이벤트는 나오지만 **S3·KMS 이벤트는 나오지 않음**. `sourceIPAddress`가 `null`. 로그 파일은 거의 즉시 S3에 씀 | 🟡. 단언은 IAM 이벤트로 |
-| Config 자동 수정 | `Automatic=true` 자동 수정이 **실제로 실행**되어 버킷 버전 관리를 켬. 규칙을 지워도 수정 설정이 남아 같은 이름의 규칙에 다시 붙음 | lab08 7단계에서 시연, 시작·끝에 수정 설정 삭제 |
+| Config 자동 수정 | `Automatic=true` 자동 수정이 **실제로 실행**되어 버킷 버전 관리를 켬(규칙 범위의 모든 위반 리소스). 규칙을 지워도 수정 설정이 남아 같은 이름의 규칙에 다시 붙음 | lab08 7단계에서 시연. 규칙 범위를 태그로 좁히고, 시작·끝에 수정 설정 삭제 |
 | Config 평가 결과 | 지운 버킷의 평가 결과를 이름으로 기억 | 평가 대상 버킷 이름에 실행마다 다른 접미사 |
 | GuardDuty | 실제 위협 탐지 없음(샘플 결과만). 결과가 EventBridge(`source=aws.guardduty`)로 전달되지 않았고 Security Hub에도 모이지 않음 | 🟡 |
 | Inspector·Macie·Security Hub·Detective | 활성화·상태 조회까지. Audit Manager `GetAccountStatus`는 501 | 상태 읽기만 |
 | Network Firewall | 규칙 그룹·정책 생성은 되지만 트래픽 검사 없음 | 🟡 구성만 |
-| (환경) | `verify.sh` 2회차 실행 중 포트 9308 컨테이너가 재시작되어 이후 lab들이 자격 증명 불일치로 실패한 적이 있다(원인 미상, 메모리 상한 1g 근처일 가능성). 재실행하면 통과 | 아래 PR 기록 참고 |
 
 ## 설계 대비 대체 사유
 

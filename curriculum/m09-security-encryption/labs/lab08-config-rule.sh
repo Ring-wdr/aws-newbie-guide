@@ -24,7 +24,7 @@ aws configservice delete-config-rule --config-rule-name "$RULE" >/dev/null 2>&1 
 aws configservice stop-configuration-recorder --configuration-recorder-name default >/dev/null 2>&1 || true
 aws configservice delete-delivery-channel --delivery-channel-name default >/dev/null 2>&1 || true
 for b in "$LOG_BUCKET" $(aws s3api list-buckets --query 'Buckets[?starts_with(Name, `todayorder-m09-versioned-`) || starts_with(Name, `todayorder-m09-unversioned-`) || starts_with(Name, `todayorder-m09-autofix-`)].Name' --output text); do
-  aws s3 rb "s3://$b" --force >/dev/null 2>&1 || true
+  nuke_bucket "$b"
 done
 delete_role "$ROLE"
 delete_role "$FIX_ROLE"
@@ -60,16 +60,18 @@ recording="$(aws configservice describe-configuration-recorder-status --query 'C
 echo "기록 중: $recording"
 
 echo "== 3. 평가 대상: 버전 관리를 켠 버킷 1개, 끈 버킷 1개"
-aws s3 mb "s3://$OK_BUCKET" >/dev/null
+# 규칙 범위를 태그 lab=m09-lab08 인 버킷으로 좁힌다 — 자동 수정이 계정의 다른 버킷(로그 버킷 등)을 건드리지 않게
+tag() { aws s3api put-bucket-tagging --bucket "$1" --tagging 'TagSet=[{Key=lab,Value=m09-lab08}]'; }
+aws s3 mb "s3://$OK_BUCKET" >/dev/null && tag "$OK_BUCKET"
 aws s3api put-bucket-versioning --bucket "$OK_BUCKET" --versioning-configuration Status=Enabled
-aws s3 mb "s3://$BAD_BUCKET" >/dev/null
+aws s3 mb "s3://$BAD_BUCKET" >/dev/null && tag "$BAD_BUCKET"
 
 echo "== 4. AWS 관리형 규칙 S3_BUCKET_VERSIONING_ENABLED"
 aws configservice put-config-rule --config-rule "{
   \"ConfigRuleName\": \"$RULE\",
   \"Description\": \"영수증 버킷은 버전 관리가 켜져 있어야 한다\",
   \"Source\": {\"Owner\": \"AWS\", \"SourceIdentifier\": \"S3_BUCKET_VERSIONING_ENABLED\"},
-  \"Scope\": {\"ComplianceResourceTypes\": [\"AWS::S3::Bucket\"]}}"
+  \"Scope\": {\"ComplianceResourceTypes\": [\"AWS::S3::Bucket\"], \"TagKey\": \"lab\", \"TagValue\": \"m09-lab08\"}}"
 aws configservice start-config-rules-evaluation --config-rule-names "$RULE"
 compliance_of() {
   aws configservice get-compliance-details-by-config-rule --config-rule-name "$RULE" --output json | py '
@@ -111,14 +113,16 @@ aws configservice put-remediation-configurations --remediation-configurations "[
   \"Parameters\": {\"BucketName\": {\"ResourceValue\": {\"Value\": \"RESOURCE_ID\"}},
                    \"AutomationAssumeRole\": {\"StaticValue\": {\"Values\": [\"$FIX_ROLE_ARN\"]}}}}]" --query 'length(FailedBatches)' --output text
 echo "-- 버전 관리 없이 새 버킷을 만든다: $AUTO_BUCKET"
-aws s3 mb "s3://$AUTO_BUCKET" >/dev/null
+aws s3 mb "s3://$AUTO_BUCKET" >/dev/null && tag "$AUTO_BUCKET"
 aws configservice start-config-rules-evaluation --config-rule-names "$RULE"
 poll 120 "자동 수정으로 버전 관리 켜짐" sh -c "aws s3api get-bucket-versioning --bucket '$AUTO_BUCKET' --query Status --output text | grep -qx Enabled"
 aws configservice describe-remediation-execution-status --config-rule-name "$RULE" \
   --query "RemediationExecutionStatuses[?ResourceKey.resourceId=='$AUTO_BUCKET'].[ResourceKey.resourceId, State]" --output text
 auto_versioning="$(aws s3api get-bucket-versioning --bucket "$AUTO_BUCKET" --query Status --output text)"
 echo "$AUTO_BUCKET 버전 관리: $auto_versioning (사람이 켜지 않았다)"
-echo "-- 정리: 자동 수정은 계정의 모든 버킷에 적용되므로 실습이 끝나면 지운다"
+log_versioning="$(aws s3api get-bucket-versioning --bucket "$LOG_BUCKET" --query Status --output text)"
+echo "태그 없는 $LOG_BUCKET 버전 관리: $log_versioning (규칙 범위 밖이라 건드리지 않음)"
+echo "-- 정리: 자동 수정 설정은 실습이 끝나면 지운다 (범위를 태그로 좁혔어도, 남겨 두면 이후 태그 붙은 버킷에 계속 손을 댄다)"
 aws configservice delete-remediation-configuration --config-rule-name "$RULE"
 
 # ---- 단언
@@ -128,4 +132,5 @@ assert_eq "$bad_before" "NON_COMPLIANT" "버전 관리 꺼진 버킷"
 assert_eq "$ok_before" "COMPLIANT" "버전 관리 켜진 버킷"
 assert_eq "$bad_after" "COMPLIANT" "수정 후 재평가"
 assert_eq "$auto_versioning" "Enabled" "자동 수정 결과"
+assert_eq "$log_versioning" "None" "범위 밖 버킷은 자동 수정 대상이 아님"
 echo "LAB08 OK"
