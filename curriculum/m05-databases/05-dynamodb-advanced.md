@@ -479,6 +479,10 @@ aws: [ERROR]: An error occurred (InvalidRestoreTimeException) when calling the R
 - TTL은 만료 후 보통 며칠 이내 삭제되며, 에뮬레이터처럼 수 초가 아니다.
 - 글로벌 테이블: 각 리전에서 쓰고 읽을 수 있고, 트랜잭션은 **쓴 리전 안에서만** ACID다(다른 리전에는 부분적으로 보일 수 있다).
 
+> **실제 AWS에서 해 보려면** (🟡 실습 — lab08의 PITR·글로벌 테이블)
+> - 과금 주의: 작은 테이블과 온디맨드 모드면 요청 요금은 아주 적지만, **PITR**은 켜 둔 동안 테이블 크기만큼, **온디맨드 백업**은 지울 때까지 과금된다. **글로벌 테이블**은 복제본 리전마다 저장·복제 쓰기 요금과 리전 간 전송 요금이 붙는다(프리 티어 적용 여부와 한도는 계정 생성 시기에 따라 다르니 [AWS 프리 티어 페이지](https://aws.amazon.com/free/)에서 확인).
+> - 정리: 복제본부터 지운다 `aws dynamodb update-table --table-name <표> --replica-updates 'Delete={RegionName=us-west-2}'` → `aws dynamodb delete-backup --backup-arn <arn>` → 복원으로 만든 표와 원본 표를 `aws dynamodb delete-table --table-name <표>`.
+
 ## 시험 포인트
 
 - "기존 테이블에 새 조회 패턴(다른 파티션 키)" → **GSI**. "같은 파티션 키, 다른 정렬 + 강력 일관" → **LSI**(테이블 생성 시에만 — 나중에 필요하면 새 테이블).
