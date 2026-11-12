@@ -12,6 +12,13 @@
 # 확인되지 않으면 0이 아닌 값으로 반환한다. 실습 스크립트는 set -e 상태에서 이 파일을
 # source 하므로, 안전 장치가 실패하면 실습은 실제 AWS에 요청을 보내기 전에 멈춘다.
 
+# 이 파일이 있는 scripts/ 디렉터리 (bash·zsh 공통. zsh 문법은 bash 가 파싱하지 않도록 eval 로 감싼다)
+if [ -n "${ZSH_VERSION:-}" ]; then
+  eval '_emu_env_dir="${${(%):-%x}:A:h}"'
+else
+  _emu_env_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+fi
+
 _emu_env_fail() {
   printf '\033[31m[env.sh] %s\033[0m\n' "$1" >&2
   [ -n "${2:-}" ] && printf '         %s\n' "$2" >&2
@@ -70,12 +77,43 @@ _emu_env_main() {
     https://127.0.0.1:*) ;;
     *) _emu_env_fail "엔드포인트가 로컬 에뮬레이터가 아닙니다: $AWS_ENDPOINT_URL"; return 1 ;;
   esac
-  local account
+  local account errfile errtext
+  errfile="$(mktemp)"
   # --endpoint-url 을 명시해, 환경 변수를 무시하는 오래된 CLI에서도 실제 AWS로 나가지 않게 한다.
   account="$(aws sts get-caller-identity --endpoint-url "$AWS_ENDPOINT_URL" \
     --cli-connect-timeout 3 --cli-read-timeout 10 \
-    --query Account --output text 2>/dev/null)" || account=""
+    --query Account --output text 2>"$errfile")" || account=""
+  errtext="$(cat "$errfile")"
+  rm -f "$errfile"
   if [ "$account" != "000000000000" ]; then
+    # 원인 진단 1: 메모리 초과(OOM)로 컨테이너가 죽었는가 (Lambda 를 많이 호출하면 메모리가 계속 늘어난다)
+    local cstate=""
+    if command -v docker >/dev/null 2>&1; then
+      cstate="$(docker container inspect -f '{{.State.Status}} {{.State.ExitCode}} {{.State.OOMKilled}}' "aws-emulator-$port" 2>/dev/null)" || cstate=""
+    fi
+    case "$cstate" in
+      *" 137 "* | *" true")
+        _emu_env_fail "포트 $port 의 에뮬레이터가 메모리 상한을 넘어 강제 종료됐습니다 (컨테이너 상태: $cstate — 종료 코드 137/OOMKilled). 만든 리소스는 모두 사라졌습니다." \
+          "scripts/emulator-reset.sh $port 로 다시 띄우세요. 자주 반복되면 EMULATOR_MEMORY=3g scripts/emulator-reset.sh $port (M00 레슨 3 문제 해결)."
+        return 1
+        ;;
+      exited*)
+        _emu_env_fail "포트 $port 의 에뮬레이터 컨테이너가 종료돼 있습니다 (상태: $cstate)." "scripts/emulator-reset.sh $port 로 다시 띄우세요."
+        return 1
+        ;;
+    esac
+    # 원인 진단 2: 시계 어긋남(노트북 수면 후 VM 시계)이면 해결 방법을 따로 알려 준다.
+    if ! bash "$_emu_env_dir/clock-check.sh" "$port"; then
+      _emu_env_fail "안전 장치: 시계 어긋남 때문에 에뮬레이터가 서명을 거부했습니다 (위 [clock-check] 안내대로 VM 시계를 맞춘 뒤 다시 source 하세요)."
+      return 1
+    fi
+    case "$errtext" in
+      *SignatureDoesNotMatch* | *RequestTimeTooSkewed* | *InvalidSignatureException*)
+        _emu_env_fail "안전 장치: 에뮬레이터가 서명을 거부했습니다 ($(printf '%s' "$errtext" | tr '\n' ' ' | cut -c1-160))." \
+          "에뮬레이터를 재시작했다면 'source scripts/env.sh' 를 다시, 노트북이 잠들었었다면 bash scripts/clock-check.sh $port 로 시계를 확인하세요."
+        return 1
+        ;;
+    esac
     _emu_env_fail "안전 장치: 요청이 에뮬레이터로 간다는 것을 확인하지 못했습니다 (Account='${account:-응답 없음}')." \
       "실제 AWS에 요청을 보낼 위험이 있어 중단합니다. 'scripts/emulator-status.sh' 로 포트 $port 의 에뮬레이터가 떠 있는지 확인하세요."
     return 1
@@ -87,6 +125,7 @@ _emu_env_main() {
 _emu_env_main
 _emu_env_rc=$?
 unset -f _emu_env_main _emu_env_fail
+unset _emu_env_dir
 if [ "$_emu_env_rc" -ne 0 ]; then
   unset _emu_env_rc
   # source 된 경우 return, 실수로 직접 실행한 경우 exit
