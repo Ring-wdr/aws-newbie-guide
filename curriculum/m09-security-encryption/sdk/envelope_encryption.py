@@ -96,13 +96,13 @@ def local_decrypt(data_key: bytes, box: dict[str, str], aad: bytes) -> bytes:
 
 def seal(kms, key_id: str, plaintext: bytes, context: dict[str, str]) -> dict[str, Any]:  # type: ignore[no-untyped-def]
     """봉투 암호화: 데이터 키를 받아 로컬에서 암호화하고, 평문 키는 버린다."""
+    # 평문 데이터 키는 이 함수 안에서만 쓰고 바깥으로 돌려주지 않는다.
+    # 솔직하게: 파이썬은 bytes 객체를 덮어쓸 수 없고 언제 메모리에서 지워질지(GC)도 보장하지 않는다.
+    # 응답 dict(dk) 에도 같은 평문이 들어 있으므로 "del data_key" 같은 것으로는 아무것도 지워지지 않는다.
+    # 할 수 있는 것은 평문 키를 반환·저장·로그하지 않고 짧은 범위에서만 쓰는 것뿐이다.
     dk = kms.generate_data_key(KeyId=key_id, KeySpec="AES_256", EncryptionContext=context)
-    data_key = dk["Plaintext"]
-    try:
-        aad = json.dumps(context, sort_keys=True).encode()
-        box = local_encrypt(data_key, plaintext, aad)
-    finally:
-        del data_key  # 파이썬에서는 메모리를 확실히 지울 수 없다 — 참조라도 빨리 끊는다
+    aad = json.dumps(context, sort_keys=True).encode()
+    box = local_encrypt(dk["Plaintext"], plaintext, aad)
     return {"encrypted_data_key": base64.b64encode(dk["CiphertextBlob"]).decode(), "context": context, **box}
 
 

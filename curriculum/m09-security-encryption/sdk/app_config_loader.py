@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
@@ -40,9 +41,15 @@ class AppConfig:
 
 
 class ConfigLoader:
-    """Parameter Store + Secrets Manager 를 읽어 AppConfig 를 만든다. ttl 초 동안 캐시한다."""
+    """Parameter Store + Secrets Manager 를 읽어 AppConfig 를 만든다. ttl 초 동안 캐시한다.
 
-    def __init__(self, env: str, secret_id: str, ttl: float = 300.0) -> None:
+    clock 은 테스트에서 시간을 직접 움직일 수 있게 주입한다(기본: time.monotonic).
+    """
+
+    def __init__(
+        self, env: str, secret_id: str, ttl: float = 300.0, clock: Callable[[], float] = time.monotonic
+    ) -> None:
+        self.clock = clock
         self.prefix = f"/todayorder/{env}"
         self.secret_id = secret_id
         self.ttl = ttl
@@ -67,7 +74,7 @@ class ConfigLoader:
         return json.loads(self.sm.get_secret_value(SecretId=self.secret_id)["SecretString"])
 
     def get(self) -> AppConfig:
-        if self._cached and time.monotonic() - self._loaded_at < self.ttl:
+        if self._cached and self.clock() - self._loaded_at < self.ttl:
             return self._cached
         p, s = self._params(), self._secret()
         self._cached = AppConfig(
@@ -78,8 +85,12 @@ class ConfigLoader:
             db_password=s["password"],
             db_host=s["host"],
         )
-        self._loaded_at = time.monotonic()
+        self._loaded_at = self.clock()
         return self._cached
+
+    def invalidate(self) -> None:
+        """캐시를 버린다 — 예: DB 인증 오류가 나면 호출해 교체된 비밀을 다시 읽는다."""
+        self._cached = None
 
 
 def seed(ssm, sm) -> None:  # type: ignore[no-untyped-def]
@@ -112,7 +123,8 @@ def cleanup(ssm, sm) -> None:  # type: ignore[no-untyped-def]
 
 
 def mask(s: str) -> str:
-    return s[:2] + "*" * (len(s) - 2)
+    """비밀은 앞 글자도 찍지 않는다 — 길이만 보여 준다."""
+    return f"<{len(s)}자 숨김>"
 
 
 def main() -> None:
@@ -121,10 +133,12 @@ def main() -> None:
     ssm, sm = boto3.client("ssm"), boto3.client("secretsmanager")
     seed(ssm, sm)
 
-    loader = ConfigLoader(ENV, SECRET_ID, ttl=2.0)
+    # 가짜 시계: 실제 시간을 기다리지 않고 TTL 경과를 흉내 낸다 (실행 속도와 무관한 결정적 테스트)
+    now = [0.0]
+    loader = ConfigLoader(ENV, SECRET_ID, ttl=300.0, clock=lambda: now[0])
     cfg = loader.get()
     print(f"설정 로드: timeout={cfg.timeout_ms}ms origins={cfg.allowed_origins}")
-    print(f"           payment_api_key={mask(cfg.payment_api_key)} db={cfg.db_user}@{cfg.db_host} pw={mask(cfg.db_password)}")
+    print(f"           payment_api_key={mask(cfg.payment_api_key)} db={cfg.db_user}@{cfg.db_host} password={mask(cfg.db_password)}")
     calls_after_first = loader.aws_calls
 
     for _ in range(100):  # 요청 100번 — 캐시 덕분에 AWS 호출은 늘지 않는다
@@ -137,11 +151,14 @@ def main() -> None:
         SecretId=SECRET_ID,
         SecretString=json.dumps({"username": "orders_app", "password": "rotated-pass", "host": "orders-db.internal"}),
     )
+    now[0] += 299.0  # TTL(300초) 직전
     stale = loader.get().db_password
-    time.sleep(2.1)  # TTL(2초)이 지나기를 기다린다 — 캐시 만료 동작을 보여 주기 위한 의도적 대기
+    now[0] += 2.0  # TTL 경과
     fresh = loader.get().db_password
-    print(f"교체 직후(캐시): pw={mask(stale)} → TTL 지난 뒤: pw={mask(fresh)}")
+    print(f"교체 직후(TTL 안, 캐시): {mask(stale)} · TTL 지난 뒤: {mask(fresh)} · 같은 값? {stale == fresh}")
     assert stale == "first-pass" and fresh == "rotated-pass"
+    loader.invalidate()  # 인증 오류 등으로 즉시 다시 읽고 싶을 때
+    assert loader.get().db_password == "rotated-pass"
 
     cleanup(ssm, sm)
     print("정리 완료")

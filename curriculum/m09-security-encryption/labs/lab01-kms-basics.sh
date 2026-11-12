@@ -50,6 +50,8 @@ echo "== 6. 자동 교체(rotation)와 즉시 교체 — 옛 암호문은 그대
 aws kms enable-key-rotation --key-id "$KEY"
 aws kms get-key-rotation-status --key-id "$KEY" --query '{Enabled: KeyRotationEnabled, PeriodDays: RotationPeriodInDays}'
 aws kms rotate-key-on-demand --key-id "$KEY" >/dev/null
+# 즉시 교체는 비동기다(실제 AWS도 같다) — 교체 기록이 보일 때까지 기다린다
+poll 60 "즉시 교체 기록" sh -c "aws kms list-key-rotations --key-id '$KEY' --query 'length(Rotations)' --output text | grep -qv '^0$'"
 aws kms list-key-rotations --key-id "$KEY" --query 'Rotations[].[RotationType, KeyMaterialState]' --output text
 after_rotate="$(aws kms decrypt --ciphertext-blob fileb://cipher.bin --encryption-context orderId=A-1001 --query Plaintext --output text | base64 --decode)"
 echo "교체 후 옛 암호문 복호화: $after_rotate"

@@ -39,7 +39,8 @@ for f in sorted(json.load(sys.stdin)["Findings"], key=lambda f: -f["Severity"]):
     if f["Type"] in seen or f["Type"] not in sys.argv[1:]:
         continue
     seen.add(f["Type"])
-    level = "높음" if f["Severity"] >= 7 else "중간" if f["Severity"] >= 4 else "낮음"
+    sv = f["Severity"]
+    level = "치명" if sv >= 9 else "높음" if sv >= 7 else "중간" if sv >= 4 else "낮음"
     sample = json.loads(f["Service"].get("AdditionalInfo", {}).get("Value", "{}")).get("sample")
     sev, typ, res = f["Severity"], f["Type"], f["Resource"]["ResourceType"]
     print(f"{sev:>4} {level}  {typ:<70} 리소스={res:<12} sample={sample}")' "${TYPES[@]}" | tee findings.txt

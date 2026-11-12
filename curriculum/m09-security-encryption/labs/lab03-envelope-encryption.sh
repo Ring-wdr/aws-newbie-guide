@@ -5,6 +5,8 @@
 #   ② 평문 데이터 키로 "내 컴퓨터에서" 데이터를 AES 로 암호화한 뒤 평문 키는 버리고
 #   ③ 암호화된 데이터 키를 데이터 옆에 같이 저장한다.
 # 여기서 로컬 AES 는 openssl 명령(aes-256-cbc)이 맡는다. (boto3 판은 sdk/envelope_encryption.py)
+# ⚠️ 교육용이다. 운영에 쓰면 안 되는 이유: ① CBC 에 무결성 검사(MAC)가 없다 ② -K <키> 가 명령줄에 있어
+#    실행 중 ps 로 보인다 ③ 평문 키가 잠깐 디스크(권한 700 임시 폴더)에 쓰인다.
 set -euo pipefail
 source "$(git rev-parse --show-toplevel)/scripts/env.sh"
 source "$(dirname "$0")/_lib.sh"
