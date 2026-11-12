@@ -6,14 +6,14 @@
 
 **1.** 영수증 버킷의 객체를 암호화해야 한다. 감사인이 "누가 언제 어떤 키로 복호화했는지 기록이 남아야 하고, 필요하면 키를 꺼서 모든 영수증 접근을 즉시 막을 수 있어야 한다"고 요구한다.
 
-- A. SSE-S3
-- B. SSE-KMS(고객 관리형 키)
+- A. SSE-KMS(고객 관리형 키)
+- B. SSE-S3
 - C. SSE-C
 - D. 버킷 버전 관리
 
 <details><summary>정답과 해설</summary>
 
-**B.** KMS 키 사용은 CloudTrail에 기록되고, 고객 관리형 키는 키 정책·비활성화로 접근을 통제할 수 있다. A는 키 사용 감사·통제가 없다. C는 고객이 키를 요청마다 보내므로 AWS 쪽 감사·중앙 비활성화가 없다. D는 암호화가 아니다.
+**A.** KMS 키 사용은 CloudTrail에 기록되고, 고객 관리형 키는 키 정책·비활성화로 접근을 통제할 수 있다. B는 키 사용 감사·통제가 없다. C는 고객이 키를 요청마다 보내므로 AWS 쪽 감사·중앙 비활성화가 없다. D는 암호화가 아니다.
 </details>
 
 ---
@@ -49,13 +49,13 @@
 **4.** 운영자가 실수로 주문 DB 스냅샷을 암호화한 KMS 키에 `ScheduleKeyDeletion`(30일)을 실행했다. 이틀 뒤 발견했다. 어떻게 하나?
 
 - A. 복구 불가 — 새 키로 다시 암호화한다
-- B. `CancelKeyDeletion` 후 `EnableKey`
+- B. 키 교체(`RotateKeyOnDemand`)를 실행한다
 - C. AWS Support에 키 재료 복구를 요청한다
-- D. 키 교체(`RotateKeyOnDemand`)를 실행한다
+- D. `CancelKeyDeletion` 후 `EnableKey`
 
 <details><summary>정답과 해설</summary>
 
-**B.** 대기 기간 안에는 취소할 수 있고, 취소된 키는 `Disabled` 상태이므로 다시 켠다(lab01 7단계). A는 대기 기간이 지난 뒤의 이야기다. C는 삭제 후에는 AWS도 복구할 수 없다. D는 `PendingDeletion` 상태의 키에 쓸 수 없고(`KMSInvalidStateException`) 문제를 풀지 못한다.
+**D.** 대기 기간 안에는 취소할 수 있고, 취소된 키는 `Disabled` 상태이므로 다시 켠다(lab01 7단계). A는 대기 기간이 지난 뒤의 이야기다. C는 삭제 후에는 AWS도 복구할 수 없다. B는 `PendingDeletion` 상태의 키에 쓸 수 없고(`KMSInvalidStateException`) 문제를 풀지 못한다.
 </details>
 
 ---
@@ -77,27 +77,27 @@
 **6.** 개발·스테이징·운영 환경의 설정값 수백 개를 `/todayorder/<환경>/…` 구조로 관리하고, 서비스는 시작할 때 자기 환경의 값만 한 번에 읽는다. 일부 값은 API 키다. 비용은 최소로.
 
 - A. Secrets Manager 비밀 수백 개
-- B. Parameter Store(Standard) 계층 + API 키는 SecureString, `GetParametersByPath --recursive`
-- C. S3 버킷에 JSON 파일
+- B. S3 버킷에 JSON 파일
+- C. Parameter Store(Standard) 계층 + API 키는 SecureString, `GetParametersByPath --recursive`
 - D. DynamoDB 테이블
 
 <details><summary>정답과 해설</summary>
 
-**B.** 계층 조회와 무료 Standard 티어, SecureString이 요구와 맞는다(lab05). A는 비밀당 월 요금이 들고 계층 조회가 핵심 기능이 아니다. C·D는 접근 제어·암호화·버전 관리를 직접 만들어야 한다.
+**C.** 계층 조회와 무료 Standard 티어, SecureString이 요구와 맞는다(lab05). A는 비밀당 월 요금이 들고 계층 조회가 핵심 기능이 아니다. B·D는 접근 제어·암호화·버전 관리를 직접 만들어야 한다.
 </details>
 
 ---
 
 **7.** 보안 그룹에 0.0.0.0/0으로 22번 포트가 열린 것을 찾았다. 보안팀은 "**누가** 열었는지"와 "**앞으로 이런 설정이 생기면 자동으로 닫히게**"를 원한다.
 
-- A. 누가: Config / 자동: CloudTrail
-- B. 누가: CloudTrail / 자동: Config 규칙 + 자동 수정(SSM Automation)
+- A. 누가: CloudTrail / 자동: Config 규칙 + 자동 수정(SSM Automation)
+- B. 누가: Config / 자동: CloudTrail
 - C. 누가: GuardDuty / 자동: Inspector
 - D. 누가: VPC Flow Logs / 자동: WAF
 
 <details><summary>정답과 해설</summary>
 
-**B.** API 호출의 주체는 CloudTrail(`AuthorizeSecurityGroupIngress` 이벤트), 구성 규칙 위반의 지속 감시와 자동 수정은 Config(lab08에서 자동 수정이 실제로 실행됨). A는 역할이 뒤바뀌었다. C의 GuardDuty는 위협 탐지, Inspector는 취약점 스캔이다. D의 Flow Logs는 트래픽 기록이지 설정 변경자가 아니고, WAF는 HTTP 필터다.
+**A.** API 호출의 주체는 CloudTrail(`AuthorizeSecurityGroupIngress` 이벤트), 구성 규칙 위반의 지속 감시와 자동 수정은 Config(lab08에서 자동 수정이 실제로 실행됨). B는 역할이 뒤바뀌었다. C의 GuardDuty는 위협 탐지, Inspector는 취약점 스캔이다. D의 Flow Logs는 트래픽 기록이지 설정 변경자가 아니고, WAF는 HTTP 필터다.
 </details>
 
 ---
@@ -105,13 +105,13 @@
 **8.** 조직의 모든 계정·리전에서 발생하는 API 활동을 7년간 보관하고, 로그가 삭제·변조되지 않았음을 증명해야 한다.
 
 - A. 각 계정의 CloudTrail 이벤트 기록
-- B. 조직 추적(멀티 리전) → 별도 로그 계정의 S3 버킷, 로그 파일 무결성 검증 켜기, S3 객체 잠금
+- B. CloudWatch Logs 보존 기간 무제한
 - C. Config 집계자
-- D. CloudWatch Logs 보존 기간 무제한
+- D. 조직 추적(멀티 리전) → 별도 로그 계정의 S3 버킷, 로그 파일 무결성 검증 켜기, S3 객체 잠금
 
 <details><summary>정답과 해설</summary>
 
-**B.** 조직 추적이 모든 계정·리전을 모으고, 무결성 검증 다이제스트로 변조를 증명하며, 객체 잠금으로 삭제를 막는다. A는 90일이고 계정별이다. C는 구성 항목이지 API 활동 로그가 아니다. D는 무결성 증명이 없고 조직 단위 수집을 따로 만들어야 한다.
+**D.** 조직 추적이 모든 계정·리전을 모으고, 무결성 검증 다이제스트로 변조를 증명하며, 객체 잠금으로 삭제를 막는다. A는 90일이고 계정별이다. C는 구성 항목이지 API 활동 로그가 아니다. B는 무결성 증명이 없고 조직 단위 수집을 따로 만들어야 한다.
 </details>
 
 ---
@@ -147,13 +147,13 @@
 **11.** CloudFront 배포에 `shop.todayorder.example` 도메인으로 HTTPS를 붙이려 한다. 서울 리전에서 ACM 인증서를 발급받았는데 CloudFront 설정 화면에 보이지 않는다.
 
 - A. 인증서를 ACM에서 내보내 CloudFront에 업로드한다
-- B. us-east-1 리전에서 ACM 인증서를 다시 요청한다
-- C. 인증서를 IAM에 업로드한다
+- B. 인증서를 IAM에 업로드한다
+- C. us-east-1 리전에서 ACM 인증서를 다시 요청한다
 - D. ALB를 앞에 두고 서울 인증서를 쓴다
 
 <details><summary>정답과 해설</summary>
 
-**B.** CloudFront는 us-east-1의 ACM 인증서만 쓴다. A는 ACM 발급 인증서 내보내기가 기본 기능이 아니고(내보내기 가능 옵션은 별도) 필요도 없다. C는 레거시 방식으로 ACM 자동 갱신을 잃는다. D는 문제를 우회할 뿐 CloudFront 도메인 HTTPS를 해결하지 못한다.
+**C.** CloudFront는 us-east-1의 ACM 인증서만 쓴다. A는 ACM 발급 인증서 내보내기가 기본 기능이 아니고(내보내기 가능 옵션은 별도) 필요도 없다. B는 레거시 방식으로 ACM 자동 갱신을 잃는다. D는 문제를 우회할 뿐 CloudFront 도메인 HTTPS를 해결하지 못한다.
 </details>
 
 ---
@@ -162,10 +162,10 @@
 
 - A. 보안 그룹 아웃바운드에 도메인 이름을 넣는다
 - B. NACL 아웃바운드 거부 규칙
-- C. AWS Network Firewall 상태 저장 도메인 허용 목록(SNI)
-- D. WAF Web ACL을 EC2에 연결한다
+- C. WAF Web ACL을 EC2에 연결한다
+- D. AWS Network Firewall 상태 저장 도메인 허용 목록(SNI)
 
 <details><summary>정답과 해설</summary>
 
-**C.** Network Firewall은 TLS SNI·HTTP Host로 도메인을 판별해 허용 목록 밖을 막는다(lab10). A·B의 보안 그룹·NACL은 IP·포트만 다루고 도메인을 모른다. D의 WAF는 들어오는 HTTP 요청을 걸러내는 L7 필터이고 EC2에 직접 붙일 수도 없다.
+**D.** Network Firewall은 TLS SNI·HTTP Host로 도메인을 판별해 허용 목록 밖을 막는다(lab10). A·B의 보안 그룹·NACL은 IP·포트만 다루고 도메인을 모른다. C의 WAF는 들어오는 HTTP 요청을 걸러내는 L7 필터이고 EC2에 직접 붙일 수도 없다.
 </details>

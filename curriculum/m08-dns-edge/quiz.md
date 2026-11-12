@@ -6,14 +6,14 @@
 
 **1.** TodayOrder의 루트 도메인 `todayorder.example`을 CloudFront 배포에 연결해야 한다. DNS 쿼리 비용도 최소로 하고 싶다. 무엇을 만드나?
 
-- A. `todayorder.example` CNAME → `dxxxx.cloudfront.net`
-- B. `todayorder.example` A 레코드 Alias → CloudFront 배포
+- A. `todayorder.example` A 레코드 Alias → CloudFront 배포
+- B. `todayorder.example` CNAME → `dxxxx.cloudfront.net`
 - C. `todayorder.example` A 레코드 → CloudFront 엣지 IP 몇 개
 - D. `www.todayorder.example` CNAME만 만들고 루트는 비워 둔다
 
 <details><summary>정답과 해설</summary>
 
-**B.** apex에는 CNAME을 둘 수 없고(A는 `InvalidChangeBatch`, lab01 4단계), Alias는 apex에 가능하며 AWS 리소스로의 쿼리가 무료다. C는 CloudFront 엣지 IP가 수시로 바뀌어 깨진다. D는 요구(루트 도메인 연결)를 만족하지 못한다.
+**A.** apex에는 CNAME을 둘 수 없고(B는 `InvalidChangeBatch`, lab01 4단계), Alias는 apex에 가능하며 AWS 리소스로의 쿼리가 무료다. C는 CloudFront 엣지 IP가 수시로 바뀌어 깨진다. D는 요구(루트 도메인 연결)를 만족하지 못한다.
 </details>
 
 ---
@@ -49,13 +49,13 @@
 **4.** 장애 조치 레코드를 구성하면서 PRIMARY(서울 ALB)에만 상태 확인을 붙이고 SECONDARY(S3 점검 페이지)에는 붙이지 않았다. 서울 상태 확인이 실패하면?
 
 - A. 아무 응답도 하지 않는다
-- B. SECONDARY를 응답한다
+- B. 두 값을 모두 응답한다
 - C. PRIMARY를 계속 응답한다
-- D. 두 값을 모두 응답한다
+- D. SECONDARY를 응답한다
 
 <details><summary>정답과 해설</summary>
 
-**B.** 상태 확인이 없는 레코드는 항상 건강한 것으로 친다. PRIMARY가 비정상이면 SECONDARY가 답한다. C는 PRIMARY·SECONDARY가 **모두** 비정상일 때의 동작이다. A·D는 장애 조치 정책의 동작이 아니다.
+**D.** 상태 확인이 없는 레코드는 항상 건강한 것으로 친다. PRIMARY가 비정상이면 SECONDARY가 답한다. C는 PRIMARY·SECONDARY가 **모두** 비정상일 때의 동작이다. A·B는 장애 조치 정책의 동작이 아니다.
 </details>
 
 ---
@@ -90,14 +90,14 @@
 
 **7.** 회원 전용 강의 동영상(HLS, 파일 수백 조각)을 CloudFront로 배포한다. 플레이어가 요청하는 URL은 바꿀 수 없다. 로그인한 회원만 보게 하려면?
 
-- A. CloudFront 서명된 URL
-- B. CloudFront 서명된 쿠키
+- A. CloudFront 서명된 쿠키
+- B. CloudFront 서명된 URL
 - C. S3 미리 서명된 URL
 - D. WAF 지역 일치 규칙
 
 <details><summary>정답과 해설</summary>
 
-**B.** 여러 파일에 대해 URL을 바꾸지 않고 접근을 제어하는 것이 서명된 쿠키다. A는 파일마다 URL이 바뀐다. C는 S3에서 직접 받아 CDN 이점이 없고 조각마다 서명이 필요하다. D는 국가 기준이지 회원 인증이 아니다.
+**A.** 여러 파일에 대해 URL을 바꾸지 않고 접근을 제어하는 것이 서명된 쿠키다. B는 파일마다 URL이 바뀐다. C는 S3에서 직접 받아 CDN 이점이 없고 조각마다 서명이 필요하다. D는 국가 기준이지 회원 인증이 아니다.
 </details>
 
 ---
@@ -105,13 +105,13 @@
 **8.** 모든 응답에 `Strict-Transport-Security` 헤더를 붙이고 `/old/*`를 `/new/*`로 리디렉션하려 한다. 초당 요청이 매우 많고 비용과 지연을 최소화하고 싶다.
 
 - A. Lambda@Edge(오리진 응답)
-- B. CloudFront Functions(뷰어 요청·응답)
+- B. API Gateway 매핑 템플릿
 - C. ALB 리스너 규칙
-- D. API Gateway 매핑 템플릿
+- D. CloudFront Functions(뷰어 요청·응답)
 
 <details><summary>정답과 해설</summary>
 
-**B.** 헤더 조작과 URL 리디렉션은 CloudFront Functions의 대표 용도이며, 1밀리초 미만·대량 처리에 맞다. A도 가능하지만 더 무겁고 비싸며 외부 호출·본문 접근이 필요할 때 쓴다. C·D는 엣지가 아니라 오리진 쪽이라 모든 요청이 오리진까지 간다.
+**D.** 헤더 조작과 URL 리디렉션은 CloudFront Functions의 대표 용도이며, 1밀리초 미만·대량 처리에 맞다. A도 가능하지만 더 무겁고 비싸며 외부 호출·본문 접근이 필요할 때 쓴다. B·C는 엣지가 아니라 오리진 쪽이라 모든 요청이 오리진까지 간다.
 </details>
 
 ---
@@ -146,14 +146,14 @@
 
 **11.** 로그인 API에 같은 IP에서 분당 수천 번의 비밀번호 대입 시도가 들어온다. 애플리케이션을 고치지 않고 ALB 앞에서 막고 싶다.
 
-- A. 보안 그룹에서 해당 IP 대역을 거부한다
-- B. WAF 속도 기반 규칙(키: IP, 범위 축소: URI `/login`)을 ALB의 Web ACL에 넣는다
+- A. WAF 속도 기반 규칙(키: IP, 범위 축소: URI `/login`)을 ALB의 Web ACL에 넣는다
+- B. 보안 그룹에서 해당 IP 대역을 거부한다
 - C. Shield Advanced를 구독한다
 - D. NACL로 포트 443을 막는다
 
 <details><summary>정답과 해설</summary>
 
-**B.** IP별 요청 수를 세어 한도를 넘으면 막는 것이 WAF 속도 기반 규칙이다(lab06: 20회 이후 403). A는 보안 그룹에 거부 규칙이 없다(허용만 가능). C는 대규모 DDoS 대응 구독으로, 이런 애플리케이션 계층 남용에는 과하고 비싸다. D는 모든 사용자를 막는다.
+**A.** IP별 요청 수를 세어 한도를 넘으면 막는 것이 WAF 속도 기반 규칙이다(lab06: 20회 이후 403). B는 보안 그룹에 거부 규칙이 없다(허용만 가능). C는 대규모 DDoS 대응 구독으로, 이런 애플리케이션 계층 남용에는 과하고 비싸다. D는 모든 사용자를 막는다.
 </details>
 
 ---
@@ -161,11 +161,11 @@
 **12.** AWS Organizations 아래 계정 40개가 있다. 모든 계정의 ALB와 CloudFront에 같은 WAF 관리형 규칙을 강제하고, 새로 만든 계정과 리소스에도 자동으로 적용되게 하고 싶다.
 
 - A. 각 계정에서 CloudFormation으로 Web ACL을 배포한다
-- B. AWS Firewall Manager 보안 정책
+- B. SCP로 WAF 설정 변경을 금지한다
 - C. Shield Standard
-- D. SCP로 WAF 설정 변경을 금지한다
+- D. AWS Firewall Manager 보안 정책
 
 <details><summary>정답과 해설</summary>
 
-**B.** 여러 계정에 WAF·Shield·보안 그룹 정책을 중앙에서 일괄·자동 적용하는 서비스가 Firewall Manager다(Organizations, 관리자 계정, Config 필요). A는 새 계정·리소스에 자동 적용되지 않는다(StackSets로 일부 가능하지만 리소스 연결 자동화가 안 된다). C는 L3/L4 자동 보호로 WAF 규칙과 무관하다. D는 금지만 할 뿐 규칙을 적용하지 않는다.
+**D.** 여러 계정에 WAF·Shield·보안 그룹 정책을 중앙에서 일괄·자동 적용하는 서비스가 Firewall Manager다(Organizations, 관리자 계정, Config 필요). A는 새 계정·리소스에 자동 적용되지 않는다(StackSets로 일부 가능하지만 리소스 연결 자동화가 안 된다). C는 L3/L4 자동 보호로 WAF 규칙과 무관하다. B는 금지만 할 뿐 규칙을 적용하지 않는다.
 </details>
