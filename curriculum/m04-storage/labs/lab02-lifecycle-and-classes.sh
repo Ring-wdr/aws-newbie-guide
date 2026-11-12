@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # M04 lab02 — 스토리지 클래스와 수명 주기 규칙 (🟢 구성 · 전환 자체는 일어나지 않음)
 # 1) 클래스를 지정해 올리기 → 2) Glacier 객체는 복원 전엔 못 읽는다 → 3) 복원 요청·완료 폴링
-# 4) 영수증 버킷 수명 주기 규칙 구성 → 5) AWS라면 거부될 규칙을 에뮬레이터는 받아 준다 / 일부는 거부한다
+# 4) 영수증 버킷 수명 주기 규칙 구성 → 5) 규칙 검증: IA 0~29일 전환(2026-07부터 허용)은 통과, 최소 보관 기간 위반 연쇄·역방향은 거부
 set -euo pipefail
 source "$(git rev-parse --show-toplevel)/scripts/env.sh"
 
@@ -92,22 +92,29 @@ echo "== 9. 규칙이 있어도 객체의 클래스는 그대로 (전환은 시�
 std_class="$(aws s3api head-object --bucket "$BUCKET" --key receipts/STANDARD.json --query StorageClass --output text)"
 echo "receipts/STANDARD.json StorageClass=$std_class"
 
-echo "== 10. AWS라면 거부될 규칙: STANDARD_IA 로 10일 만에 전환 (AWS 최소 30일)"
+echo "== 10. STANDARD_IA 로 10일 만에 전환 → 받아 준다 (AWS도 2026-07부터 허용. 예전에는 최소 30일)"
 set +e
-bad_ia="$(aws s3api put-bucket-lifecycle-configuration --bucket "$BUCKET" --lifecycle-configuration \
-  '{"Rules":[{"ID":"bad-ia-10d","Status":"Enabled","Filter":{"Prefix":"receipts/"},"Transitions":[{"Days":10,"StorageClass":"STANDARD_IA"}]}]}' 2>&1)"
-bad_ia_rc=$?
+ia10="$(aws s3api put-bucket-lifecycle-configuration --bucket "$BUCKET" --lifecycle-configuration \
+  '{"Rules":[{"ID":"ia-10d","Status":"Enabled","Filter":{"Prefix":"receipts/"},"Transitions":[{"Days":10,"StorageClass":"STANDARD_IA"}]}]}' 2>&1)"
+ia10_rc=$?
 set -e
-echo "rc=$bad_ia_rc $bad_ia"
+echo "rc=$ia10_rc $ia10"
 
-echo "== 11. 에뮬레이터도 거부하는 규칙: 전환 순서가 거꾸로 (GLACIER 30일 → STANDARD_IA 60일)"
+echo "== 11. 한 규칙 안에서 최소 보관 기간보다 빠른 연쇄 전환 (Glacier IR 4일 → Deep Archive 20일) → 거부"
+set +e
+chain="$(aws s3api put-bucket-lifecycle-configuration --bucket "$BUCKET" --lifecycle-configuration \
+  '{"Rules":[{"ID":"gir4-da20","Status":"Enabled","Filter":{"Prefix":"receipts/"},"Transitions":[{"Days":4,"StorageClass":"GLACIER_IR"},{"Days":20,"StorageClass":"DEEP_ARCHIVE"}]}]}' 2>&1 >/dev/null)"
+set -e
+echo "$chain" | sed '/^$/d'
+
+echo "== 12. 전환 순서가 거꾸로 (GLACIER 30일 → STANDARD_IA 60일) → 거부"
 set +e
 reverse="$(aws s3api put-bucket-lifecycle-configuration --bucket "$BUCKET" --lifecycle-configuration \
   '{"Rules":[{"ID":"reverse","Status":"Enabled","Filter":{"Prefix":"receipts/"},"Transitions":[{"Days":30,"StorageClass":"GLACIER"},{"Days":60,"StorageClass":"STANDARD_IA"}]}]}' 2>&1 >/dev/null)"
 set -e
-echo "$reverse"
+echo "$reverse" | sed '/^$/d'
 
-echo "== 12. 정리"
+echo "== 13. 정리"
 aws s3api delete-bucket-lifecycle --bucket "$BUCKET"
 aws s3 rb "s3://$BUCKET" --force >/dev/null
 
@@ -118,8 +125,8 @@ case "$deep_exp" in *InvalidTier*) ;; *) echo "FAIL: Deep Archive Expedited 가 
 case "$restore" in *'ongoing-request="false"'*) ;; *) echo "FAIL: 120초 안에 복원이 끝나지 않음 (마지막 관찰: $restore)"; exit 1 ;; esac
 [ "$rules_ok" = "2" ] || { echo "FAIL: 수명 주기 규칙 수 ($rules_ok)"; exit 1; }
 [ "$std_class" = "None" ] || [ "$std_class" = "STANDARD" ] || { echo "FAIL: 클래스가 바뀜 ($std_class)"; exit 1; }
-# 10일 IA 규칙: 에뮬레이터 1.0.322 는 받아 준다(AWS는 InvalidArgument). 거부하기 시작하면 문서를 갱신해야 한다.
-[ "$bad_ia_rc" -eq 0 ] || { echo "FAIL: 에뮬레이터가 10일 IA 규칙을 거부하기 시작함 → 레슨 2 갱신 필요"; exit 1; }
+[ "$ia10_rc" -eq 0 ] || { echo "FAIL: 10일 IA 규칙이 거부됨 → 레슨 2 갱신 필요 ($ia10)"; exit 1; }
+case "$chain" in *InvalidArgument*) ;; *) echo "FAIL: 최소 보관 기간보다 빠른 연쇄 전환이 거부되지 않음"; exit 1 ;; esac
 case "$reverse" in *InvalidArgument*) ;; *) echo "FAIL: 거꾸로 된 전환이 거부되지 않음"; exit 1 ;; esac
 if aws s3api head-bucket --bucket "$BUCKET" >/dev/null 2>&1; then echo "FAIL: 버킷이 남아 있음"; exit 1; fi
 echo "LAB02 OK"
