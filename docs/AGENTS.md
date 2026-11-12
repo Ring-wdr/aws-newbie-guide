@@ -6,8 +6,8 @@
 
 | 단계 | 역할 | 브랜치 | 담당 범위 | 에뮬레이터 포트 |
 |---|---|---|---|---|
-| 0 | 커리큘럼 설계자 (메인 세션) | `architect/curriculum-master-design` | `README.md`, `docs/CURRICULUM.md`, `docs/AUTHORING.md`, `docs/AGENTS.md` | – |
-| 1 | 환경 구축 엔지니어 | `setup/emulator-runtime-and-tooling` | 필수 프로그램 설치, `scripts/`, `tools/probe/`, `pyproject.toml`, `docs/FIDELITY.md`, `curriculum/m00-orientation/` | 9297 |
+| 0 | 커리큘럼 설계자 (메인 세션) | `architect/curriculum-master-design`, 이후 개정은 `architect/<개정 내용>` (예: `architect/curriculum-fidelity-regrade`) | `README.md`, `docs/CURRICULUM.md`, `docs/AUTHORING.md`, `docs/AGENTS.md` | – |
+| 1 | 환경 구축 엔지니어 | `setup/emulator-runtime-and-tooling` | 필수 프로그램 설치, `scripts/`, `tools/probe/`, `src/emulator_guard/`, `pyproject.toml`, `docs/FIDELITY.md`, `curriculum/m00-orientation/` | 9297 |
 | 2 | IAM·계정 모듈 저자 | `author/m01-iam-identity` | `curriculum/m01-iam-identity/` | 9301 |
 | 2 | VPC 네트워킹 모듈 저자 | `author/m02-vpc-networking` | `curriculum/m02-vpc-networking/` | 9302 |
 | 2 | 컴퓨트·확장 모듈 저자 | `author/m03-compute-scaling` | `curriculum/m03-compute-scaling/` | 9303 |
@@ -38,6 +38,6 @@ flowchart LR
 
 ## 병렬 작업 규칙
 
-- 에뮬레이터는 계정·리전을 분리하지 않으므로, **에이전트마다 전용 포트의 에뮬레이터**를 띄운다 (`scripts/emulator-up.sh <port>`). 다른 에이전트의 포트를 건드리지 않는다.
+- 에뮬레이터는 계정·리전을 분리하지 않으므로, **에이전트마다 전용 포트의 에뮬레이터**를 띄운다 (`export EMULATOR_PORT=<port>` 후 `scripts/emulator-up.sh`, 깨끗한 상태가 필요하면 `scripts/emulator-reset.sh`). 다른 에이전트의 포트를 건드리지 않는다.
 - 각 저자는 자신의 git worktree에서 작업하고, 자기 담당 디렉터리만 수정한다.
 - 작업을 마치면 자기 포트의 에뮬레이터를 반드시 내린다 (`scripts/emulator-down.sh <port>`).
