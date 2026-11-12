@@ -78,6 +78,7 @@ API: https://127.0.0.1:9306/_aws/execute-api/y6abp5yu9r   (실제 AWS: https://y
 == 6. 같은 주문을 다시 POST (클라이언트 재시도) → 409, 표에는 1건
 {"message": "order A-4001 already exists"}
 [HTTP 409]
+...
 == 8. 조회 → 200 / 없는 주문 → 404
 {"orderId": "A-4001", "customerId": "C-77", "total": 32000, "status": "CREATED"}
 [HTTP 200]

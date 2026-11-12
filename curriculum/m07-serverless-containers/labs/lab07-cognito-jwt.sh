@@ -57,11 +57,11 @@ if aws cognito-idp initiate-auth --client-id "$CLIENT" --auth-flow USER_PASSWORD
   --auth-parameters "USERNAME=$EMAIL,PASSWORD=wrong-Passw0rd!" >/dev/null 2>"$WORK/e2"; then fail "틀린 비밀번호로 로그인 성공"; fi
 cat "$WORK/e2"
 
-echo "== 4. 로그인 → 토큰 3종 (ID·액세스·갱신)"
+echo "== 4. 로그인 → 토큰 3종 (ID·액세스·갱신) — 토큰 값은 비밀이라 길이만 출력"
 aws cognito-idp initiate-auth --client-id "$CLIENT" --auth-flow USER_PASSWORD_AUTH \
   --auth-parameters "USERNAME=$EMAIL,PASSWORD=$PASSWORD" --output json >"$WORK/auth.json"
 IDTOKEN="$(uv run --quiet --project "$ROOT" python -c 'import json,sys; print(json.load(open(sys.argv[1]))["AuthenticationResult"]["IdToken"])' "$WORK/auth.json")"
-uv run --quiet --project "$ROOT" python -c 'import json,sys; r=json.load(open(sys.argv[1]))["AuthenticationResult"]; print(json.dumps({k: (f"<{len(v)}자>" if isinstance(v, str) else v) for k, v in r.items()}, indent=2, ensure_ascii=False))' "$WORK/auth.json"
+uv run --quiet --project "$ROOT" python -c 'import json,sys; r=json.load(open(sys.argv[1]))["AuthenticationResult"]; print(json.dumps({k: (f"<{len(v)}자>" if k.endswith("Token") else v) for k, v in r.items()}, indent=2, ensure_ascii=False))' "$WORK/auth.json"
 echo "-- ID 토큰의 payload (서명된 JSON — 누구나 읽을 수 있으니 비밀을 넣지 않는다):"
 jwt_payload "$IDTOKEN" | tee "$WORK/claims.json"
 ISSUER="$(uv run --quiet --project "$ROOT" python -c 'import json,sys; print(json.load(open(sys.argv[1]))["iss"])' "$WORK/claims.json")"

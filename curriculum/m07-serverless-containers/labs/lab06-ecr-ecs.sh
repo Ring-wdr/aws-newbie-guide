@@ -93,9 +93,20 @@ aws ecs describe-tasks --cluster "$CLUSTER" --tasks "$TASK" \
 reason="$(aws ecs describe-tasks --cluster "$CLUSTER" --tasks "$TASK" --query 'tasks[0].stoppedReason' --output text)"
 echo "stoppedReason: $reason" | cut -c1-200
 
-echo "== 8. 서비스 쪽 태스크들도 같은 이유로 멈춘다 — 서비스는 desired 2 를 맞추려 계속 새 태스크를 띄운다"
+echo "== 8. 서비스가 띄운 태스크도 같은 이유로 멈춘다 — 서비스의 STOPPED 태스크 하나 확인"
+svc_stopped() {
+  aws ecs list-tasks --cluster "$CLUSTER" --service-name "$SERVICE" --desired-status STOPPED \
+    --output json --query taskArns >"$WORK/svc.json"
+  grep -q 'arn:' "$WORK/svc.json"
+}
+poll 120 "서비스 태스크 STOPPED" svc_stopped
+SVC_TASK="$(grep -o 'arn:[^"]*' "$WORK/svc.json" | head -1)"
+aws ecs describe-tasks --cluster "$CLUSTER" --tasks "$SVC_TASK" \
+  --query 'tasks[0].{group: group, lastStatus: lastStatus, stopCode: stopCode}'
+svc_reason="$(aws ecs describe-tasks --cluster "$CLUSTER" --tasks "$SVC_TASK" --query 'tasks[0].stoppedReason' --output text)"
+echo "stoppedReason: $svc_reason" | cut -c1-80
 aws ecs describe-services --cluster "$CLUSTER" --services "$SERVICE" \
-  --query 'services[0].{Desired: desiredCount, Running: runningCount, Pending: pendingCount}'
+  --query 'services[0].{Desired: desiredCount, Running: runningCount}'
 
 echo "== 9. 정리: 서비스 desired 0 → 삭제"
 aws ecs update-service --cluster "$CLUSTER" --service "$SERVICE" --desired-count 0 --query service.desiredCount
@@ -103,4 +114,5 @@ aws ecs delete-service --cluster "$CLUSTER" --service "$SERVICE" --query service
 
 # ---- 단언
 grep -q CannotPullContainerError <<<"$reason" || fail "예상한 이미지 풀 실패가 아님: $reason"
+grep -q CannotPullContainerError <<<"$svc_reason" || fail "서비스 태스크의 정지 이유: $svc_reason"
 echo "LAB06 OK"

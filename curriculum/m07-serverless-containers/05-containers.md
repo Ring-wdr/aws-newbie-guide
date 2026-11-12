@@ -50,7 +50,7 @@ Fargate Spot은 중단될 수 있는 대신 저렴하다(배치·내결함성 �
 | 서비스 | 언제 |
 |---|---|
 | **EKS** | 쿠버네티스가 표준인 조직, 기존 K8s 매니페스트·도구(Helm) 그대로, 멀티클라우드 이식성. 컨트롤 플레인을 AWS가 관리, 노드는 EC2·Fargate |
-| **App Runner** | 소스 코드나 이미지만 주면 HTTPS 엔드포인트·오토스케일까지 끝 — 웹 앱·API를 가장 간단히 |
+| **App Runner** | 소스 코드나 이미지만 주면 HTTPS 엔드포인트·오토스케일까지 끝 — 웹 앱·API를 가장 간단히. ⚠️ **2026년 4월 30일부터 신규 고객에게 닫혔다**(기존 고객은 계속 사용, 새 기능 없음). AWS는 대안으로 **Amazon ECS Express Mode**(이미지와 IAM 역할 2개만 주면 Fargate 서비스·ALB·오토스케일링을 한 번에 구성, 추가 요금 없음)를 권장한다([App Runner 가용성 변경](https://docs.aws.amazon.com/apprunner/latest/dg/apprunner-availability-change.html)) |
 | **ECS Anywhere / EKS Anywhere** | **온프레미스 서버**에서 ECS/EKS로 관리되는 컨테이너 실행(규정·지연 때문에 데이터 센터에 남아야 할 때) |
 | **EKS Distro** | EKS가 쓰는 쿠버네티스 배포판 자체(직접 운영) |
 | Lambda 컨테이너 이미지 | Lambda 실행 모델(최대 15분)은 그대로, 패키징만 컨테이너(최대 10 GB) |
@@ -133,11 +133,16 @@ todayorder/order-api
     "stopCode": "TaskFailedToStart"
 }
 stoppedReason: CannotPullContainerError: failed to resolve ref registry.todayorder.invalid/todayorder/order-api:1.0: failed to do request: Get "https://registry.todayorder.invalid/v2/": dial tcp regis
-== 8. 서비스 쪽 태스크들도 같은 이유로 멈춘다 — 서비스는 desired 2 를 맞추려 계속 새 태스크를 띄운다
+== 8. 서비스가 띄운 태스크도 같은 이유로 멈춘다 — 서비스의 STOPPED 태스크 하나 확인
+{
+    "group": "service:todayorder-order-api-svc",
+    "lastStatus": "STOPPED",
+    "stopCode": "TaskFailedToStart"
+}
+stoppedReason: CannotPullContainerError: failed to resolve ref registry.todayord
 {
     "Desired": 2,
-    "Running": 0,
-    "Pending": 0
+    "Running": 0
 }
 == 9. 정리: 서비스 desired 0 → 삭제
 0
@@ -145,7 +150,7 @@ DRAINING
 LAB06 OK
 ```
 
-방금 본 것: 태스크 수명 주기 `PROVISIONING → PENDING → (RUNNING) → STOPPED`를 따라갔다. 이미지를 받을 수 없으니 `CannotPullContainerError`로 시작에 실패했다. **실제 AWS에서도 똑같은 오류**가 흔하다 — 원인 1순위는 ① 이미지 URI·태그 오타 ② 작업 실행 역할에 ECR 권한 없음 ③ 프라이빗 서브넷에서 ECR에 닿을 경로 없음(NAT 게이트웨이 또는 ECR·S3 VPC 엔드포인트 필요, M02).
+방금 본 것: 태스크 수명 주기 `PROVISIONING → PENDING → (RUNNING) → STOPPED`를 따라갔다. 이미지를 받을 수 없으니 `CannotPullContainerError`로 시작에 실패했다. 서비스가 띄운 태스크(`group: service:…`)도 같은 이유로 멈췄고, 서비스는 `Running 0`인 채로 desired 2를 맞추려 계속 새 태스크를 시도한다. **실제 AWS에서도 똑같은 오류**가 흔하다 — 원인 1순위는 ① 이미지 URI·태그 오타 ② 작업 실행 역할에 ECR 권한 없음 ③ 프라이빗 서브넷에서 ECR에 닿을 경로 없음(NAT 게이트웨이 또는 ECR·S3 VPC 엔드포인트 필요, M02).
 
 ## 실제 AWS에서는
 
@@ -157,7 +162,7 @@ LAB06 OK
 
 - "서버(인스턴스) 관리 없이 컨테이너 실행" → **Fargate**. "GPU·특정 인스턴스 유형·호스트 제어 / 대규모 상시 워크로드 비용 최적화" → **EC2 시작 유형**.
 - "컨테이너 앱이 S3/DynamoDB에 접근" → **작업 역할(task role)**. "이미지 풀·로그 전송·비밀 주입 실패" → **작업 실행 역할**.
-- "쿠버네티스 표준, 기존 매니페스트 이전" → **EKS**. "코드/이미지만으로 가장 빨리 웹 서비스" → **App Runner**.
+- "쿠버네티스 표준, 기존 매니페스트 이전" → **EKS**. "코드/이미지만으로 가장 빨리 웹 서비스" → **App Runner**(SAA-C03 시험 범위에 있으므로 이 답을 알아 둔다. 실무 신규 도입이라면 App Runner는 신규 고객에게 닫혔으니 **ECS Express Mode**).
 - "온프레미스에서 AWS 관리형으로 컨테이너" → **ECS Anywhere / EKS Anywhere**.
 - "태스크마다 보안 그룹" → **awsvpc 네트워크 모드**(Fargate는 필수).
 - "같은 태그의 이미지가 바뀌는 것 방지" → ECR **태그 불변성**. "푸시할 때 취약점 검사" → **스캔(scan on push / Inspector 향상된 스캔)**.

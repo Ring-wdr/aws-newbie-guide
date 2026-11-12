@@ -75,17 +75,17 @@ aws: [ERROR]: An error occurred (UserNotConfirmedException) when calling the Ini
 -- 틀린 비밀번호:
 
 aws: [ERROR]: An error occurred (NotAuthorizedException) when calling the InitiateAuth operation: Incorrect username or password.
-== 4. 로그인 → 토큰 3종 (ID·액세스·갱신)
+== 4. 로그인 → 토큰 3종 (ID·액세스·갱신) — 토큰 값은 비밀이라 길이만 출력
 {
   "AccessToken": "<732자>",
   "ExpiresIn": 3600,
-  "TokenType": "<6자>",
+  "TokenType": "Bearer",
   "RefreshToken": "<950자>",
   "IdToken": "<713자>"
 }
 ```
 
-방금 본 것: 가입 직후 사용자는 미확인 상태라 로그인할 수 없다(실제로는 이메일로 받은 코드를 `confirm-sign-up`에 넣는다). 틀린 비밀번호의 오류 메시지는 "사용자 이름 **또는** 비밀번호"라고 뭉뚱그린다 — 어느 쪽이 틀렸는지 알려 주면 계정 존재 여부가 새기 때문이다. 토큰 값은 비밀이라 길이만 찍었다. 유효 기간(`ExpiresIn`) 3,600초.
+방금 본 것: 가입 직후 사용자는 미확인 상태라 로그인할 수 없다(실제로는 이메일로 받은 코드를 `confirm-sign-up`에 넣는다). 틀린 비밀번호의 오류 메시지는 "사용자 이름 **또는** 비밀번호"라고 뭉뚱그린다 — 어느 쪽이 틀렸는지 알려 주면 계정 존재 여부가 새기 때문이다. 토큰 값은 비밀이라 길이만 찍었다. `TokenType`은 `Bearer` — HTTP 요청에 `Authorization: Bearer <토큰>`으로 싣는다는 뜻이다. 유효 기간(`ExpiresIn`) 3,600초.
 
 **2) ID 토큰 들여다보기**
 
@@ -165,6 +165,7 @@ SDK cognito_login OK
 ## 실제 AWS에서는
 
 - 토큰 발급자(`iss`)는 `https://cognito-idp.<리전>.amazonaws.com/<풀 ID>`다. 에뮬레이터는 `https://127.0.0.1:<포트>/<풀 ID>`를 쓰고, JWT 권한 부여자도 그 값으로 검증한다(저자 확인: Issuer를 AWS 형식으로 넣으면 유효한 토큰도 401). 그래서 실습은 토큰의 `iss`를 읽어 설정한다. 실제 AWS 스크립트에서는 AWS 형식을 쓴다.
+- ⚠️ **에뮬레이터에서 AWS 형식 Issuer를 시험해 보지 말 것.** JWT 권한 부여자는 Issuer 주소에서 서명 검증용 공개 키(JWKS)를 내려받으므로, 에뮬레이터가 실제 `cognito-idp.us-east-1.amazonaws.com`에 요청을 보낼 수 있다. 이 커리큘럼은 실제 AWS로 나가는 요청을 만들지 않는다.
 - 실습은 이메일 확인을 `admin-confirm-sign-up`으로 건너뛰었다. 실제로는 이메일·SMS 발송(SES·SNS 연동, 발송 한도)이 따른다.
 - 자격 증명 풀의 임시 자격 증명으로 S3에 실제 업로드하는 것은 이 실습에서 하지 않았다(M04·M01에서 다룬 S3 정책 평가 한계 때문에 의미 있는 시연이 어렵다).
 - 실제 AWS에서 해 보려면: Cognito 사용자 풀은 월간 활성 사용자(MAU) 기준 과금이고 소규모는 무료 범위에 든다(요금제 Lite/Essentials/Plus에 따라 다름 — 콘솔에서 확인). SMS MFA는 별도 과금. 정리: `aws cognito-idp delete-user-pool --user-pool-id <id>`, `aws cognito-identity delete-identity-pool --identity-pool-id <id>`, API·함수·역할 삭제.

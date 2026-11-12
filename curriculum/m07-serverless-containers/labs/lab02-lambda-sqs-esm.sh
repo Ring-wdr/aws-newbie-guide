@@ -84,6 +84,6 @@ aws lambda put-function-event-invoke-config --function-name "$FN" --maximum-retr
 echo "실패 대상 큐: $FAIL_URL (에뮬레이터는 실패 대상으로 전달하지 않는다 — README 의 에뮬레이터 제약 참고)"
 
 # ---- 단언
-[ "$settled_n" -ge 3 ] || fail "정산 로그 3건 미만: $settled_n"
+[ "$settled_n" = 3 ] || fail "정산 로그가 정확히 3건이 아님(성공 메시지가 다시 처리됐나?): $settled_n"
 [ "$failed_n" -ge 2 ] || fail "실패 메시지가 2번(maxReceiveCount) 시도되지 않음: $failed_n"
 echo "LAB02 OK"

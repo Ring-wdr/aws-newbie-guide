@@ -29,11 +29,13 @@ flowchart LR
 | 인증 | IAM, Cognito 사용자 풀 권한 부여자, Lambda 권한 부여자, **리소스 정책** | IAM, **JWT 권한 부여자**(Cognito 등 OIDC), Lambda 권한 부여자 | IAM, Lambda 권한 부여자 |
 | API 키·사용량 계획(고객별 스로틀·할당량) | ✓ | ✗ | ✗ |
 | 캐싱 | ✓ | ✗ | ✗ |
-| AWS WAF | ✓ | ✗ | ✓ |
+| AWS WAF 직접 연결 | ✓ | ✗ | ✗ |
 | 요청 검증·본문 변환·MOCK 통합 | ✓ | ✗ (파라미터 매핑만) | – |
 | 배포 | 배포를 만들어 스테이지에 연결 | **자동 배포**(`$default` 스테이지) 가능 | 배포/스테이지 |
 
-(비교 출처: [REST API와 HTTP API 중 선택](https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-vs-rest.html)) — 시험 요령: **"API 키·사용량 계획·캐싱·WAF·프라이빗 API·요청 검증"이 나오면 REST**, **"가장 저렴·낮은 지연·JWT/OIDC"면 HTTP API**, **"양방향·서버 푸시"면 WebSocket**.
+(비교 출처: [REST API와 HTTP API 중 선택](https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-vs-rest.html), WAF 연결 대상: [AWS WAF 개요](https://docs.aws.amazon.com/waf/latest/developerguide/waf-chapter.html) — API Gateway 중에는 REST API만 목록에 있다.) HTTP API·WebSocket API를 WAF로 보호하려면 앞에 **CloudFront 배포를 두고 그 배포에 WAF 웹 ACL을 연결**한다.
+
+ — 시험 요령: **"API 키·사용량 계획·캐싱·WAF·프라이빗 API·요청 검증"이 나오면 REST**, **"가장 저렴·낮은 지연·JWT/OIDC"면 HTTP API**, **"양방향·서버 푸시"면 WebSocket**.
 
 ### 스테이지, 스로틀링, 캐싱
 

@@ -56,6 +56,7 @@ curriculum/m07-serverless-containers/labs/verify.sh
 | 오퍼레이션 / 동작 | 증상 | 실습에서의 처리 |
 |---|---|---|
 | **Lambda 함수 실행 환경** | CPython이 아니라 **RustPython**(`3.14.0.alpha … [RustPython 0.6.0]`). `boto3`는 에뮬레이터가 `/var/task/boto3`에 넣은 **대체 모듈**(`client`·`resource`·`Session`만). 네트워크는 에뮬레이터 서비스(sqs, events, dynamodb, logs, cloudwatch, apigateway, secretsmanager, opensearch, stepfunctions, sesv2, s3, xray, rds-data, appconfig)로만. `socket.gethostname()`, `os.listdir()`, `os.getcwd()`는 `OSError`. 함수 안에서 `sts`·`lambda` 클라이언트는 `UnknownServiceError` | 함수는 표준 라이브러리 + boto3 클라이언트 API만 쓴다 |
+| **Lambda 호출마다 에뮬레이터 메모리 누적(OOM)** | 동기 호출 한 번마다 에뮬레이터 메모리가 수 MiB씩 늘고 줄지 않는다(검증자 측정: 174 → 327 → 466 MiB, 호출 20·40회 뒤). 반복하면 기본 상한 1 GiB에서 컨테이너가 `OOMKilled`(종료 코드 137)되고, 학습자에게는 `Could not connect to the endpoint URL`만 보인다 | lab01의 호출 수를 줄였다(별칭 호출 20 → 10, 중복 오류 호출 제거). 증상이 보이면 `scripts/emulator-reset.sh`(상태 초기화), 반복 실습이 많으면 `EMULATOR_MEMORY=2g scripts/emulator-reset.sh`. 메모리 확인: `docker stats --no-stream aws-emulator-$EMULATOR_PORT` |
 | 함수 안 자격 증명 | 환경 변수에 `AWS_ACCESS_KEY_ID` 등이 없다. 대신 실행 역할의 세션으로 서명된 것처럼 동작하고 **IAM 정책이 평가된다**(DynamoDB `PutItem`·`GetItem` 거부/허용 확인. `ListTables`는 권한 없이 통과) | lab04가 거부 → 최소 권한 허용을 보여 준다 |
 | 비동기 호출의 실패 대상·성공 대상·함수 DLQ | 구성은 저장되지만 90초 넘게 기다려도 **전달되지 않았다**. 비동기 실패는 3번 실행됐고 `MaximumRetryAttempts=0`도 무시됐다 | lab02는 구성만(🟡) |
 | API Gateway → Lambda 권한 | **REST API(`AWS_PROXY`)는 Lambda 리소스 정책을 검사**해 없으면 500(컨테이너 로그에 이유). **HTTP API는 검사하지 않고** 호출한다 | 두 API 모두 `add-permission`을 넣는다(실제 AWS는 둘 다 필요) |

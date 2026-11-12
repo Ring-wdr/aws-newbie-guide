@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 # M07 lab01 — Lambda 함수 생성·구성·버전·별칭과 Invoke (동기/비동기/DryRun, 오류 응답, 타임아웃) (🟢)
+# 참고: 에뮬레이터 1.0.322 는 Lambda 호출마다 메모리를 조금씩 쌓아 두고 풀지 않는다(README "에뮬레이터 제약").
+# 그래서 이 lab 은 호출 수를 최소로 유지한다.
 set -euo pipefail
 ROOT="$(git rev-parse --show-toplevel)"
 source "$ROOT/scripts/env.sh"
@@ -34,10 +36,9 @@ aws lambda invoke --function-name "$FN" --cli-binary-format raw-in-base64-out \
 cat "$WORK/out.json"; echo
 
 echo "== 4. 핸들러가 예외를 던지면? — HTTP 200 이지만 FunctionError 가 붙는다"
-aws lambda invoke --function-name "$FN" --cli-binary-format raw-in-base64-out --payload '{}' "$WORK/err.json"
+aws lambda invoke --function-name "$FN" --cli-binary-format raw-in-base64-out --payload '{}' "$WORK/err.json" | tee "$WORK/err-meta.json"
 cat "$WORK/err.json"; echo
-ferr="$(aws lambda invoke --function-name "$FN" --cli-binary-format raw-in-base64-out --payload '{}' \
-  --query FunctionError --output text "$WORK/err2.json")"
+ferr="$(grep -o '"FunctionError": *"[^"]*"' "$WORK/err-meta.json" | sed 's/.*: *"\(.*\)"/\1/')"
 
 echo "== 5. 비동기 호출 (Event) → 202, DryRun → 204 (실행 없이 권한·파라미터만 확인)"
 aws lambda invoke --function-name "$FN" --invocation-type Event --cli-binary-format raw-in-base64-out \
@@ -70,8 +71,8 @@ echo "== 9. 별칭 live → v1 (90%) + v2 (10%) — 카나리 배포"
 aws lambda create-alias --function-name "$FN" --name live --function-version "$v1" \
   --routing-config "{\"AdditionalVersionWeights\":{\"$v2\":0.1}}" \
   --query '{Alias: Name, Version: FunctionVersion, Routing: RoutingConfig}'
-echo "-- 별칭으로 20번 호출해 실행된 버전 세기 (비율은 단언하지 않는다)"
-for _ in $(seq 1 20); do
+echo "-- 별칭으로 10번 호출해 실행된 버전 세기 (비율은 단언하지 않는다)"
+for _ in $(seq 1 10); do
   aws lambda invoke --function-name "$FN" --qualifier live --cli-binary-format raw-in-base64-out \
     --payload '{"orderId":"A-1005"}' --query ExecutedVersion --output text "$WORK/a.json"
 done | sort | uniq -c

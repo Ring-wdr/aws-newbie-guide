@@ -27,7 +27,8 @@ sequenceDiagram
     Note over E: 한동안 호출 없으면 회수
 ```
 
-- **콜드 스타트(cold start)**: 새 실행 환경을 만들 때의 추가 지연(코드 다운로드, 런타임·초기화 코드 실행). DB 연결·SDK 클라이언트는 **핸들러 밖**에서 만들어 재사용하는 것이 정석이다. 콜드 스타트를 줄이려면 **프로비저닝된 동시성(Provisioned Concurrency)** 으로 환경을 미리 데워 두거나, Java 등은 **SnapStart**를 쓴다.
+- **콜드 스타트(cold start)**: 새 실행 환경을 만들 때의 추가 지연(코드 다운로드, 런타임·초기화 코드 실행). DB 연결·SDK 클라이언트는 **핸들러 밖**에서 만들어 재사용하는 것이 정석이다. 콜드 스타트를 줄이려면 **프로비저닝된 동시성(Provisioned Concurrency)** 으로 환경을 미리 데워 두거나, **SnapStart**(초기화된 환경의 스냅숏에서 재개 — Java 11+, Python 3.12+, .NET 8+ 관리형 런타임)를 쓴다.
+- **INIT 단계도 과금된다**: 2025년 8월 1일부터 관리형 런타임 + zip 패키지 함수도 콜드 스타트의 INIT 시간이 청구 기간(Billed Duration)에 포함된다([AWS Compute Blog](https://aws.amazon.com/blogs/compute/aws-lambda-standardizes-billing-for-init-phase/)). 무거운 초기화 코드는 지연뿐 아니라 비용도 늘린다.
 - **상태 없음(stateless)**: 다음 호출이 같은 환경으로 갈 보장이 없다. 상태는 DynamoDB·S3·ElastiCache에 둔다. `/tmp`(512 MB ~ 10,240 MB)는 임시 공간일 뿐이다.
 - **동시성(concurrency)**: 동시에 실행 중인 환경 수. 계정·리전당 기본 1,000(증설 요청 가능). **예약 동시성(reserved)** 은 함수 하나가 쓸 몫을 떼어 두는 동시에 **상한**이 된다(다른 함수 보호, 하위 DB 보호). **프로비저닝된 동시성**은 콜드 스타트를 없애려고 미리 띄워 두는 것(유료).
 - 한도를 넘으면 동기 호출은 **429 `TooManyRequestsException`(스로틀)**, 비동기·이벤트 소스는 Lambda가 재시도한다.
@@ -150,8 +151,8 @@ aws: [ERROR]: An error occurred (ValidationException) when calling the UpdateFun
         }
     }
 }
--- 별칭으로 20번 호출해 실행된 버전 세기 (비율은 단언하지 않는다)
-  18 1
+-- 별칭으로 10번 호출해 실행된 버전 세기 (비율은 단언하지 않는다)
+   8 1
    2 2
 -- 검증이 끝났다고 치고 live 를 v2 100% 로 승격
 {
@@ -161,7 +162,7 @@ aws: [ERROR]: An error occurred (ValidationException) when calling the UpdateFun
 {"orderId": "A-1006", "status": "PAID", "appVersion": "2.0", "functionVersion": "2", "remainingMs": 1901}
 ```
 
-방금 본 것: 버전 1은 `APP_VERSION=1.0`을 그대로 간직한다 — 버전은 코드뿐 아니라 **구성까지** 고정한다. 별칭 가중치에 따라 실제로 두 버전이 섞여 실행됐다(20번 중 몇 번이 v2일지는 확률이므로 실행마다 다르다). 호출자는 `--qualifier live`만 알면 되고, 승격·롤백은 별칭만 바꾼다.
+방금 본 것: 버전 1은 `APP_VERSION=1.0`을 그대로 간직한다 — 버전은 코드뿐 아니라 **구성까지** 고정한다. 별칭 가중치에 따라 실제로 두 버전이 섞여 실행됐다(10번 중 몇 번이 v2일지는 확률이므로 실행마다 다르다). 호출자는 `--qualifier live`만 알면 되고, 승격·롤백은 별칭만 바꾼다.
 
 **5) 동시성과 로그**
 
@@ -193,13 +194,14 @@ LAB01 OK
 ## 실제 AWS에서는
 
 - **에뮬레이터의 함수 실행 환경은 AWS와 다르다.** 저자가 함수 안에서 직접 확인한 결과: Python은 CPython이 아니라 **RustPython**(`sys.version`이 `3.14.0.alpha … [RustPython 0.6.0 …]`)이고, `boto3`는 에뮬레이터가 넣어 준 **대체 모듈**(`/var/task/boto3`, `client`·`resource`·`Session`만 있음)이며, 환경 변수에 `AWS_ACCESS_KEY_ID`가 **없다**. 함수가 열 수 있는 네트워크는 에뮬레이터가 제공하는 서비스(sqs, events, dynamodb, logs, cloudwatch, s3, stepfunctions, secretsmanager 등)뿐이고, `socket.gethostname()`·`os.listdir()` 같은 호스트 접근도 막혀 있다. 그래서 순수 Python + boto3로 된 짧은 함수는 잘 돌지만, 네이티브 확장(예: `pydantic-core`)이나 외부 HTTP 호출이 있는 코드는 에뮬레이터에서 실행되지 않는다. 실제 AWS의 python3.12 런타임은 CPython에 실제 boto3가 들어 있다.
+- **문제 해결 — `Could not connect to the endpoint URL`이 갑자기 나면**: 에뮬레이터 1.0.322는 Lambda를 호출할 때마다 메모리를 조금씩(측정상 호출당 수 MiB) 쌓아 두고 풀지 않는다. 실습을 여러 번 반복하면 컨테이너가 메모리 상한(기본 1 GiB)에 닿아 강제 종료(OOM)되고, 그 뒤 모든 명령이 이 오류를 낸다. `docker stats --no-stream aws-emulator-$EMULATOR_PORT`로 메모리를 보고, 높으면 `scripts/emulator-reset.sh`로 다시 시작한다(상태는 사라진다). 반복 실습이 많다면 `EMULATOR_MEMORY=2g scripts/emulator-reset.sh`로 상한을 올려 다시 시작한다. 실제 AWS와는 무관한 에뮬레이터 문제다.
 - 콜드 스타트 지연, 동시성 스로틀(429), 프로비저닝된 동시성의 효과는 에뮬레이터에서 관찰하지 않았다. 에뮬레이터의 실행 시간(`Duration`)을 AWS 성능으로 해석하지 말자.
 - 실제 AWS에서 해 보려면: Lambda는 매월 요청 100만 건 + 40만 GB-초가 프리 티어(상시)라 이 실습은 사실상 무료다. **프로비저닝된 동시성은 켜 두는 시간만큼 과금**되므로 실습 뒤 반드시 지운다. 정리: `aws lambda delete-function --function-name todayorder-order-status`(버전·별칭 함께 삭제), 로그 그룹 `aws logs delete-log-group --log-group-name /aws/lambda/todayorder-order-status`, 역할의 정책 분리 후 `aws iam delete-role`.
 
 ## 시험 포인트
 
 - "15분 이상 걸리는 작업" → Lambda 불가. **ECS/Fargate, AWS Batch, Step Functions로 쪼개기**.
-- "콜드 스타트 때문에 지연이 들쭉날쭉, 일정한 저지연 필요" → **프로비저닝된 동시성**(Java면 SnapStart도).
+- "콜드 스타트 때문에 지연이 들쭉날쭉, 일정한 저지연 필요" → **프로비저닝된 동시성** 또는 **SnapStart**(Java·Python 3.12+·.NET 8+).
 - "한 함수가 폭주해 다른 함수가 스로틀된다 / 하위 DB 연결 수 보호" → **예약 동시성**으로 상한.
 - "새 버전을 일부 트래픽에만 먼저" → **별칭 + 가중치 라우팅**(CodeDeploy 카나리/선형).
 - "여러 함수가 같은 라이브러리" → **계층(Layer)**. "큰 의존성(> 250 MB)" → **컨테이너 이미지(최대 10 GB)**.
