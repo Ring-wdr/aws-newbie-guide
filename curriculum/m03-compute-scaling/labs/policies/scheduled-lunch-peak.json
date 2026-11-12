@@ -1,0 +1,8 @@
+{
+  "AutoScalingGroupName": "todayorder-policy-asg",
+  "ScheduledActionName": "weekday-lunch-peak",
+  "Recurrence": "30 11 * * 1-5",
+  "TimeZone": "Asia/Seoul",
+  "MinSize": 4,
+  "DesiredCapacity": 6
+}

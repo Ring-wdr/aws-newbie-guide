@@ -1,0 +1,12 @@
+{
+  "AutoScalingGroupName": "todayorder-policy-asg",
+  "PolicyName": "requests-per-target-1000",
+  "PolicyType": "TargetTrackingScaling",
+  "TargetTrackingConfiguration": {
+    "PredefinedMetricSpecification": {
+      "PredefinedMetricType": "ALBRequestCountPerTarget",
+      "ResourceLabel": "app/todayorder-alb/1234567890abcdef/targetgroup/todayorder-api-tg/fedcba0987654321"
+    },
+    "TargetValue": 1000.0
+  }
+}
