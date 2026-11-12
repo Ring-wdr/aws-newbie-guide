@@ -1,0 +1,18 @@
+[project]
+name = "aws-newbie-guide"
+version = "0.1.0"
+description = "aws-emulator로 실습하는 AWS SAA-C03 커리큘럼의 Python(boto3) 예제 실행 환경"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "boto3>=1.40",
+]
+
+# src/emulator_guard: 모든 boto3 예제가 클라이언트를 만들기 전에 호출하는 안전 장치.
+# uv sync 가 이 저장소를 편집 가능 모드로 설치하므로 어디서든 `from emulator_guard import require_emulator`.
+[build-system]
+requires = ["uv_build>=0.8,<0.14"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "emulator_guard"
