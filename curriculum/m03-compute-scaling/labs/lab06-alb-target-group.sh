@@ -131,15 +131,22 @@ poll 60 "api-a unhealthy" a_unhealthy
 aws elbv2 describe-target-health --target-group-arn "$TG" \
   --query 'TargetHealthDescriptions[].[Target.Id,TargetHealth.State,TargetHealth.Reason]' --output text
 
-echo "== 9. NLB: TCP, 교차 영역 기본 꺼짐"
+echo "== 9. NLB: TCP, 교차 영역 기본 꺼짐, IP 대상(TCP)은 클라이언트 IP 보존 기본 꺼짐"
 NLB="$(aws elbv2 create-load-balancer --name "$NLB_NAME" --type network --scheme internal \
   --subnets "$M03_SUBNET_A" "$M03_SUBNET_B" --query 'LoadBalancers[0].LoadBalancerArn' --output text)"
-aws elbv2 create-target-group --name "$TCP_TG_NAME" --protocol TCP --port 8080 --vpc-id "$M03_VPC" --target-type ip \
+TCP_TG="$(aws elbv2 create-target-group --name "$TCP_TG_NAME" --protocol TCP --port 8080 --vpc-id "$M03_VPC" --target-type ip \
+  --query 'TargetGroups[0].TargetGroupArn' --output text)"
+aws elbv2 describe-target-groups --target-group-arns "$TCP_TG" \
   --query 'TargetGroups[0].[Protocol,Port,TargetType,HealthCheckProtocol]' --output text
 aws elbv2 describe-load-balancers --load-balancer-arns "$NLB" --query 'LoadBalancers[0].[Type,Scheme,DNSName]' --output text
 nlb_cross="$(aws elbv2 describe-load-balancer-attributes --load-balancer-arn "$NLB" \
   --query 'Attributes[?Key==`load_balancing.cross_zone.enabled`].Value' --output text)"
 echo "load_balancing.cross_zone.enabled = $nlb_cross"
+echo "-- TCP + IP 대상 그룹: 클라이언트 IP 보존과 프록시 프로토콜 v2 기본값"
+aws elbv2 describe-target-group-attributes --target-group-arn "$TCP_TG" \
+  --query 'Attributes[?Key==`preserve_client_ip.enabled`||Key==`proxy_protocol_v2.enabled`].[Key,Value]' --output text
+preserve="$(aws elbv2 describe-target-group-attributes --target-group-arn "$TCP_TG" \
+  --query 'Attributes[?Key==`preserve_client_ip.enabled`].Value' --output text)"
 
 echo "== 10. 정리"
 cleanup
@@ -149,4 +156,5 @@ echo "정리 완료"
 [ "$rule_count" = "5" ] || fail "규칙 수가 5(4개 + default)가 아님 ($rule_count)"
 [ "$sticky" = "true" ] || fail "스티키 세션이 켜지지 않음 ($sticky)"
 [ "$nlb_cross" = "false" ] || fail "NLB 교차 영역 기본값이 false 가 아님 ($nlb_cross)"
+[ "$preserve" = "false" ] || fail "TCP·IP 대상 그룹의 클라이언트 IP 보존 기본값이 false 가 아님 ($preserve)"
 echo "LAB06 OK"

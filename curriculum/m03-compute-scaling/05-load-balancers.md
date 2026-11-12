@@ -38,11 +38,21 @@ flowchart LR
 | 라우팅 | 경로·호스트·헤더·쿼리·메서드 | 포트 단위 | 모든 트래픽을 어플라이언스로 |
 | 고정 IP | 없음(DNS 이름만) | **AZ마다 고정 IP, EIP 지정 가능** | – |
 | 성능 | 일반 웹 | **초당 수백만 요청, 매우 낮은 지연** | – |
-| 클라이언트 IP | `X-Forwarded-For` 헤더로 전달 | 그대로 보존(인스턴스·IP 대상) | 보존 |
+| 클라이언트 IP | `X-Forwarded-For` 헤더로 전달 | 대상 유형·프로토콜에 따라 다름(아래) | 보존 |
 | 대상 | instance, ip, **lambda** | instance, ip, **alb** | instance, ip (방화벽·IDS 어플라이언스) |
 | 교차 영역 기본값 | **켜짐** | **꺼짐** | 꺼짐 |
 | 보안 그룹 | 붙인다 | 붙일 수 있다(생성 시) | – |
 | 이럴 때 | 웹·API, 마이크로서비스 경로 라우팅, 컨테이너 | 게임·IoT·금융 등 TCP/UDP, 고정 IP, 극저지연, PrivateLink 서비스 제공 | 서드파티 방화벽·IDS/IPS를 투명하게 끼워 넣기 |
+
+**NLB의 클라이언트 IP 보존**(대상 그룹 속성 `preserve_client_ip.enabled`, AWS 문서 2026-11 확인):
+
+| 대상 그룹 | 기본값 |
+|---|---|
+| 인스턴스 대상 | **켜짐** — 대상은 클라이언트 IP를 그대로 본다 |
+| IP 대상 + UDP / TCP_UDP | **켜짐**(끌 수 없음) |
+| IP 대상 + **TCP / TLS** | **꺼짐** — 대상에는 NLB 노드의 프라이빗 IP가 보인다 |
+
+TCP/TLS + IP 대상에서 클라이언트 IP가 필요하면 `preserve_client_ip.enabled=true`로 켜거나(대상이 같은 VPC 또는 같은 리전의 피어링 VPC에 있어야 한다), **프록시 프로토콜 v2**(`proxy_protocol_v2.enabled`)를 켜고 앱이 헤더에서 읽게 한다. PrivateLink(엔드포인트 서비스)로 들어온 트래픽은 항상 NLB IP로 보이므로 프록시 프로토콜 v2를 쓴다.
 
 **CLB(Classic)** 는 이전 세대다. 새로 만들지 않는다.
 
@@ -52,7 +62,7 @@ flowchart LR
 - **스티키 세션(Stickiness)**: 같은 클라이언트를 같은 대상으로 보낸다. ALB가 만드는 쿠키(`lb_cookie`, 기간 지정) 또는 앱이 만든 쿠키(`app_cookie`). 세션을 서버 메모리에 두는 레거시 앱용이다. **더 좋은 해법은 세션을 ElastiCache·DynamoDB로 빼서 서버를 무상태로** 만드는 것이다.
 - **등록 취소 지연(Deregistration delay, 연결 드레이닝)**: 대상을 빼거나 축소할 때, 진행 중인 요청이 끝나도록 기다리는 시간. 기본 300초.
 - **HTTPS**: 리스너에 **ACM 인증서**를 붙여 로드 밸런서에서 TLS를 종료한다. 하나의 리스너에 여러 도메인 인증서를 둘 수 있다(**SNI**).
-- 전송 계층 보안·WAF: ALB에 **AWS WAF**를 붙여 SQL 인젝션·속도 제한을 막는다(M08).
+- **AWS WAF 연결**: ALB에 **AWS WAF**를 붙여 SQL 인젝션·속도 제한을 막는다(M08).
 
 ## 직접 해 보기
 
@@ -167,13 +177,24 @@ i-00000000000000016	healthy	None
 
 방금 본 것: 에뮬레이터의 헬스 상태는 **인스턴스 상태를 따른다**. 실제 AWS에서는 `/health` 응답이 실패해도(앱이 죽어도) unhealthy가 된다.
 
-**7) NLB: 교차 영역 기본 꺼짐.**
+**7) NLB: 교차 영역 기본 꺼짐, IP 대상(TCP)은 클라이언트 IP 보존 기본 꺼짐.**
+
+```bash
+aws elbv2 create-target-group --name todayorder-api-tcp-tg --protocol TCP --port 8080 --vpc-id "$M03_VPC" --target-type ip
+aws elbv2 describe-target-group-attributes --target-group-arn <tcp-tg> \
+  --query 'Attributes[?Key==`preserve_client_ip.enabled`||Key==`proxy_protocol_v2.enabled`].[Key,Value]' --output text
+```
 
 ```
 TCP	8080	ip	TCP
-network	internal	todayorder-nlb-e0567f88ec1b7ebd.elb.us-east-1.amazonaws.com
+network	internal	todayorder-nlb-ee65fe25de1ae77b.elb.us-east-1.amazonaws.com
 load_balancing.cross_zone.enabled = false
+-- TCP + IP 대상 그룹: 클라이언트 IP 보존과 프록시 프로토콜 v2 기본값
+preserve_client_ip.enabled	false
+proxy_protocol_v2.enabled	false
 ```
+
+방금 본 것: 이 대상 그룹(IP 대상 + TCP)은 클라이언트 IP 보존이 **기본 꺼짐**이다. 이대로면 대상 서버는 NLB 노드의 프라이빗 IP를 보게 된다. 클라이언트 IP가 필요하면 `preserve_client_ip.enabled=true` 또는 `proxy_protocol_v2.enabled=true`로 바꾼다(위 표). 같은 설정을 UDP 대상 그룹이나 인스턴스 대상 그룹으로 만들면 기본값이 `true`다.
 
 ### 선택 과제: 규칙이 정말 응답하는지 (컨테이너 안에서)
 
@@ -217,7 +238,7 @@ GET / (Host: admin…)   →  [HTTP 502]
 ## 시험 포인트
 
 - "경로/호스트별로 다른 서비스로(마이크로서비스)", "Lambda를 대상으로" → **ALB**.
-- "고정 IP, TCP/UDP, 초저지연·초고성능, 클라이언트 IP 보존" → **NLB**. "고정 IP + HTTP 경로 라우팅" → **NLB 뒤에 ALB 대상**(또는 Global Accelerator + ALB).
+- "고정 IP, TCP/UDP, 초저지연·초고성능, 클라이언트 IP 보존" → **NLB**. 단 IP 대상 + TCP/TLS는 클라이언트 IP 보존이 기본 꺼짐 → `preserve_client_ip.enabled` 또는 **프록시 프로토콜 v2**. "고정 IP + HTTP 경로 라우팅" → **NLB 뒤에 ALB 대상**(또는 Global Accelerator + ALB).
 - "서드파티 방화벽 어플라이언스를 투명하게 끼워 넣기" → **GWLB**(GENEVE).
 - "AZ마다 대상 수가 달라 부하가 쏠린다" → **교차 영역 로드 밸런싱** 켜기.
 - "배포·축소 때 진행 중 요청이 끊긴다" → **등록 취소 지연(연결 드레이닝)**. "로그인 세션이 풀린다" → 스티키 세션(임시) 또는 **세션 외부화**(정답에 가까움).

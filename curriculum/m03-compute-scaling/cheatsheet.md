@@ -64,12 +64,12 @@
 | | ALB | NLB | GWLB |
 |---|---|---|---|
 | 계층 | L7 HTTP/HTTPS/gRPC | L4 TCP/UDP/TLS | L3 (GENEVE 6081) |
-| 특징 | 경로·호스트·헤더 라우팅, Lambda 대상, WAF | **고정 IP/EIP**, 초저지연, 클라이언트 IP 보존, ALB 대상 | 방화벽 어플라이언스 삽입 |
+| 특징 | 경로·호스트·헤더 라우팅, Lambda 대상, WAF | **고정 IP/EIP**, 초저지연, 클라이언트 IP 보존(IP 대상 TCP/TLS는 기본 꺼짐), ALB 대상 | 방화벽 어플라이언스 삽입 |
 | 교차 영역 기본 | 켜짐 | 꺼짐 | 꺼짐 |
 
 - 규칙: 작은 우선순위 먼저, 없으면 default. 동작 = forward / redirect / fixed-response / authenticate.
 - 등록 취소 지연(연결 드레이닝) 기본 300초. 스티키 세션 = `lb_cookie`/`app_cookie`(근본 해결은 세션 외부화).
-- 클라이언트 IP(ALB 뒤) = `X-Forwarded-For`. HTTPS = ACM 인증서, 여러 도메인 = SNI.
+- 클라이언트 IP(ALB 뒤) = `X-Forwarded-For`. NLB 뒤: 인스턴스 대상·IP 대상(UDP/TCP_UDP)은 기본 보존, **IP 대상(TCP/TLS)은 기본 꺼짐** → `preserve_client_ip.enabled` 또는 프록시 프로토콜 v2. HTTPS = ACM 인증서, 여러 도메인 = SNI.
 
 ## Auto Scaling
 
