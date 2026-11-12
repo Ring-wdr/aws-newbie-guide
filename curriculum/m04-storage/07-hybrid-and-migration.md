@@ -94,6 +94,7 @@ aws: [ERROR]: An error occurred (NotImplemented) when calling the CreateTapes op
 
 ```
 == 3. DataSync — S3 → S3 이전 작업
+작업 상태: AVAILABLE
 {
     "Status": "SUCCESS",
     "FilesTransferred": 0,

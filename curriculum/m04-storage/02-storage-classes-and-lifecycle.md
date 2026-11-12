@@ -72,9 +72,10 @@ flowchart TD
 ```
 
 AWS가 **거부하는** 규칙(`InvalidArgument`):
-- `STANDARD_IA`·`ONEZONE_IA`로의 전환이 생성 후 **30일 미만**.
 - 한 규칙 안에서 다음 전환이 이전 클래스의 최소 보관 기간보다 빠름. 예: Glacier IR 4일 → Deep Archive 20일은 안 되고 94일 이후여야 한다.
 - 폭포를 거스르는 전환(예: Glacier → Standard-IA).
+
+> 📌 **2026년 7월 변경**: 예전에는 "Standard-IA·One Zone-IA로의 전환은 생성 후 30일 이상"이어야 했고, 그보다 짧으면 `InvalidArgument`였다. 2026-07-16 발표로 이 제한이 없어져 **0일 전환도 가능**하다. 하지만 IA의 **최소 보관 기간 30일(요금)** 은 그대로다. 그 전에 지우거나 다른 클래스로 옮기면 남은 기간만큼 요금이 나온다. 시험 문제나 옛 자료는 여전히 "30일 이후부터"를 정답으로 기대할 수 있으니 두 가지를 모두 알아 둔다.
 
 그리고 2024년 9월부터 **128 KB 미만 객체는 기본적으로 어떤 클래스로도 전환되지 않는다**. 작은 객체는 전환 요청 요금이 절감액보다 크기 때문이다. 필요하면 필터에 `ObjectSizeGreaterThan`/`ObjectSizeLessThan`을 직접 쓴다. 에뮬레이터 응답의 `"TransitionDefaultMinimumObjectSize": "all_storage_classes_128K"`가 이 기본값이다.
 
@@ -175,34 +176,43 @@ receipts/STANDARD.json StorageClass=None
 
 방금 본 것: `HeadObject`는 Standard 객체에 대해 `StorageClass`를 아예 돌려주지 않는다(그래서 `None`). 이건 실제 S3도 같다. 규칙의 날짜 계산 예: 30일 IA → 90일 Glacier IR 사이는 60일로 IA 최소 보관 30일을 넘고, 90일 → 365일은 Glacier IR 최소 90일을 넘으므로 유효하다.
 
-**5) 에뮬레이터는 잘못된 규칙도 받아 준다 — 일부만**
+**5) 규칙 검증 — 무엇이 저장되고 무엇이 거부되나**
 
 ```
-== 10. AWS라면 거부될 규칙: STANDARD_IA 로 10일 만에 전환 (AWS 최소 30일)
+== 10. STANDARD_IA 로 10일 만에 전환 → 받아 준다 (AWS도 2026-07부터 허용. 예전에는 최소 30일)
 rc=0 {
     "TransitionDefaultMinimumObjectSize": "all_storage_classes_128K"
 }
-== 11. 에뮬레이터도 거부하는 규칙: 전환 순서가 거꾸로 (GLACIER 30일 → STANDARD_IA 60일)
-
+== 11. 한 규칙 안에서 최소 보관 기간보다 빠른 연쇄 전환 (Glacier IR 4일 → Deep Archive 20일) → 거부
+aws: [ERROR]: An error occurred (InvalidArgument) when calling the PutBucketLifecycleConfiguration operation: 'Days' in the 'Transition' action for StorageClass 'DEEP_ARCHIVE' for filter '(prefix=receipts/)' must be 90 days more than 'filter '(prefix=receipts/)'' 'Days' in the 'Transition' action for StorageClass 'GLACIER_IR' for filter '(prefix=receipts/)'
+== 12. 전환 순서가 거꾸로 (GLACIER 30일 → STANDARD_IA 60일) → 거부
 aws: [ERROR]: An error occurred (InvalidArgument) when calling the PutBucketLifecycleConfiguration operation: 'Days' in the 'Transition' action for StorageClass 'GLACIER' for filter '(prefix=receipts/)' must be greater than 'Days' in the 'Transition' action for StorageClass 'STANDARD_IA' for filter '(prefix=receipts/)'
-== 12. 정리
+== 13. 정리
 LAB02 OK
 ```
 
-> ⚠️ **에뮬레이터 한계**: 에뮬레이터 1.0.322는 "IA로 10일 만에 전환"(실제 AWS는 `InvalidArgument`)을 **받아 준다**. 거꾸로 된 전환, 존재하지 않는 클래스, 중복 규칙 ID, 0일 만료, "IA 다음 전환이 30일 이내"는 거부한다. 그러니 "에뮬레이터에서 통과했다"가 "AWS에서도 통과한다"는 뜻이 아니다. [sdk/lifecycle_lint.py](./sdk/lifecycle_lint.py)가 이런 규칙을 찾아낸다.
+방금 본 것: 에뮬레이터 1.0.322의 수명 주기 검증은 위 "AWS가 거부하는 규칙"과 같게 동작했다. IA 10일 전환은 저장하고(2026-07 이후 AWS와 같음), 최소 보관 기간보다 빠른 연쇄 전환(이전 버전 전환에도 적용)과 역방향 전환은 거부한다. 존재하지 않는 클래스, 중복 규칙 ID, 0일 만료도 거부한다.
+
+하지만 **"저장됐다"가 "좋은 규칙"이라는 뜻은 아니다.** IA로 10일 만에 옮기고 20일에 지우는 규칙은 저장되지만 IA 최소 보관 30일 요금을 낸다. [sdk/lifecycle_lint.py](./sdk/lifecycle_lint.py)는 저장되는 규칙의 비용 함정과, 저장 전에 걸러야 할 규칙(현재·이전 버전 전환 모두, 첫 전환이 0일인 경우 포함)을 찾는다.
 
 ```bash
 uv run python curriculum/m04-storage/sdk/lifecycle_lint.py
 ```
 
 ```
-데모 버킷 todayorder-m04-lifecycle-lint 에 규칙 3개 저장 — 에뮬레이터는 모두 받아 줬다
+데모 버킷 todayorder-m04-lifecycle-lint 에 규칙 3개 저장 — 모두 저장됐다
 [todayorder-m04-lifecycle-lint] 점검 결과 5건
-  INFO  receipts-good: 128 KB 미만 객체는 기본적으로 전환되지 않음(작은 객체는 전환 요청 비용이 절감액보다 큼)
-  ERROR thumbs-ia-10d: STANDARD_IA 전환이 10일 — AWS는 생성 후 30일 이상만 허용 (InvalidArgument)
-  INFO  thumbs-ia-10d: 128 KB 미만 객체는 기본적으로 전환되지 않음(작은 객체는 전환 요청 비용이 절감액보다 큼)
-  WARN  logs-deep-then-delete: DEEP_ARCHIVE 에 30일만 두고 삭제 → 최소 보관 180일 중 남은 150일치 조기 삭제 요금
+  WARN  logs-deep-then-delete: [현재 버전] DEEP_ARCHIVE 에 30일만 두고 삭제 → 최소 보관 180일 중 남은 150일치 조기 삭제 요금
   INFO  logs-deep-then-delete: 128 KB 미만 객체는 기본적으로 전환되지 않음(작은 객체는 전환 요청 비용이 절감액보다 큼)
+  INFO  menu-old-versions: [이전 버전] STANDARD_IA 전환 10일 — 2026-07 발표는 현재 버전만 언급 — 이전 버전의 최소 일수는 실제 계정에서 확인
+  WARN  menu-old-versions: [이전 버전] STANDARD_IA 에 10일만 두고 삭제 → 최소 보관 30일 중 남은 20일치 조기 삭제 요금
+  INFO  menu-old-versions: 128 KB 미만 객체는 기본적으로 전환되지 않음(작은 객체는 전환 요청 비용이 절감액보다 큼)
+[저장 전 점검(규칙 사전)] 점검 결과 4건
+  ERROR gir-4-da-20: [현재 버전] GLACIER_IR(4일) → DEEP_ARCHIVE(20일): GLACIER_IR 최소 보관 90일보다 빠름 — 한 규칙에서는 거부됨
+  ERROR gir-0-da-30: [현재 버전] GLACIER_IR(0일) → DEEP_ARCHIVE(30일): GLACIER_IR 최소 보관 90일보다 빠름 — 한 규칙에서는 거부됨
+  ERROR nc-gir-5-da-20: [이전 버전] GLACIER_IR(5일) → DEEP_ARCHIVE(20일): GLACIER_IR 최소 보관 90일보다 빠름 — 한 규칙에서는 거부됨
+  ERROR backwards: [현재 버전] GLACIER → STANDARD_IA 전환은 폭포 모델에 없음
+에뮬레이터도 4개 모두 InvalidArgument 로 거부
 정리 완료
 SDK lifecycle_lint OK
 ```
@@ -266,18 +276,18 @@ SDK lifecycle_lint OK
 - "가끔 읽지만 읽을 땐 **즉시**(밀리초)" → Standard-IA. "분기 1회 정도, 즉시" → **Glacier Instant Retrieval**.
 - "**다시 만들 수 있는** 데이터 + 가끔 읽음 + 최저가" → **One Zone-IA**. "AZ 장애에도 살아남아야" → One Zone 계열은 오답.
 - "몇 분 안에 가끔 꺼내야 하는 아카이브" → Glacier Flexible(신속 1–5분). "**12시간/48시간** 기다려도 되는 장기 규정 보관, 최저가" → **Deep Archive**(신속 검색 없음).
-- 수명 주기로 IA 전환은 **30일 이후부터**. 최소 보관 기간: IA 30일, Glacier IR·Flexible 90일, Deep Archive 180일. 작은 객체(128 KB 미만)는 IA·Glacier IR 비용 함정.
+- 수명 주기의 IA·One Zone-IA 전환은 2026-07부터 **0일부터** 가능(예전 자료·시험은 "30일 이후부터"). 최소 보관 기간(요금): IA 30일, Glacier IR·Flexible 90일, Deep Archive 180일. 작은 객체(128 KB 미만)는 IA·Glacier IR 비용 함정.
 - "완료되지 않은 멀티파트 업로드 비용" → 수명 주기 `AbortIncompleteMultipartUpload`. "이전 버전이 쌓여 비용 증가" → `NoncurrentVersionExpiration`.
 
 ## 스스로 확인
 
-1. 영수증을 "생성 7일 후 Standard-IA로" 옮기는 규칙을 에뮬레이터에 넣었더니 잘 저장됐다. 실제 계정에 같은 스크립트를 돌리면?
+1. 영수증을 "생성 7일 후 Standard-IA로, 20일 후 삭제"하는 규칙을 에뮬레이터에 넣었더니 잘 저장됐다. 실제 계정에서는 저장되는가? 이 규칙의 문제는?
 2. 데이터 분석팀이 1년에 한 번, 감사 때만 2018년 주문 로그를 본다. 감사관은 "요청 후 이틀 안에 주면 된다"고 했다. 가장 싼 클래스는? 감사 일정이 "요청 후 5분 안에"로 바뀌면?
 3. Intelligent-Tiering이 항상 Standard보다 싸지 않은 경우는?
 
 <details><summary>답</summary>
 
-1. `InvalidArgument`로 거부된다. Standard-IA·One Zone-IA 전환은 생성 후 30일 이상이어야 한다. 에뮬레이터는 이 검증을 하지 않는다(lab02 10단계). 배포 전에 `lifecycle_lint.py` 같은 점검이나 IaC 검증을 둔다.
+1. 2026-07 이후의 실제 AWS에서도 저장된다(그 전에는 7일 IA 전환이 `InvalidArgument`였다). 문제는 비용이다. IA의 최소 보관 기간은 30일인데 13일만 두고 지우므로, 객체마다 남은 17일치를 IA 요율로 더 낸다. 20일 안에 지울 데이터라면 Standard에 두는 편이 낫다. `lifecycle_lint.py`가 이런 규칙을 WARN으로 알려 준다.
 2. 이틀 안이면 Deep Archive(대량 검색 48시간 이내, 표준 12시간 이내)가 가장 싸다. 5분 안이면 Glacier Flexible Retrieval의 신속 검색(1–5분)이나 Glacier Instant Retrieval(밀리초)을 쓴다. 1년에 한 번이라면 검색 요금보다 저장 요금이 중요하니 비교 계산이 필요하다.
 3. 객체가 아주 많고 작을 때(128 KB 미만은 계층 이동이 안 되어 Standard와 같은 Frequent 계층 요금), 또는 거의 모든 객체가 매일 읽혀 계속 Frequent에 머무를 때. 이때는 모니터링 요금만큼 손해다(128 KB 미만은 모니터링 요금도 없지만 절감도 없다).
 

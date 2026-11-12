@@ -29,7 +29,7 @@ EBS 볼륨 유형(gp3/io2/st1/sc1)과 스냅샷은 M03 레슨 3에서 다룬다.
 | 실습 | 스크립트 | 레슨 | 등급 |
 |---|---|---|---|
 | 객체 CRUD·접두사·메타데이터·강한 일관성 | [labs/lab01-s3-object-basics.sh](./labs/lab01-s3-object-basics.sh) | 1 | 🟢 |
-| 스토리지 클래스·Glacier 복원·수명 주기 규칙(잘못된 규칙도 받아 줌) | [labs/lab02-lifecycle-and-classes.sh](./labs/lab02-lifecycle-and-classes.sh) | 2 | 🟢 (전환 자체는 일어나지 않음 → 워크시트) |
+| 스토리지 클래스·Glacier 복원·수명 주기 규칙(저장되는 규칙/거부되는 규칙) | [labs/lab02-lifecycle-and-classes.sh](./labs/lab02-lifecycle-and-classes.sh) | 2 | 🟢 (전환 자체는 일어나지 않음 → 워크시트) |
 | 비용 워크시트 W1~W6 (정답 포함) | [02 레슨 "비용 워크시트"](./02-storage-classes-and-lifecycle.md#비용-워크시트-손으로-풀기) | 2 | 🔴 (손으로 계산) |
 | 버전 관리·삭제 마커·객체 잠금(거버넌스/규정 준수/법적 보존)·MFA Delete | [labs/lab03-versioning-object-lock.sh](./labs/lab03-versioning-object-lock.sh) | 3 | 🟢 / MFA Delete 🟡 |
 | 복제(대상 버킷에 실제 복사, 삭제 마커 복제 옵션) | [labs/lab04-replication.sh](./labs/lab04-replication.sh) | 3 | 🟢 |
@@ -41,7 +41,7 @@ EBS 볼륨 유형(gp3/io2/st1/sc1)과 스냅샷은 M03 레슨 3에서 다룬다.
 | EFS 파일 시스템·마운트 타깃·액세스 포인트 | [labs/lab10-efs-file-system.sh](./labs/lab10-efs-file-system.sh) | 6 | 🟡 |
 | Storage Gateway·DataSync·Transfer Family 구성 | [labs/lab11-hybrid-transfer.sh](./labs/lab11-hybrid-transfer.sh) | 7 | 🟡 / 일부 🔴(501) |
 | boto3: 영수증 업로드 서비스 (presigned PUT/GET, 업로드 검증) | [sdk/receipt_upload_service.py](./sdk/receipt_upload_service.py) | 4 | 🟢 |
-| boto3: 수명 주기 규칙 점검기 (에뮬레이터가 받아 주는 잘못된 규칙 찾기) | [sdk/lifecycle_lint.py](./sdk/lifecycle_lint.py) | 2 | 🟢 |
+| boto3: 수명 주기 규칙 점검기 (현재·이전 버전 전환의 거부 규칙과 비용 함정 찾기) | [sdk/lifecycle_lint.py](./sdk/lifecycle_lint.py) | 2 | 🟢 |
 
 `labs/_lib.sh`는 lab 공용 함수(버전까지 지우는 `purge_bucket`, 오류 단언 `expect_error`)다. 단독 실행용이 아니다.
 
@@ -62,8 +62,9 @@ curriculum/m04-storage/labs/verify.sh
 
 | 오퍼레이션 / 동작 | 증상 | 실습 대응 |
 |---|---|---|
+| S3에 대한 IAM 사용자 정책 **(M01과 같은 관찰)** | 객체·버킷 단위 데이터 요청(`GetObject`·`PutObject`·`ListObjectsV2`)은 정책이 없으면 암묵적 Deny, 명시적 Deny도 집행한다. 계정·관리 수준 요청(`ListBuckets`·`CreateBucket`·`DeleteBucket`·`PutBucketVersioning`)은 정책 없이도 통과 | 레슨 4 "실제 AWS에서는" |
 | 수명 주기 전환 | 규칙은 저장되지만 시간이 지나도 클래스가 바뀌지 않음 | lab02는 구성까지, 비용은 워크시트 |
-| `PutBucketLifecycleConfiguration` 검증 | **STANDARD_IA·ONEZONE_IA 30일 미만 전환**(예: IA 10일, One Zone-IA 7일)을 받아 줌(AWS는 `InvalidArgument`). **(신규)** 반면 거꾸로 된 전환, 없는 클래스, 중복 규칙 ID, 0일 만료, "IA 다음 전환이 30일 이내"는 거부함 — FIDELITY의 "잘못된 규칙도 받아 줌"은 일부만 맞다 | lab02 10·11단계에서 둘 다 보여 줌, `sdk/lifecycle_lint.py` |
+| `PutBucketLifecycleConfiguration` 검증 | **AWS 현재 규칙과 같게 동작한다.** STANDARD_IA·ONEZONE_IA를 30일 전에 전환하는 규칙(IA 10일, One Zone-IA 7일, IA 0일)과 이전 버전 IA 10일 전환을 받아 준다. 2026-07-16 AWS 발표로 현재 버전의 30일 최소 제한이 없어졌으므로 이것은 차이가 아니다(이전 버전은 발표가 언급하지 않아 미확인). 한 규칙 안에서 최소 보관 기간보다 빠른 연쇄 전환(Glacier IR 4일 → Deep Archive 20일, Glacier IR 0일 → Deep Archive 30일, 이전 버전 Glacier IR 5일 → Deep Archive 20일), 거꾸로 된 전환, 없는 클래스, 중복 규칙 ID, 0일 만료는 거부한다. **(신규)** FIDELITY의 "STANDARD_IA 30일 미만 → InvalidArgument 기대, 실제로는 성공(⚠️ 다름)"은 2026-07 이후 기준으로는 다름이 아니다 | lab02 10~12단계, `sdk/lifecycle_lint.py` |
 | Glacier 복원 | 수 초 만에 완료(실제 Standard 3–5시간) | 폴링으로 기다리고, 시간은 단언하지 않음 |
 | MFA Delete **(신규)** | 아무 MFA 코드나 받아 저장하고, 켠 뒤에도 MFA 없이 버전 영구 삭제가 통과함 | lab03에서 🟡로 관찰만 |
 | 객체 잠금 버킷의 버전 관리 일시 중지 **(신규)** | `Suspended`로 바뀜(AWS는 거부) | 레슨 3 "실제 AWS에서는" |
@@ -74,7 +75,7 @@ curriculum/m04-storage/labs/verify.sh
 | 퍼블릭 정책 + BPA 해제 **(신규)** | `IsPublic: true`가 되어도 익명 GET은 403 | 실습하지 않음, 레슨 4에 기록 |
 | S3 Control (`s3control`) | SDK가 `000000000000.127.0.0.1`로 보내 **도달 불가** | lab07 🔴 + 버킷 수준 BPA·정책 JSON 대체 실습 |
 | 웹 사이트·가속 엔드포인트 | 설정은 저장되지만 엔드포인트 없음 | lab09는 설정 확인만 |
-| EFS 마운트 타깃 AZ·IP **(신규 상세)** | AZ·IP를 서브넷이 아니라 **에뮬레이터 전체에서 생성 순서**로 매김(`us-east-1a, 1b, …, 1e, 1f`, `10.0.x.4`). 그래서 같은 AZ의 **다른 서브넷**에는 두 번째 마운트 타깃이 만들어짐. 같은 서브넷에서만 `MountTargetConflict` | lab10은 AZ를 출력하지 않고 같은 서브넷으로 충돌 재현 |
+| EFS 마운트 타깃 **(신규 상세)** | 같은 AZ의 **다른 서브넷**에 두 번째 마운트 타깃을 만들면 충돌 없이 만들어진다(AWS는 `MountTargetConflict`). `MountTargetConflict`는 **같은 서브넷**으로 다시 만들 때만 난다. 마운트 타깃의 AZ 표시(`AvailabilityZoneName`, 오류 메시지의 AZ)와 IP가 서브넷의 AZ·CIDR과 다를 수 있다 | lab10은 AZ를 출력하지 않고 같은 서브넷으로 충돌 재현 |
 | EFS 마운트 | NFS 서버가 없어 마운트 불가 | 🟡, "실제 AWS에서 해 보려면" |
 | Storage Gateway **(신규)** | 임의 활성화 키로 게이트웨이가 생기고 NFS 파일 공유는 AVAILABLE. `CreateSMBFileShare`·`CreateCachediSCSIVolume`·`CreateTapes`·`ListTapes`·`ListVolumes`는 **501** | lab11 🟡/🔴 |
 | DataSync **(신규)** | S3→S3 작업 실행이 `SUCCESS`인데 **0개 전송**(실제 복사 없음). `CreateLocationNfs`·`ListTaskExecutions`는 **501** | lab11은 "복사 안 됨"까지 단언 |
@@ -84,7 +85,7 @@ curriculum/m04-storage/labs/verify.sh
 
 CURRICULUM.md M04의 레슨 7개와 실습 9개를 모두 구현했다. 차이는 다음과 같다.
 
-- **수명 주기 규칙 구성**: 그대로(🟢 구성). 단 "잘못된 규칙도 받아 줌"은 일부만 맞아서, 받아 주는 예(IA 10일)와 거부하는 예(거꾸로 된 전환)를 함께 보여 준다. 비용 계산은 레슨 2의 워크시트(정답 포함)와 `sdk/lifecycle_lint.py`로 보강했다.
+- **수명 주기 규칙 구성**: 그대로(🟢 구성). CURRICULUM의 "잘못된 규칙도 받아 줌"은 근거였던 "IA 30일 미만 전환 금지"가 2026-07에 AWS에서 폐지되어 더 이상 맞지 않는다. 에뮬레이터는 현재 AWS 규칙대로 IA 10일 전환은 받고, 최소 보관 기간 위반 연쇄 전환과 역방향 전환은 거부한다(lab02 10~12단계). "저장되지만 돈이 새는 규칙"은 레슨 2의 워크시트(정답 포함)와 `sdk/lifecycle_lint.py`로 다룬다.
 - **CRUD·버전 관리·삭제 마커**: lab01(CRUD)과 lab03(버전 관리)으로 나눴다. 레슨 3의 객체 잠금(거버넌스·규정 준수·법적 보존)과 MFA Delete 관찰을 lab03에 추가했다. MFA Delete는 집행되지 않아 🟡이다.
 - **복제·이벤트 알림**: 레슨이 다르므로(3, 5) lab04와 lab09로 나눴다. 둘 다 🟢 그대로다.
 - **버킷 정책·BPA·SSE**: lab05(🟢)로 구현했다. KMS 키를 끄는 시연은 하지 않는다(CURRICULUM 지시). 미리 서명된 URL은 lab06으로 따로 뒀다.
