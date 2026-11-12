@@ -50,7 +50,25 @@ def run_iam(p: Probe) -> None:
            PermissionsBoundary="arn:aws:iam::aws:policy/ReadOnlyAccess")
     p.call("CreateLoginProfile", iam.create_login_profile, UserName=user, Password="Todayorder-Pass-123!")
     p.cleanup("lp", lambda: iam.delete_login_profile(UserName=user))
-    p.call("CreateVirtualMFADevice", iam.create_virtual_mfa_device, VirtualMFADeviceName=p.name("mfa"))
+    mfa = p.call("CreateVirtualMFADevice", iam.create_virtual_mfa_device, VirtualMFADeviceName=p.name("mfa"))
+    mfa_sn = mfa["VirtualMFADevice"]["SerialNumber"] if mfa else f"arn:aws:iam::000000000000:mfa/{p.name('mfa')}"
+    p.call("EnableMFADevice", iam.enable_mfa_device, UserName=user, SerialNumber=mfa_sn,
+           AuthenticationCode1="123456", AuthenticationCode2="654321")
+    p.call("ListMFADevices", iam.list_mfa_devices, UserName=user)
+    p.call("DeactivateMFADevice", iam.deactivate_mfa_device, UserName=user, SerialNumber=mfa_sn)
+    p.call("DeleteVirtualMFADevice", iam.delete_virtual_mfa_device, SerialNumber=mfa_sn)
+    p.call("GetAccountSummary (AWS: 동작 / 에뮬레이터: InvalidAction 예상)", iam.get_account_summary)
+    p.call("GetAccountPasswordPolicy (AWS: 동작 / 에뮬레이터: InvalidAction 예상)", iam.get_account_password_policy)
+    principal_doc = json.dumps({"Version": "2012-10-17", "Statement": [{"Effect": "Allow", "Action": "s3:GetObject",
+                                "Resource": "*", "Principal": {"AWS": "*"}}]})
+    code = p.expect_error("CreatePolicy", iam.create_policy, "MalformedPolicyDocument",
+                          PolicyName=p.name("withprincipal"), PolicyDocument=principal_doc,
+                          what="자격 증명 기반 정책에 Principal → MalformedPolicyDocument")
+    if code is None:
+        try:
+            iam.delete_policy(PolicyArn=f"arn:aws:iam::000000000000:policy/{p.name('withprincipal')}")
+        except Exception:  # noqa: BLE001
+            pass
     p.call("GetAccountPasswordPolicy/UpdateAccountPasswordPolicy", iam.update_account_password_policy,
            MinimumPasswordLength=14, RequireSymbols=True)
     p.call("GetPolicy (AWS 관리형 ReadOnlyAccess)", iam.get_policy, PolicyArn="arn:aws:iam::aws:policy/ReadOnlyAccess")
@@ -120,10 +138,12 @@ def run_iam(p: Probe) -> None:
             ("iam", "iam:ListUsers", lambda c: c.list_users()),
             ("kms", "kms:ListKeys", lambda c: c.list_keys()),
         ):
-            name = f"정책 없는 사용자의 {label} 거부(암묵적 Deny)"
+            level = " [계정 수준 호출 — 전체 표는 iam-enforcement]" if svc in ("s3", "sqs", "dynamodb") else ""
+            name = f"정책 없는 사용자의 {label} 거부(암묵적 Deny){level}"
             try:
                 fn(s2.client(svc, config=cfg))
-                p.behavior(name, False, "허용됨 — 이 서비스는 IAM 정책을 평가하지 않는다")
+                p.behavior(name, False, "허용됨 — 이 서비스는 계정·관리 수준 호출에 IAM 정책을 평가하지 않는다"
+                           if level else "허용됨 — IAM 정책을 평가하지 않는다")
             except ClientError as e:
                 code = e.response["Error"]["Code"]
                 p.behavior(name, "AccessDenied" in code or code == "UnauthorizedOperation", code)
@@ -148,9 +168,10 @@ def run_iam(p: Probe) -> None:
         p.cleanup("deny", lambda: iam.delete_user_policy(UserName=user, PolicyName="deny-s3"))
         try:
             sess.client("s3", config=cfg).list_buckets()
-            p.behavior("명시적 Deny(s3:*)가 ListBuckets를 막음", False, "허용됨 — 명시적 Deny도 집행되지 않는다")
+            p.behavior("명시적 Deny(s3:*)가 ListBuckets(계정 수준)를 막음", False,
+                       "허용됨 — 계정 수준 호출에는 명시적 Deny도 집행되지 않는다(객체 API는 집행: iam-enforcement)")
         except ClientError as e:
-            p.behavior("명시적 Deny(s3:*)가 ListBuckets를 막음", e.response["Error"]["Code"] in ("AccessDenied",),
+            p.behavior("명시적 Deny(s3:*)가 ListBuckets(계정 수준)를 막음", e.response["Error"]["Code"] in ("AccessDenied",),
                        e.response["Error"]["Code"])
 
 
@@ -216,6 +237,12 @@ def run_organizations(p: Probe) -> None:
         # SCP 생성이 501 이어도 AttachPolicy 자체가 구현됐는지 확인 (AWS 관리형 FullAWSAccess 정책 ID)
         p.call("AttachPolicy(FullAWSAccess → OU)", org.attach_policy, PolicyId="p-FullAWSAccess",
                TargetId=ou["OrganizationalUnit"]["Id"])
+    p.call("DescribeAccount", org.describe_account, AccountId="000000000000")
+    p.call("ListAccountsForParent", org.list_accounts_for_parent, ParentId=root_id)
+    p.call("ListChildren", org.list_children, ParentId=root_id, ChildType="ORGANIZATIONAL_UNIT")
+    if ou:
+        p.call("MoveAccount", org.move_account, AccountId="000000000000", SourceParentId=root_id,
+               DestinationParentId=ou["OrganizationalUnit"]["Id"])
     acct = p.call("CreateAccount", org.create_account, Email="probe@example.com", AccountName=p.name("acct"))
     if acct:
         sid = acct["CreateAccountStatus"]["Id"]
