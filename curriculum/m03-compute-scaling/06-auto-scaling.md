@@ -174,7 +174,7 @@ i-0000000000000001d	us-east-1b	InService	Healthy	t3.small	$Default
 
 ## 직접 해 보기 2 — 조정 정책과 자가 치유 (🔴)
 
-에뮬레이터는 `PutScalingPolicy`, `PutScheduledUpdateGroupAction`, `PutLifecycleHook`, `DescribePolicies`, `DescribeScalingActivities`, `SetInstanceHealth`, `TerminateInstanceInAutoScalingGroup`, `PutWarmPool`이 모두 501이고 자가 치유도 하지 않는다. 그래서 **정책 JSON을 직접 쓰고**, 계산은 **워크시트**로 한다. 전체 과정: [labs/lab09-scaling-policies-and-healing.sh](./labs/lab09-scaling-policies-and-healing.sh)
+lab09는 lab08과 섞이지 않도록 별도의 연습용 ASG `todayorder-policy-asg`(min 2 / max 10)를 쓴다. 에뮬레이터는 `PutScalingPolicy`, `PutScheduledUpdateGroupAction`, `PutLifecycleHook`, `DescribePolicies`, `DescribeScalingActivities`, `SetInstanceHealth`, `TerminateInstanceInAutoScalingGroup`, `PutWarmPool`이 모두 501이고 자가 치유도 하지 않는다. 그래서 **정책 JSON을 직접 쓰고**, 계산은 **워크시트**로 한다. 전체 과정: [labs/lab09-scaling-policies-and-healing.sh](./labs/lab09-scaling-policies-and-healing.sh)
 
 ### 정책 JSON (labs/policies/)
 
@@ -182,7 +182,7 @@ i-0000000000000001d	us-east-1b	InService	Healthy	t3.small	$Default
 
 ```json
 {
-  "AutoScalingGroupName": "todayorder-api-asg",
+  "AutoScalingGroupName": "todayorder-policy-asg",
   "PolicyName": "cpu-target-50",
   "PolicyType": "TargetTrackingScaling",
   "EstimatedInstanceWarmup": 120,
@@ -200,7 +200,7 @@ i-0000000000000001d	us-east-1b	InService	Healthy	t3.small	$Default
 
 ```json
 {
-  "AutoScalingGroupName": "todayorder-api-asg",
+  "AutoScalingGroupName": "todayorder-policy-asg",
   "PolicyName": "cpu-step-out",
   "PolicyType": "StepScaling",
   "AdjustmentType": "ChangeInCapacity",
@@ -219,7 +219,7 @@ i-0000000000000001d	us-east-1b	InService	Healthy	t3.small	$Default
 
 ```json
 {
-  "AutoScalingGroupName": "todayorder-api-asg",
+  "AutoScalingGroupName": "todayorder-policy-asg",
   "ScheduledActionName": "weekday-lunch-peak",
   "Recurrence": "30 11 * * 1-5",
   "TimeZone": "Asia/Seoul",
@@ -282,13 +282,13 @@ sequenceDiagram
   EC2-xEC2: 장애(프로세스 사망 또는 종료)
   ELB->>ASG: i-a unhealthy (ELB 헬스 체크 유형)
   ASG->>EC2: i-a 종료 (Terminating, 수명 주기 후크가 있으면 Terminating:Wait)
-  ASG->>ASG: 실제 2 < 희망 2 → 새 인스턴스 시작
+  ASG->>ASG: 실제 1 < 희망 2 → 새 인스턴스 시작
   ASG->>ELB: 새 인스턴스 등록 → 유예 기간 뒤 healthy
 ```
 
 ## 워크시트: "이 지표 값이면 몇 대?"
 
-ASG `todayorder-api-asg`: **min 2 / max 10**. 정책 값은 위 JSON 파일들. 대상 추적은 시험 풀이용 근사식 **필요 대수 = ⌈현재 대수 × 현재 지표 ÷ 목표값⌉** (min/max로 자른다)을 쓴다. AWS는 정확한 계산식을 공개하지 않고, 실제 축소는 이보다 천천히 일어난다.
+ASG `todayorder-policy-asg`: **min 2 / max 10**. 정책 값은 위 JSON 파일들. 대상 추적은 시험 풀이용 근사식 **필요 대수 = ⌈현재 대수 × 현재 지표 ÷ 목표값⌉** (min/max로 자른다)을 쓴다. AWS는 정확한 계산식을 공개하지 않고, 실제 축소는 이보다 천천히 일어난다.
 
 | # | 상황 | 답 |
 |---|---|---|
@@ -311,7 +311,7 @@ ASG `todayorder-api-asg`: **min 2 / max 10**. 정책 값은 위 JSON 파일들. 
 |---|---|---|
 | 1 | **6대** | ⌈4 × 75 ÷ 50⌉ = ⌈6⌉ = 6 |
 | 2 | **10대** | ⌈6 × 90 ÷ 50⌉ = ⌈10.8⌉ = 11 → max 10 |
-| 3 | **4대** | ⌈6 × 30 ÷ 50⌉ = ⌈3.6⌉ = 4. 실제는 더 천천히 줄인다 |
+| 3 | **4대** | ⌈6 × 30 ÷ 50⌉ = ⌈3.6⌉ = 4. 단 실제 축소(scale-in)는 보수적이라 여러 단계에 걸쳐 천천히 줄어든다. 근사식을 외우지 말고 "목표보다 낮으면 줄이고, 높으면 비례해서 늘린다"는 방향만 기억한다 |
 | 4 | **8대** | 대상당 7,500 ÷ 4 = 1,875 → ⌈4 × 1,875 ÷ 1,000⌉ = ⌈7.5⌉ = 8 (= ⌈전체 요청 ÷ 목표⌉) |
 | 5 | **5대** | 초과 폭 5 → [0, 20) 구간 → +1 |
 | 6 | **7대** | 초과 폭 25 → [20, ∞) 구간 → +3 |
@@ -325,7 +325,7 @@ ASG `todayorder-api-asg`: **min 2 / max 10**. 정책 값은 위 JSON 파일들. 
 1~11번은 [sdk/scaling_worksheet.py](./sdk/scaling_worksheet.py)가 같은 JSON 파일을 읽어 계산하고 채점한다.
 
 ```
-ASG todayorder-api-asg: min 2 / max 10
+ASG todayorder-policy-asg: min 2 / max 10
  1. 대상 추적 CPU 50%, 현재 4대, 평균 CPU 75% → 6대  [OK]
  2. 대상 추적 CPU 50%, 현재 6대, 평균 CPU 90% (max 10) → 10대  [OK]
  3. 대상 추적 CPU 50%, 현재 6대, 평균 CPU 30% → 4대  [OK]

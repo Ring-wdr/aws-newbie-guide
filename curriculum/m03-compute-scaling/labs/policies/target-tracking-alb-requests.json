@@ -1,5 +1,5 @@
 {
-  "AutoScalingGroupName": "todayorder-api-asg",
+  "AutoScalingGroupName": "todayorder-policy-asg",
   "PolicyName": "requests-per-target-1000",
   "PolicyType": "TargetTrackingScaling",
   "TargetTrackingConfiguration": {

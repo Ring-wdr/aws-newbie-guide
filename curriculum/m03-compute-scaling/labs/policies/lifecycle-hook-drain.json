@@ -1,5 +1,5 @@
 {
-  "AutoScalingGroupName": "todayorder-api-asg",
+  "AutoScalingGroupName": "todayorder-policy-asg",
   "LifecycleHookName": "drain-before-terminate",
   "LifecycleTransition": "autoscaling:EC2_INSTANCE_TERMINATING",
   "HeartbeatTimeout": 300,

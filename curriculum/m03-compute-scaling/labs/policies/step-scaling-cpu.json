@@ -1,5 +1,5 @@
 {
-  "AutoScalingGroupName": "todayorder-api-asg",
+  "AutoScalingGroupName": "todayorder-policy-asg",
   "PolicyName": "cpu-step-out",
   "PolicyType": "StepScaling",
   "AdjustmentType": "ChangeInCapacity",

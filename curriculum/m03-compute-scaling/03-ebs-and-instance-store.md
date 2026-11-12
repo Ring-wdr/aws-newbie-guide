@@ -121,7 +121,7 @@ i-0000000000000000a	/dev/sdg	attached
 aws: [ERROR]: An error occurred (InvalidVolume.ZoneMismatch) when calling the AttachVolume operation: The volume 'vol-000000000000000cb' is not in the same availability zone as instance 'i-00000000000000009'
 ```
 
-방금 본 것: **볼륨은 AZ에 묶인다**(`ZoneMismatch`). 다중 연결은 io2에서만 된다.
+방금 본 것: **볼륨은 AZ에 묶인다**(`ZoneMismatch`). 다중 연결은 io1/io2에서만 된다(이 실습은 io2로 확인).
 
 **4) 연결된 채로 gp2 → gp3, 10 → 20 GiB (Elastic Volumes).**
 
@@ -258,13 +258,13 @@ aws: [ERROR]: An error occurred (NotImplemented) when calling the CopyImage oper
 ## 스스로 확인
 
 1. us-east-1a의 DB 서버를 us-east-1b로 옮겨야 한다. 데이터 볼륨은 어떻게 옮기나?
-2. gp2 1,000 GiB 볼륨의 기준 IOPS는? 같은 성능을 gp3로 얻으려면 무엇을 설정하나?
+2. gp2 1,000 GiB 볼륨의 기준 IOPS와 처리량은? 같은 성능을 gp3로 얻으려면 무엇을 설정하나?
 3. 인스턴스 스토어에 세션 캐시를 두던 서버를 비용 절감을 위해 밤에 **중지**했다가 아침에 켰다. 무슨 일이 생기나?
 
 <details><summary>답</summary>
 
 1. 볼륨 스냅샷을 만들고, 그 스냅샷으로 us-east-1b에 새 볼륨을 만들어 새 인스턴스에 붙인다. EBS 볼륨은 AZ 리소스라 직접 옮길 수 없다.
-2. 3 IOPS/GiB × 1,000 = **3,000 IOPS**. gp3는 크기와 상관없이 기본 3,000 IOPS·125 MiB/s를 주므로 1,000 GiB gp3면 추가 설정 없이 같은 IOPS를 더 싸게 얻는다(처리량이 더 필요하면 throughput만 올린다).
+2. 3 IOPS/GiB × 1,000 = **3,000 IOPS**, 처리량은 334 GiB 이상이라 **250 MiB/s**다. gp3는 크기와 상관없이 기본 3,000 IOPS·125 MiB/s를 주므로 IOPS는 그대로 맞지만, 처리량까지 같게 하려면 **throughput을 250 MiB/s로 올려야** 한다. 그래도 보통 gp2보다 싸다.
 3. 인스턴스 스토어 데이터는 중지하면 **사라진다**. 캐시가 비어 아침 첫 요청들이 느려진다. 남겨야 하는 데이터라면 EBS나 ElastiCache 같은 외부 저장소에 둔다.
 
 </details>

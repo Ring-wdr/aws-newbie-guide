@@ -26,7 +26,7 @@ from pathlib import Path
 from emulator_guard import require_emulator
 
 POLICY_DIR = Path(__file__).resolve().parent.parent / "labs" / "policies"
-MIN_SIZE, MAX_SIZE = 2, 10  # 워크시트의 ASG: todayorder-api-asg (min 2 / max 10)
+MIN_SIZE, MAX_SIZE = 2, 10  # 워크시트의 ASG: todayorder-policy-asg (min 2 / max 10)
 
 
 def load(name: str) -> dict:  # type: ignore[type-arg]
@@ -122,7 +122,7 @@ def main() -> None:
         Question(11, "정책 두 개: CPU 추적은 6대, 요청 추적은 8대를 원한다", max(6, 8), 8),
     ]
 
-    print(f"ASG todayorder-api-asg: min {MIN_SIZE} / max {MAX_SIZE}")
+    print(f"ASG todayorder-policy-asg: min {MIN_SIZE} / max {MAX_SIZE}")
     for x in q:
         mark = "OK" if x.answer == x.expected else f"!= 정답 {x.expected}"
         print(f"{x.no:>2}. {x.text} → {x.answer}대  [{mark}]")

@@ -12,7 +12,7 @@ set -euo pipefail
 source "$(git rev-parse --show-toplevel)/scripts/env.sh"
 source "$(dirname "$0")/_lib.sh"
 
-ASG="todayorder-api-asg"
+ASG="todayorder-policy-asg"
 LT_NAME="todayorder-heal-lt"
 POL="$(cd "$(dirname "$0")/policies" && pwd)"
 WORK="$(mktemp -d)"
@@ -62,7 +62,7 @@ expect_error NotImplemented aws autoscaling put-lifecycle-hook --cli-input-json 
 echo "== 2. 일부러 틀린 JSON → CLI 가 보내기도 전에 거부 (ParamValidation)"
 cat >"$WORK/broken-step.json" <<'EOF'
 {
-  "AutoScalingGroupName": "todayorder-api-asg",
+  "AutoScalingGroupName": "todayorder-policy-asg",
   "PolicyName": "broken",
   "PolicyTyp": "StepScaling",
   "StepAdjustments": [ { "MetricIntervalLowerBound": 0.0, "ScalingAdjustment": "one" } ]
