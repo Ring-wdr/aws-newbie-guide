@@ -1,0 +1,198 @@
+# TodayOrder 캡스톤 — 네트워크 계층 (M02의 CIDR 계획을 그대로 따른다)
+#   10.0.0.0/16, 2 AZ × (퍼블릭 / 앱 / DB) 서브넷 6개
+#   퍼블릭 → IGW, 앱 → AZ별 NAT 게이트웨이(AZ 장애 격리), DB → 인터넷 경로 없음
+#   앱 라우팅 테이블에 S3·DynamoDB 게이트웨이 엔드포인트(무료, NAT 처리 요금 절감)
+#   보안 그룹 체인: 인터넷 → alb(443, 80은 리디렉션용) → app(8080, alb SG만) → db(5432, app SG만)
+# 비용 주의(실제 AWS): NAT 게이트웨이 2개와 EIP(퍼블릭 IPv4)는 시간당 과금된다. 실습 뒤 lab06으로 지운다.
+# ALB·대상 그룹·리스너·ASG는 이 템플릿에 넣지 않는다 — 에뮬레이터 1.0.322의 CloudFormation은
+# AWS::ElasticLoadBalancingV2::* 를 CREATE_COMPLETE로 보고하지만 ELBv2 API에서는 보이지 않는다(README "에뮬레이터 제약").
+AWSTemplateFormatVersion: "2010-09-09"
+Description: TodayOrder capstone - 2-AZ 3-tier network
+Parameters:
+  Prefix:
+    Type: String
+    Default: todayorder-cap
+Resources:
+  Vpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags: [{Key: Name, Value: !Sub "${Prefix}-vpc"}, {Key: Project, Value: todayorder}]
+  Igw:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags: [{Key: Name, Value: !Sub "${Prefix}-igw"}, {Key: Project, Value: todayorder}]
+  IgwAttach:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties: {VpcId: !Ref Vpc, InternetGatewayId: !Ref Igw}
+
+  PublicA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: 10.0.0.0/24
+      AvailabilityZone: us-east-1a
+      MapPublicIpOnLaunch: true
+      Tags: [{Key: Name, Value: !Sub "${Prefix}-public-a"}, {Key: Tier, Value: public}]
+  PublicB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: 10.0.1.0/24
+      AvailabilityZone: us-east-1b
+      MapPublicIpOnLaunch: true
+      Tags: [{Key: Name, Value: !Sub "${Prefix}-public-b"}, {Key: Tier, Value: public}]
+  AppA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: 10.0.10.0/24
+      AvailabilityZone: us-east-1a
+      Tags: [{Key: Name, Value: !Sub "${Prefix}-app-a"}, {Key: Tier, Value: app}]
+  AppB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: 10.0.11.0/24
+      AvailabilityZone: us-east-1b
+      Tags: [{Key: Name, Value: !Sub "${Prefix}-app-b"}, {Key: Tier, Value: app}]
+  DbA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: 10.0.20.0/24
+      AvailabilityZone: us-east-1a
+      Tags: [{Key: Name, Value: !Sub "${Prefix}-db-a"}, {Key: Tier, Value: db}]
+  DbB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: 10.0.21.0/24
+      AvailabilityZone: us-east-1b
+      Tags: [{Key: Name, Value: !Sub "${Prefix}-db-b"}, {Key: Tier, Value: db}]
+
+  NatEipA:
+    Type: AWS::EC2::EIP
+    DependsOn: IgwAttach
+    Properties: {Domain: vpc}
+  NatEipB:
+    Type: AWS::EC2::EIP
+    DependsOn: IgwAttach
+    Properties: {Domain: vpc}
+  NatA:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt NatEipA.AllocationId
+      SubnetId: !Ref PublicA
+      Tags: [{Key: Name, Value: !Sub "${Prefix}-nat-a"}]
+  NatB:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt NatEipB.AllocationId
+      SubnetId: !Ref PublicB
+      Tags: [{Key: Name, Value: !Sub "${Prefix}-nat-b"}]
+
+  PublicRt:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc
+      Tags: [{Key: Name, Value: !Sub "${Prefix}-public-rt"}]
+  PublicDefault:
+    Type: AWS::EC2::Route
+    DependsOn: IgwAttach
+    Properties: {RouteTableId: !Ref PublicRt, DestinationCidrBlock: 0.0.0.0/0, GatewayId: !Ref Igw}
+  PublicAAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: {SubnetId: !Ref PublicA, RouteTableId: !Ref PublicRt}
+  PublicBAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: {SubnetId: !Ref PublicB, RouteTableId: !Ref PublicRt}
+
+  AppRtA:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc
+      Tags: [{Key: Name, Value: !Sub "${Prefix}-app-rt-a"}]
+  AppDefaultA:
+    Type: AWS::EC2::Route
+    Properties: {RouteTableId: !Ref AppRtA, DestinationCidrBlock: 0.0.0.0/0, NatGatewayId: !Ref NatA}
+  AppAAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: {SubnetId: !Ref AppA, RouteTableId: !Ref AppRtA}
+  AppRtB:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc
+      Tags: [{Key: Name, Value: !Sub "${Prefix}-app-rt-b"}]
+  AppDefaultB:
+    Type: AWS::EC2::Route
+    Properties: {RouteTableId: !Ref AppRtB, DestinationCidrBlock: 0.0.0.0/0, NatGatewayId: !Ref NatB}
+  AppBAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: {SubnetId: !Ref AppB, RouteTableId: !Ref AppRtB}
+
+  DbRt:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc
+      Tags: [{Key: Name, Value: !Sub "${Prefix}-db-rt"}]
+  DbAAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: {SubnetId: !Ref DbA, RouteTableId: !Ref DbRt}
+  DbBAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: {SubnetId: !Ref DbB, RouteTableId: !Ref DbRt}
+
+  # 게이트웨이 엔드포인트: 앱 서브넷 → S3·DynamoDB 트래픽이 NAT를 거치지 않는다(무료, 처리 요금 절감)
+  S3Endpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref Vpc
+      ServiceName: com.amazonaws.us-east-1.s3
+      VpcEndpointType: Gateway
+      RouteTableIds: [!Ref AppRtA, !Ref AppRtB]
+  DynamoDbEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref Vpc
+      ServiceName: com.amazonaws.us-east-1.dynamodb
+      VpcEndpointType: Gateway
+      RouteTableIds: [!Ref AppRtA, !Ref AppRtB]
+
+  AlbSg:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub "${Prefix}-alb-sg"
+      GroupDescription: ALB - HTTPS from internet, HTTP only for redirect
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - {IpProtocol: tcp, FromPort: 443, ToPort: 443, CidrIp: 0.0.0.0/0}
+        - {IpProtocol: tcp, FromPort: 80, ToPort: 80, CidrIp: 0.0.0.0/0}
+  AppSg:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub "${Prefix}-app-sg"
+      GroupDescription: back-office app - 8080 from ALB SG only
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - {IpProtocol: tcp, FromPort: 8080, ToPort: 8080, SourceSecurityGroupId: !Ref AlbSg}
+  DbSg:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub "${Prefix}-db-sg"
+      GroupDescription: settlement DB - 5432 from app SG only
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - {IpProtocol: tcp, FromPort: 5432, ToPort: 5432, SourceSecurityGroupId: !Ref AppSg}
+Outputs:
+  VpcId: {Value: !Ref Vpc}
+  PublicSubnets: {Value: !Join [",", [!Ref PublicA, !Ref PublicB]]}
+  AppSubnets: {Value: !Join [",", [!Ref AppA, !Ref AppB]]}
+  DbSubnets: {Value: !Join [",", [!Ref DbA, !Ref DbB]]}
+  AppRouteTables: {Value: !Join [",", [!Ref AppRtA, !Ref AppRtB]]}
+  NatGateways: {Value: !Join [",", [!Ref NatA, !Ref NatB]]}
+  AlbSgId: {Value: !GetAtt AlbSg.GroupId}
+  AppSgId: {Value: !GetAtt AppSg.GroupId}
+  DbSgId: {Value: !GetAtt DbSg.GroupId}
