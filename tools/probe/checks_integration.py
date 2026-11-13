@@ -283,7 +283,7 @@ def run_sns(p: Probe) -> None:
         p.behavior("email 구독은 확인 대기 상태", "pending" in e["SubscriptionArn"].lower() or
                    sns.get_subscription_attributes(SubscriptionArn=e["SubscriptionArn"])["Attributes"].get("PendingConfirmation") == "true",
                    e["SubscriptionArn"][-40:])
-    p.call("Subscribe(https)", sns.subscribe, TopicArn=topic, Protocol="https", Endpoint="https://example.com/hook")
+    p.call("Subscribe(https)", sns.subscribe, TopicArn=topic, Protocol="https", Endpoint="https://hook.todayorder.invalid/sns")
     subs = p.call("ListSubscriptionsByTopic", sns.list_subscriptions_by_topic, TopicArn=topic)
     if subs:
         p.behavior("구독 목록 조회", len(subs["Subscriptions"]) >= 4, f"{len(subs['Subscriptions'])}개")

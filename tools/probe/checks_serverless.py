@@ -250,7 +250,7 @@ def run_apigatewayv2(p: Probe) -> None:
         p.cleanup("http", lambda: ag.delete_api(ApiId=aid))
         p.behavior("HTTP API 엔드포인트 URL 발급", bool(api.get("ApiEndpoint")), api.get("ApiEndpoint", ""))
         integ = p.call("CreateIntegration(HTTP_PROXY)", ag.create_integration, ApiId=aid, IntegrationType="HTTP_PROXY",
-                       IntegrationMethod="GET", IntegrationUri="https://example.com/orders", PayloadFormatVersion="1.0")
+                       IntegrationMethod="GET", IntegrationUri="https://orders.todayorder.invalid/orders", PayloadFormatVersion="1.0")
         if integ:
             p.call("CreateRoute(GET /orders)", ag.create_route, ApiId=aid, RouteKey="GET /orders",
                    Target=f"integrations/{integ['IntegrationId']}")
@@ -258,7 +258,7 @@ def run_apigatewayv2(p: Probe) -> None:
         p.call("GetRoutes", ag.get_routes, ApiId=aid)
         p.call("CreateAuthorizer(JWT)", ag.create_authorizer, ApiId=aid, Name="jwt", AuthorizerType="JWT",
                IdentitySource=["$request.header.Authorization"],
-               JwtConfiguration={"Audience": ["client"], "Issuer": "https://cognito-idp.us-east-1.amazonaws.com/us-east-1_example"})
+               JwtConfiguration={"Audience": ["client"], "Issuer": "https://issuer.todayorder.invalid/us-east-1_example"})
     # HTTP API → Lambda 프록시 통합을 실제로 호출
     lam = p.client("lambda")
     fn = p.name("apifn")[:64]
@@ -333,7 +333,7 @@ def run_ecs(p: Probe) -> None:
     td = p.call("RegisterTaskDefinition(Fargate, awsvpc)", ecs.register_task_definition, family=p.name("api"),
                 requiresCompatibilities=["FARGATE"], networkMode="awsvpc", cpu="256", memory="512",
                 executionRoleArn=exec_role,
-                containerDefinitions=[{"name": "api", "image": "public.ecr.aws/nginx/nginx:latest", "essential": True,
+                containerDefinitions=[{"name": "api", "image": "registry.invalid/todayorder/nginx:latest", "essential": True,
                                        "portMappings": [{"containerPort": 80, "protocol": "tcp"}]}])
     if not td:
         return
