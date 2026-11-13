@@ -22,6 +22,8 @@ const SHOTS = [
   { name: 'module-m06', path: '/curriculum/m06-integration-messaging/' },
   { name: 'exam-result', path: '/curriculum/m14-capstone-exam/mock-exam/questions/', prepare: examResult },
   { name: 'source-view', path: '/files/curriculum/m06-integration-messaging/labs/lab01-sqs-basics.sh/' },
+  { name: 'source-helper', path: '/files/scripts/lab-wait.sh/' },
+  { name: 'diagram-m02', path: '/curriculum/m02-vpc-networking/02-vpc-subnet-route-igw/', prepare: (p) => p.locator('.diagram').first().evaluate((e) => e.scrollIntoView({ block: 'start' })) },
 ];
 
 async function examResult(page) {

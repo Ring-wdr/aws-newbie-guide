@@ -80,6 +80,12 @@ h1#_top {
   }
 }
 
+/* 가운뎃점으로 이은 낱말 묶음(rehype-guide.mjs) */
+.nb {
+  display: inline-block;
+  text-indent: 0;
+}
+
 /* ---------- 코드 블록(Shiki 라이트·다크 이중 테마) ---------- */
 /* <pre>는 브라우저 기본 monospace 를 받으므로 글꼴을 직접 준다(한글이 고딕으로 나오게) */
 pre,
@@ -326,6 +332,17 @@ kbd {
 .sl-markdown-content .table-scroll :is(th, td) code {
   overflow-wrap: normal;
 }
+/* 좁은 화면: 열을 내용 폭(최대 16rem)으로 두고 표 전체를 상자 안에서 가로로 스크롤한다.
+   (100% 폭에 맞추면 마지막 열이 좁아져 줄이 매우 길어진다) */
+@media (max-width: 50rem) {
+  .sl-markdown-content .table-scroll > table {
+    width: max-content;
+    max-width: none;
+  }
+  .sl-markdown-content .table-scroll :is(th, td) {
+    max-width: 16rem;
+  }
+}
 .sl-markdown-content .table-scroll :is(th, td):first-child {
   min-width: 4.5rem;
 }
@@ -448,6 +465,8 @@ section.quiz-q[data-result='correct'] { border-left: 4px solid var(--guide-ok); 
 section.quiz-q[data-result='wrong'] { border-left: 4px solid var(--guide-bad); }
 .quiz-options,
 .exam-options {
+  /* fieldset 의 기본 최소 폭(min-content)이 긴 영문 식별자 때문에 360px 화면을 넘지 않게 */
+  min-inline-size: 0;
   border: 0;
   padding: 0;
   margin: 0.75rem 0 0 !important;
@@ -466,6 +485,17 @@ section.quiz-q[data-result='wrong'] { border-left: 4px solid var(--guide-bad); }
   cursor: pointer;
   margin: 0 !important;
   line-height: 1.65;
+}
+.quiz-option,
+.exam-option,
+.quiz-option-text,
+.exam-option-text {
+  min-width: 0;
+}
+.quiz-option-text,
+.exam-option-text,
+.sl-markdown-content :is(.quiz-option-text, .exam-option-text) code {
+  overflow-wrap: anywhere;
 }
 .quiz-option input,
 .exam-option input {

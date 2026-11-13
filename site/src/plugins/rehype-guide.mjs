@@ -23,5 +23,32 @@ export function rehypeGuide() {
       }
     };
     walk(tree);
+    keepMiddleDotRuns(tree);
   };
+}
+
+// "알림·정산"처럼 가운뎃점(·)으로 이은 낱말이 줄 끝에서 "알림 / ·정산"으로 갈리지 않게 한 덩어리로 묶는다.
+// (word-break: keep-all 은 한글과 가운뎃점 사이의 줄바꿈을 막지 못한다.) 글자는 바꾸지 않고 <span>으로 감싸기만 한다.
+// 덩어리가 한 줄보다 길면 inline-block 안에서 다시 줄바꿈된다. 코드·SVG 안은 건드리지 않는다.
+const SKIP = new Set(['pre', 'code', 'svg', 'script', 'style', 'kbd', 'foreignObject']);
+const RUN = /[^\s·]+(?:·[^\s·]+)+/g;
+function keepMiddleDotRuns(node) {
+  if (!node.children) return;
+  if (node.type === 'element' && SKIP.has(node.tagName)) return;
+  const out = [];
+  for (const c of node.children) {
+    if (c.type === 'text' && c.value.includes('·')) {
+      let last = 0;
+      for (const m of c.value.matchAll(RUN)) {
+        if (m.index > last) out.push({ type: 'text', value: c.value.slice(last, m.index) });
+        out.push({ type: 'element', tagName: 'span', properties: { className: ['nb'] }, children: [{ type: 'text', value: m[0] }] });
+        last = m.index + m[0].length;
+      }
+      if (last < c.value.length) out.push({ type: 'text', value: c.value.slice(last) });
+      continue;
+    }
+    keepMiddleDotRuns(c);
+    out.push(c);
+  }
+  node.children = out;
 }
