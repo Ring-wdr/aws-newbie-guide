@@ -30,7 +30,7 @@
 
 aws-emulator는 **컨트롤 플레인(리소스 생성·조회·수정·삭제)** 충실도가 가장 높고, 데이터 플레인과 서비스 간 연동은 서비스마다 다르다. 알려진 주요 제약:
 
-- IAM 정책 평가는 **부분적이다**. IAM·EC2·KMS·Secrets Manager와 S3·SQS·DynamoDB의 **리소스 단위 데이터 요청**(GetObject·PutObject·ListObjectsV2, SendMessage·ReceiveMessage, PutItem·Scan 등)은 사용자 정책의 암묵적·명시적 Deny를 집행한다. 그러나 S3·SQS·DynamoDB의 **계정·관리 요청**(ListBuckets·CreateBucket·DeleteBucket·PutBucketVersioning, ListQueues·CreateQueue, ListTables·CreateTable·DescribeTable·DeleteTable)은 평가하지 않는다. AssumeRole은 역할의 신뢰 정책만 보고 호출자 정책은 보지 않는다(명시적 Deny도 무시). 세션 정책은 IAM에는 적용되고 EC2에는 적용되지 않는다. `iam:PassRole`은 검사하지 않는다. 비활성 액세스 키는 IAM API만 거부한다. 자격 증명 정책의 전역 조건 키(`aws:RequestedRegion`, `aws:SecureTransport`, `aws:PrincipalAccount` 등)는 실제 호출에서 Deny는 항상, Allow는 결코 적용되지 않는다. 반면 `iam simulate-*-policy`와 신뢰 정책 조건은 올바르게 판정하고, 버킷 정책 Deny·KMS 키 정책·서비스 역할 신뢰 정책·Lambda 실행 역할·Glue 작업 역할 정책은 집행된다. 공식 문서는 "보안 테스트에 쓰지 말라"고 하며, 이 동작은 버전에 따라 바뀔 수 있다.
+- IAM 정책 평가는 **부분적이다**. IAM·EC2·KMS·Secrets Manager와 S3·SQS·DynamoDB의 **리소스 단위 데이터 요청**(GetObject·PutObject·ListObjectsV2, SendMessage·ReceiveMessage, PutItem·Scan 등)은 사용자 정책의 암묵적·명시적 Deny를 집행한다. 그러나 S3·SQS·DynamoDB의 **계정·관리 요청**(ListBuckets·CreateBucket·DeleteBucket·PutBucketVersioning, ListQueues·CreateQueue, ListTables·CreateTable·DescribeTable·DeleteTable)은 평가하지 않는다. AssumeRole은 역할의 신뢰 정책만 보고 호출자 정책은 보지 않는다(명시적 Deny도 무시). 세션 정책은 IAM에는 적용되고 EC2에는 적용되지 않는다. `iam:PassRole`은 검사하지 않는다. 비활성 액세스 키는 IAM API만 거부한다. 자격 증명 정책의 전역 조건 키는 서비스·키마다 다르게 평가된다: S3·SQS 데이터 요청은 `aws:SecureTransport`·`aws:PrincipalAccount` 조건을 AWS처럼 판정하지만 `aws:RequestedRegion` 조건이 붙은 문장은 Allow가 결코·Deny가 항상 적용되고, DynamoDB·EC2·IAM은 세 키 모두 Allow가 결코·Deny가 항상 적용된다. 따라서 조건이 있는 정책은 `iam simulate-*-policy`(`--context-entries`)로 판정한다. `iam simulate-*-policy`와 신뢰 정책 조건은 올바르게 판정하고, 버킷 정책 Deny·KMS 키 정책·서비스 역할 신뢰 정책·Lambda 실행 역할·Glue 작업 역할 정책은 집행된다. 공식 문서는 "보안 테스트에 쓰지 말라"고 하며, 이 동작은 버전에 따라 바뀔 수 있다.
 - 리전·계정을 **분리하지 않는다**. 어떤 리전·계정 ID로 요청해도 받아 주지만 리소스를 나눠 보관하지 않는다. 계정은 `000000000000`으로 보이며, 이 커리큘럼은 리전을 `us-east-1` 하나로 고정한다.
 - S3 Control API(액세스 포인트, 계정 수준 퍼블릭 액세스 차단 등)는 SDK가 호스트명에 계정 ID를 붙이기 때문에 에뮬레이터에 **도달하지 않는다** → 🔴.
 - 엔드포인트는 반드시 `127.0.0.1` (`localhost`를 쓰면 일부 SDK(JS·Java·Go)가 S3 버킷명을 호스트명에 넣어 실패한다). `AWS_DISABLE_HOST_PREFIX_INJECTION=true`는 에뮬레이터 전용 설정이다.
@@ -40,7 +40,7 @@ aws-emulator는 **컨트롤 플레인(리소스 생성·조회·수정·삭제)*
 - 조정·관리·삭제 계열에 501이 몰려 있다: Auto Scaling 조정 정책·수명 주기 후크·조회, Organizations SCP·계정, IAM MFA 장치, VPC 피어링 수락·거절·삭제·`ReplaceRoute`·TGW 정적 경로·연결 삭제·Egress-only IGW·리전 NAT·VPN·Client VPN, AMI 생성, RDS PITR·복제본 승격, ElastiCache 복제 그룹 삭제, Glue 크롤러, Athena 작업 그룹 목록·삭제, SSM Session Manager·패치, Backup·DMS 목록·삭제 계열, Cost Explorer.
 - 시간 기반 동작은 빠르거나 없다: TTL 삭제·Firehose 버퍼·Glacier 복원은 수 초, EventBridge Scheduler `at()`은 지정 시각 전에 발화, S3 수명 주기 전환·Lambda 비동기 실패 대상·Route 53 상태 확인 실패는 일어나지 않는다. CloudFormation은 `DescribeStacks`가 올 때만 진행하고 대기 리소스에 약 10초 마감이 있어, NAT 경로가 있는 스택은 CLI `wait`로는 롤백되고 2초 간격 폴링으로는 성공한다.
 - 동기 Lambda 호출은 회당 약 7 MiB의 에뮬레이터 메모리를 회수하지 않는다(기본 상한 2g, 반복 실습 시 `scripts/emulator-reset.sh`). 노트북이 잠든 뒤에는 VM 시계가 어긋나 서명 오류가 날 수 있다(M00 레슨 3).
-- 일부 리소스는 **외부 호스트에 접속을 시도**할 수 있다: ECS 작업 정의에 실제 레지스트리 URI를 넣으면 에뮬레이터 컨테이너가 이미지를 받으려 한다. 실습은 `.invalid` 레지스트리와 예약 도메인(`example.com`, `.example`, `.test`)만 쓴다.
+- 일부 리소스는 **외부 호스트에 접속을 시도**할 수 있다: ECS 작업 정의에 실제 레지스트리 URI를 넣으면 에뮬레이터 컨테이너가 이미지를 받으려 한다. 실습은 `.invalid` 레지스트리와 예약 도메인(`example.com`, `.example`, `.test`)만 쓴다. 탐침과 M00 `verify.sh`는 `tools/probe/no_external_hosts.py`로 이를 검사한다.
 - 미구현 오퍼레이션은 `501 NotImplemented`를 반환한다.
 
 따라서 모든 실습에 아래 등급 중 하나를 붙인다. 등급은 추측이 아니라 **M00에서 만든 탐침(probe) 결과와 저자의 실제 실행**으로 정한다.
