@@ -63,7 +63,7 @@ aws acm describe-certificate --certificate-arn "$REQ" --output json \
 r = json.load(sys.stdin)
 print(json.dumps({"Changes": [{"Action": "UPSERT", "ResourceRecordSet": {"Name": r["Name"], "Type": r["Type"], "TTL": 300,
   "ResourceRecords": [{"Value": r["Value"]}]}}]}))' >cname.json
-aws route53 wait resource-record-sets-changed --id "$(aws route53 change-resource-record-sets --hosted-zone-id "$ZID" \
+wait_route53_change_insync "$(aws route53 change-resource-record-sets --hosted-zone-id "$ZID" \
   --change-batch file://cname.json --query ChangeInfo.Id --output text)"
 echo "CNAME 반영됨(INSYNC). 20초 동안 상태를 지켜본다:"
 seen=""
