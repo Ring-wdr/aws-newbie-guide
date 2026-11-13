@@ -47,7 +47,7 @@ export EMULATOR_PORT=9297          # 대화형 터미널이면 생략 가능
 curriculum/m09-security-encryption/labs/verify.sh
 ```
 
-`verify.sh`는 에뮬레이터를 재시작해 깨끗한 상태로 만든 뒤 sdk 예제의 안전 장치를 확인하고, 모든 lab을 **두 번씩**(멱등성) 실행하고 sdk 예제를 실행한다. 마지막 줄이 `MODULE m09 OK`면 통과. `labs/_lib.sh`는 lab 공용 도우미(단언, 폴링, JSON 가공, KMS 별칭·IAM 정리)이며 단독으로 실행하지 않는다. lab06은 자체 서명 인증서를 만들려고 `openssl`(macOS·Linux 기본 포함)을 쓴다. lab03과 sdk의 로컬 암호화는 `cryptography`(프로젝트 의존성)를 쓴다 — import 오류가 나면 `uv sync`.
+`verify.sh`는 에뮬레이터를 재시작해 깨끗한 상태로 만든 뒤 sdk 예제의 안전 장치를 확인하고, 모든 lab을 **두 번** — 1회차는 번호 순, 2회차는 역순 — 실행하고(멱등성·순서 무관성) sdk 예제를 실행한다. 마지막 줄이 `MODULE m09 OK`면 통과. `labs/_lib.sh`는 lab 공용 도우미(단언, 폴링, JSON 가공, KMS 별칭·IAM 정리)이며 단독으로 실행하지 않는다. lab06은 자체 서명 인증서를 만들려고 `openssl`(macOS·Linux 기본 포함)을 쓴다. lab03과 sdk의 로컬 암호화는 `cryptography`(프로젝트 의존성)를 쓴다 — import 오류가 나면 `uv sync`.
 
 **KMS 키는 바로 지울 수 없다.** 각 lab은 다시 실행할 때 옛 키를 7일 삭제 대기로 예약하고 새 키를 만든다. 에뮬레이터를 재시작하면 모두 사라진다.
 
