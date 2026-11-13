@@ -36,11 +36,11 @@ aws-emulator는 **컨트롤 플레인(리소스 생성·조회·수정·삭제)*
 - 엔드포인트는 반드시 `127.0.0.1` (`localhost`를 쓰면 일부 SDK(JS·Java·Go)가 S3 버킷명을 호스트명에 넣어 실패한다). `AWS_DISABLE_HOST_PREFIX_INJECTION=true`는 에뮬레이터 전용 설정이다.
 - 모든 상태는 **메모리**에 있고 에뮬레이터를 끄면 사라진다.
 - EC2 인스턴스는 상태만 바뀌고 **부팅되지 않는다**. 반대로 Lambda `Invoke`는 함수 코드를 **실제로 실행**한다(CPython이 아니라 RustPython과 축소된 boto3). SNS→SQS·S3 이벤트·EventBridge·Pipes·Step Functions(Retry/Catch 포함)·CloudWatch 경보→SNS 같은 서비스 간 전달, Glue Python shell 작업, Athena SQL(SQLite 계열 — 파티션 열·Trino 함수 없음), Secrets Manager 교체, Config 자동 수정, ALB 앞의 WAF 차단도 실제로 일어난다. Lambda 리소스 정책은 REST API·SNS·S3 경로에서 집행되고 HTTP API만 예외다.
-- RDS 인스턴스·Aurora 쓰기 엔드포인트·ALB·NLB·CloudFront의 **엔드포인트는 `127.0.0.1:<임의 포트>`로 컨테이너 안에만** 열린다. 학습자 PC에서 접속할 수 없다(API Gateway 실행 URL만 예외). ElastiCache·Aurora 리더 엔드포인트는 실제 AWS 형식 이름이라 어디서도 접속할 수 없고, 접속을 시도하면 바깥 DNS에 묻게 되므로 실습에서 접속하지 않는다.
+- RDS 인스턴스·Aurora 쓰기 엔드포인트·ALB·NLB·CloudFront의 **엔드포인트는 `127.0.0.1:<임의 포트>`로 컨테이너 안에만** 열린다. 학습자 PC에서 접속할 수 없다(API Gateway 실행 URL만 예외). ElastiCache·Aurora 리더 엔드포인트는 실제 AWS 형식 이름이라 어디서도 접속할 수 없고, 기본 설정에서는 이름 해석이 바로 실패하고, 격리를 끈(`EMULATOR_DNS=host`) 환경에서는 바깥 DNS에 묻게 되므로 실습에서 접속하지 않는다.
 - 조정·관리·삭제 계열에 501이 몰려 있다: Auto Scaling 조정 정책·수명 주기 후크·조회, Organizations SCP·계정, IAM MFA 장치, VPC 피어링 수락·거절·삭제·`ReplaceRoute`·TGW 정적 경로·연결 삭제·Egress-only IGW·리전 NAT·VPN·Client VPN, AMI 생성, RDS PITR·복제본 승격, ElastiCache 복제 그룹 삭제, Glue 크롤러, Athena 작업 그룹 목록·삭제, SSM Session Manager·패치, Backup·DMS 목록·삭제 계열, Cost Explorer.
 - 시간 기반 동작은 빠르거나 없다: TTL 삭제·Firehose 버퍼·Glacier 복원은 수 초, EventBridge Scheduler `at()`은 지정 시각 전에 발화, S3 수명 주기 전환·Lambda 비동기 실패 대상·Route 53 상태 확인 실패는 일어나지 않는다. CloudFormation은 `DescribeStacks`가 올 때만 진행하고 대기 리소스에 약 10초 마감이 있어, NAT 경로가 있는 스택은 CLI `wait`로는 롤백되고 2초 간격 폴링으로는 성공한다.
 - 동기 Lambda 호출은 회당 약 7 MiB의 에뮬레이터 메모리를 회수하지 않는다(기본 상한 2g, 반복 실습 시 `scripts/emulator-reset.sh`). 노트북이 잠든 뒤에는 VM 시계가 어긋나 서명 오류가 날 수 있다(M00 레슨 3).
-- 일부 리소스는 **외부 호스트에 접속을 시도**할 수 있다: ECS 작업 정의에 실제 레지스트리 URI를 넣으면 에뮬레이터 컨테이너가 이미지를 받으려 한다. 실습은 `.invalid` 레지스트리와 예약 이름만 쓴다(AUTHORING 규칙 11). 탐침 시작과 M00 `verify.sh`가 `tools/probe/no_external_hosts.py`로 `tools`·`scripts`·`src`·M00 소스 텍스트를 정적 검사한다(API 응답으로 얻은 주소, 변수로 조립한 이름은 보지 못한다).
+- 일부 리소스는 **외부 호스트에 접속을 시도**할 수 있다: ECS 작업 정의에 실제 레지스트리 URI를 넣으면 에뮬레이터 컨테이너가 이미지를 받으려 한다. 실습은 `.invalid` 레지스트리와 예약 이름만 쓴다(AUTHORING 규칙 11). `tools/probe/no_external_hosts.py`가 탐침 시작 때는 탐침 코드를, M00 `verify.sh`에서는 `tools`·`scripts`·`src`·`curriculum/` 전체 소스 텍스트를 정적 검사한다. 에뮬레이터 컨테이너는 기본으로 `--dns 127.0.0.1`로 떠 이름 해석 자체가 실패한다(`EMULATOR_DNS=host`로 해제)(API 응답으로 얻은 주소, 변수로 조립한 이름은 보지 못한다).
 - 미구현 오퍼레이션은 `501 NotImplemented`를 반환한다.
 
 따라서 모든 실습에 아래 등급 중 하나를 붙인다. 등급은 추측이 아니라 **M00에서 만든 탐침(probe) 결과와 저자의 실제 실행**으로 정한다.
