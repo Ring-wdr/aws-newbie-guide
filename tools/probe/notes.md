@@ -29,7 +29,7 @@
    - 빠른 것: TTL 삭제·Firehose 버퍼·CloudTrail 로그는 수 초, Glacier Standard 복원은 1초 안에 끝남(`s3`), Scheduler `at()`은 지정 시각 전에 발화.
    - 일어나지 않는 것: 수명 주기 전환, Lambda 비동기 실패의 OnFailure 대상·함수 DLQ(`DeadLetterConfig`) 전달(`lambda-runtime`, 35초 관찰).
    - CloudFormation은 조회할 때만 진행하고 대기 리소스에 약 10초 마감이 있어, 30초 간격의 CLI waiter로는 NAT 경로가 있는 스택이 롤백된다.
-5. **리소스 엔드포인트는 컨테이너 안에만 있다.** RDS, ALB, CloudFront가 실제로 응답하지만 호스트에서는 닿지 않는다. API Gateway 실행 URL만 호스트에서 열린다.
+5. **리소스 엔드포인트는 컨테이너 안에만 있다.** RDS, ALB, CloudFront가 실제로 응답하지만 호스트에서는 닿지 않는다. API Gateway 실행 URL만 호스트에서 열린다. ElastiCache·Aurora 리더 엔드포인트는 실제 AWS 형식 이름이라 어디서도 접속할 수 없다.
 
 남은 501은 대부분 **관리·삭제·조정 계열**이다.
 - Auto Scaling: 정책·후크·조회
@@ -64,7 +64,7 @@
 | efs | 🟡 | 파일 시스템·마운트 타깃·액세스 포인트 생성. 마운트 타깃 AZ·IP가 서브넷 CIDR을 따르지 않음, 마운트 불가 |
 | rds | 🟡 | 인스턴스·복제본·스냅샷·Aurora 클러스터 OK, 컨테이너 안에 실제 DB. 호스트 접속 불가, Multi-AZ 장애 조치 재현 안 됨 |
 | dynamodb | 🟢 | 키 설계·Query/Scan·조건부 쓰기·GSI·Streams·트랜잭션·TTL·백업 실제처럼. PITR은 `db-gaps` |
-| elasticache | 🟡 | 클러스터·복제 그룹 available, 엔드포인트에 실제 캐시 서버 없음 |
+| elasticache | 🟡 | 클러스터·복제 그룹 available. 엔드포인트는 실제 AWS 형식 이름(`*.cache.amazonaws.com`)이라 해석되지 않고, 탐침은 접속을 생략한다 |
 | db-gaps | 🟡 | RDS PITR·복제본 승격·사용자 지정 엔드포인트·자동 백업 조회 501, ElastiCache 복제 그룹 삭제 501, DAX 서브넷 그룹 실패, DynamoDB PITR 복원 창이 앞으로 가지 않음 |
 | sqs | 🟢 | 가시성 타임아웃·DLQ·재처리·롱 폴링·지연·FIFO 순서/중복 제거·1 MiB 제한 모두 재현 |
 | sns | 🟢 | SQS 구독 전달·필터 정책(속성/본문)·Raw 전달·FIFO 재현. 큐 정책이 없으면 전달 안 됨(AWS와 동일) |
@@ -179,6 +179,7 @@
 | DynamoDB 키 설계·소비 용량·조건부 쓰기·GSI·Streams·트랜잭션·TTL(수 초 안 삭제)·백업은 AWS와 같다. 생성 응답은 `CREATING`이고, 직후 상태는 경쟁 상태다 | `dynamodb` |
 | DynamoDB PITR: `LatestRestorableDateTime`이 PITR을 켠 시각에 멈춘다. 최신 시점 복원은 현재 데이터를 돌려주고, 중간 시각은 `InvalidRestoreTimeException`이다 → 특정 시점 복원은 재현되지 않는다 | `db-gaps` |
 | RDS 인스턴스·복제본·스냅샷·Aurora는 동작하고 컨테이너 안에 실제 DB 엔진이 뜬다(호스트에서 접속 불가). Multi-AZ 장애 조치는 재현되지 않는다 | `rds` |
+| 엔드포인트 주소: RDS 인스턴스·Aurora 쓰기 엔드포인트는 `127.0.0.1`(컨테이너 안 포트)이다. Aurora 리더 엔드포인트와 ElastiCache 기본·리더·구성 엔드포인트는 실제 AWS 형식 이름(`*.rds.amazonaws.com`, `master.<id>.000001.us-east-1.cache.amazonaws.com:6379`, `*.cfg.us-east-1.cache.amazonaws.com:11211`)이라 컨테이너 안에서도 해석되지 않는다. 탐침은 이런 이름에 접속하지 않는다(행은 SKIP) | `rds`, `elasticache` |
 | RDS PITR 복원·복제본 승격·Aurora 사용자 지정 엔드포인트·자동 백업 조회는 501이다 | `db-gaps` |
 | ElastiCache 복제 그룹 삭제는 501이다. DAX 서브넷 그룹은 유효한 서브넷으로도 실패한다 | `db-gaps` |
 | `timestream-write` CLI는 `AmbiguousService`다. DocumentDB·Neptune·Keyspaces는 구성만 된다 | 모듈 저자 관찰 (m05 README) |
@@ -267,6 +268,7 @@
 - **정책을 실제처럼 써야 한다.** 큐 정책, 버킷 정책, 역할 신뢰 정책·권한, Lambda 리소스 정책(`add-permission`)이 없으면 전달이 **조용히** 일어나지 않거나 거부된다(HTTP API만 예외).
 - **조건 키가 있는 IAM 정책은 시뮬레이터로 판정한다.** 실제 호출로 맞게 동작하는 조합은 S3·SQS의 `aws:SecureTransport`·`aws:PrincipalAccount`뿐이다(`iam-conditions`).
 - **코드에 바깥 주소를 쓰지 않는다.** 이미지·URL·구독 엔드포인트·Issuer에는 `.invalid` 같은 예약 이름을 쓴다. `tools/probe/no_external_hosts.py`로 검사할 수 있다(환경 메모).
+- **에뮬레이터가 돌려준 주소로 접속하기 전에 루프백 IP인지 확인한다.** ElastiCache·Aurora 리더 엔드포인트처럼 실제 AWS 형식 이름이면 접속(`curl`, `/dev/tcp`, `redis-cli` 등)하지 않는다. 이름 해석만으로 바깥 DNS 질의가 나간다.
 - **상태와 시간을 단언하지 않는다.** waiter나 짧은 간격 폴링을 쓰되, CloudFormation은 2초 간격으로 폴링한다. "몇 초 뒤"라는 시간이나 "생성 직후 상태"는 단언하지 않는다.
 - **목록 결과를 `--query ... --output text`로 변수에 담지 않는다**(페이지마다 `None` 줄). `--output json`이나 `--no-paginate`를 쓴다.
 - **boto3 예제는 `emulator_guard`를 먼저 호출한다.** 두 사이트는 `emulator_site()`와 `emulator_site("DR_")`로 구분한다.
@@ -313,8 +315,13 @@
 
 - **메모리 상한 기본 2g.** `scripts/emulator-up.sh`의 기본 `EMULATOR_MEMORY`는 2g다(공식 가이드와 같음). 빈 에뮬레이터는 약 174 MiB를 쓴다. 동기 Lambda `Invoke`는 호출 한 번에 약 7 MiB씩 늘리고 그 메모리를 되돌려 주지 않는다(`lambda-runtime` 행). 1 GiB 상한에서는 약 120회 호출 뒤 `OOMKilled`(종료 코드 137)되었다. 학습자에게는 `Could not connect to the endpoint URL`만 보인다. `env.sh`와 `emulator-status.sh`가 OOM을 알려 주며, 대처는 `scripts/emulator-reset.sh`다.
 - **호스트 잠자기 뒤 시계 어긋남.** 노트북이 잠들었다 깨면 Colima VM(= 에뮬레이터 컨테이너)의 시계가 뒤처질 수 있다. 그러면 STS는 `SignatureDoesNotMatch`, S3·DynamoDB 등은 `RequestTimeTooSkewed`로 모든 요청을 거부한다. M03·M04·M05·M12 작업 중에 실제로 겪었다. `scripts/clock-check.sh`가 차이를 재고, `env.sh`는 서명 거부일 때만 이 진단을 보여 준다. 해결 명령(VM의 `systemd-timesyncd` 재시작 또는 `date -s`)은 실제로 잠자기 뒤 어긋난 상황에서는 아직 검증하지 못했다(M00 레슨 3).
-- **리소스 엔드포인트는 컨테이너 안에만 있다.** RDS·Aurora·ElastiCache 주소, ALB·NLB `DNSName`, CloudFront `DomainName`은 `127.0.0.1:<임의 포트>`이고 에뮬레이터 컨테이너 **안에서만** 열린다. 호스트에서는 접속할 수 없다. 확인하려면 `docker exec aws-emulator-$EMULATOR_PORT curl ...`을 쓴다. API Gateway 실행 URL(`https://127.0.0.1:<API 포트>/_aws/execute-api/...`)만 호스트에서 열린다.
+- **리소스 엔드포인트는 컨테이너 안에만 있다.** RDS 인스턴스·Aurora 쓰기 엔드포인트, ALB·NLB `DNSName`, CloudFront `DomainName`은 `127.0.0.1:<임의 포트>`이고 에뮬레이터 컨테이너 **안에서만** 열린다. ElastiCache 엔드포인트와 Aurora 리더 엔드포인트는 **실제 AWS 형식 이름**(`master.<id>.000001.us-east-1.cache.amazonaws.com:6379` 등)이라 어디서도 접속할 수 없고, 접속을 시도하면 그 이름을 바깥 DNS에 묻게 된다. 호스트에서는 접속할 수 없다. 확인하려면 `docker exec aws-emulator-$EMULATOR_PORT curl ...`을 쓴다. API Gateway 실행 URL(`https://127.0.0.1:<API 포트>/_aws/execute-api/...`)만 호스트에서 열린다.
 - **외부 접속 위험.** 에뮬레이터는 받은 주소를 실제로 따라간다. ECS 태스크는 이미지를 **실제로 내려받으려** 하고, ECR 주소를 주면 실제 AWS 호스트(`000000000000.dkr.ecr.us-east-1.amazonaws.com:443`)로 연결을 시도했다(m07 README). Cognito JWT 권한 부여자에 AWS 형식의 Issuer를 넣으면 JWKS를 실제 AWS에서 가져오려 할 수 있다(m07 리뷰 경고, 미검증).
   - **이 탐침의 이전 실행도 외부에 연결을 시도했다.** 이 보고서 이전의 모든 탐침 실행(PR #2 이후)은 ECS 작업 정의에 `public.ecr.aws/nginx/nginx:latest`를 썼고, 에뮬레이터는 `RunTask` 때 public.ecr.aws에서 이미지를 익명으로 받으려 했다(태스크는 `CannotPullContainerError`로 STOPPED). 같은 실행들은 SNS https 구독 엔드포인트(`https://example.com/hook`), HTTP API `HTTP_PROXY` 통합(`https://example.com/orders`), JWT 권한 부여자 Issuer(`https://cognito-idp.us-east-1.amazonaws.com/...`)도 바깥 주소로 등록했다. 에뮬레이터가 이 셋에 실제로 연결했는지는 기록하지 않았다. 자격 증명이나 계정 정보는 보내지 않았다(익명 요청, 에뮬레이터 내부 키만 사용).
-  - 지금은 탐침의 이미지·URL·엔드포인트가 모두 `.invalid` 주소다(`registry.invalid/todayorder/nginx:latest`, `hook.todayorder.invalid` 등). `tools/probe/no_external_hosts.py`가 **탐침 시작 때**와 **M00 verify.sh**에서 tools·scripts·src·M00 코드를 정적으로 검사해, 이미지·URL·주소 키·메일 자리에 예약 이름(`.invalid`·`.test`·`.example`·`.localhost`)이나 루프백 이외의 호스트가 있으면 실패한다(Docker Hub로 가는 `nginx:latest` 같은 이름 포함). 의도된 예외(가드가 거부해야 하는 주소, 설치 안내 링크, 설치용 Dockerfile)는 그 줄에 `external-host-ok: <이유>`를 단다.
+  - 또 이전의 모든 실행은 ElastiCache 복제 그룹의 기본 엔드포인트(`master.to-rg-<id>.000001.us-east-1.cache.amazonaws.com`)로 컨테이너 안에서 TCP 접속을 시도했고, 그때마다 이 실제 amazonaws.com 이름이 **컨테이너의 기본 리졸버를 거쳐 바깥 DNS에 질의**됐다(PR #15 리뷰가 두 번의 전체 실행에서 기록한 유일한 DNS 질의). 이름이 없으니 접속은 실패했고(`CLOSED`), 그래서 이전 보고서의 "ElastiCache 엔드포인트에 실제 캐시 서버 없음"은 서버가 없다는 관찰이 아니라 이름 해석 실패였다.
+  - **지금의 방어는 세 겹이다.**
+    1. **실행 중 관문.** 탐침이 여는 모든 연결(호스트의 curl·HTTPS·TCP, 컨테이너 안의 curl·TCP)은 `tools/probe/lib.py`의 관문 함수만 쓴다. 대상이 루프백 IP 리터럴(127.0.0.0/8, ::1)이 아니면 연결하지 않고 그 행을 SKIP(`외부 이름이라 접속 생략: <주소>`)으로 남긴다. 리디렉션은 따라가지 않는다. 에뮬레이터가 돌려준 주소를 이렇게 다루는 곳: RDS·Aurora·ElastiCache 엔드포인트, ALB `DNSName`(WAF·host-header·리스너 시험), CloudFront `DomainName`, API Gateway REST·HTTP API 실행 URL, 미리 서명 URL. 이번 실행에서 SKIP 된 것은 ElastiCache 기본 엔드포인트 하나다.
+    2. **정적 검사.** 탐침의 이미지·URL·엔드포인트는 모두 `.invalid` 주소다(`registry.invalid/todayorder/nginx:latest`, `hook.todayorder.invalid` 등). `tools/probe/no_external_hosts.py`가 **탐침 시작 때**와 **M00 verify.sh**에서 tools·scripts·src·M00 코드를 정적으로 검사해, 이미지·URL·주소 키·메일 자리에 예약 이름(`.invalid`·`.test`·`.example`·`.localhost`)이나 루프백 이외의 호스트가 있으면 실패한다(Docker Hub로 가는 `nginx:latest` 같은 이름 포함). Python의 f-string·문자열 연결 안의 `amazonaws.com`·공개 도메인도 잡는다. `.internal`은 예약 이름으로 보지 않는다. 의도된 예외는 그 줄이나 윗줄에 `external-host-ok: <이유>`를 단다: 가드가 거부해야 하는 주소, 설치 안내 링크, 설치용 Dockerfile, 그리고 에뮬레이터가 이름 해석 없이 내부에서 매핑하는 AWS 형식 식별자 넷 — CloudFront S3 원본 `<버킷>.s3.us-east-1.amazonaws.com`(예약 이름으로 바꾸면 OAC가 집행되지 않거나 404), Route 53 별칭 값, Cognito 자격 증명 풀의 공급자 이름, ACM 시험용 `.com` 영역(에뮬레이터 ACM이 예약 TLD를 즉시 FAILED로 만든다). **한계:** 이 검사는 소스 텍스트만 본다. 실행 중 API 응답에서 얻은 주소, 변수·`format`·셸 변수로 조립한 이름은 볼 수 없다 — 그래서 1과 3이 필요하다.
+    3. **DNS 기록 실행.** 같은 탐침을 컨테이너 DNS를 바꾼 에뮬레이터(`EMULATOR_DNS=<IP> scripts/emulator-reset.sh`, `probe.py --no-dns`)에서도 돌린다. 이번에는 Colima VM 안에 모든 질의를 기록하고 NXDOMAIN만 돌려주는 임시 리졸버를 띄워 그 주소를 컨테이너 DNS로 줬다. 전체 실행(1,141건) 동안 **에뮬레이터 컨테이너에서 나온 DNS 질의는 0건**이었고(전후에 넣은 확인용 질의만 기록됨), 모든 행의 상태가 기본 리졸버 실행과 같았다. `registry.invalid`(ECS 이미지)와 CloudFront 원본 이름의 질의도 없었다. 학습자는 `EMULATOR_DNS=127.0.0.1`로 같은 격리를 쓸 수 있다(이름 해석이 모두 실패하므로 바깥 질의가 나갈 수 없다). 실습의 기본값은 Docker 기본 리졸버 그대로다.
+  - `scripts/emulator-up.sh`는 `docker run --pull never`로 로컬 이미지만 쓴다(이미지가 없을 때 Docker Hub에 같은 이름을 찾으러 가지 않는다).
 - **보고서의 근거.** 표의 각 행은 이 탐침의 실제 호출 결과다. 탐침이 다시 확인하지 않은 항목은 아래 "탐침이 다시 확인하지 않은 모듈 저자 관찰"에 출처(`모듈 저자 관찰 (mNN README)`)와 함께 따로 적었다.
