@@ -49,6 +49,13 @@ container_state() {
   docker container inspect -f '{{.State.Status}}' "$(container_name "$1")" 2>/dev/null || true
 }
 
+# 컨테이너의 DNS 설정(--dns 값, 쉼표로 구분). --dns 없이 띄웠으면 host(Docker 기본 리졸버), 컨테이너가 없으면 '-'.
+container_dns() {
+  local dns
+  dns="$(docker container inspect -f '{{join .HostConfig.Dns ","}}' "$(container_name "$1")" 2>/dev/null)" || { echo "-"; return 0; }
+  echo "${dns:-host}"
+}
+
 health_ok() {
   local port="$1" ca="$EMULATOR_HOME_DIR/$1/ca.pem"
   [ -f "$ca" ] || return 1
