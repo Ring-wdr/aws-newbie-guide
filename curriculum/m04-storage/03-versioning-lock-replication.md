@@ -62,7 +62,7 @@ WORM(Write Once Read Many): 한 번 쓰면 정해진 기간 동안 **수정·삭
 - **체인 복제는 안 된다.** A→B, B→C로 걸어도 A의 객체가 C까지 가지 않는다(B에서 "복제본"인 객체는 다시 복제되지 않는다).
 - 삭제 마커는 **기본적으로 복제되지 않는다**(`DeleteMarkerReplication`으로 켤 수 있다). **버전 지정 삭제는 복제되지 않는다.** 원본에서 악의적으로 영구 삭제해도 대상은 안전하다.
 - 대상에서 다른 스토리지 클래스(예: DR 사본은 Standard-IA)를 지정할 수 있고, 다른 계정이면 소유권을 대상 계정으로 바꿀 수 있다.
-- 복제 시간에 SLA가 필요하면 **S3 Replication Time Control(RTC)**: 새 객체의 99.99%를 15분 안에 복제한다.
+- 복제 시간에 SLA가 필요하면 **S3 Replication Time Control(RTC)**: 대부분의 객체를 수 초 안에, **99.9%를 15분 안에** 복제하고(SLA), 15분을 넘긴 객체는 이벤트로 알려 준다([S3 RTC](https://docs.aws.amazon.com/AmazonS3/latest/userguide/replication-time-control.html)).
 
 ```mermaid
 flowchart LR

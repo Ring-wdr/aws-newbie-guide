@@ -45,7 +45,7 @@ Firehose의 S3 목적지 핵심 설정:
 | **AWS Data Exchange** | **제3자 데이터**(시장·날씨·금융 데이터)를 구독해 S3·Redshift로 받기 |
 | **AWS Data Pipeline** | 예전의 배치 데이터 이동·변환 스케줄러. **신규 고객에게 더 이상 제공되지 않는다**(유지 관리 모드). 새 설계는 Glue·Step Functions·MWAA |
 | AWS DMS | DB → DB/S3 마이그레이션·지속 복제(M12) |
-| AWS DataSync / Snow 패밀리 / Transfer Family | 파일·대용량 오프라인·SFTP 전송(M04) |
+| AWS DataSync / Snow 패밀리 / Transfer Family | 파일·대용량 오프라인·SFTP 전송(M04. Snowball Edge는 2025-11-07부터 신규 고객 불가) |
 | Amazon AppFlow | Salesforce 같은 SaaS ↔ S3 데이터 흐름(M06) |
 
 ## 직접 해 보기

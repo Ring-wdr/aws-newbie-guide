@@ -32,7 +32,8 @@ cleanup() {
     for mt in $(aws efs describe-mount-targets --file-system-id "$fs" --output json | jq -r '.MountTargets[].MountTargetId'); do
       aws efs delete-mount-target --mount-target-id "$mt"
     done
-    poll "마운트 타깃 삭제" 120 bash -c "[ \"\$(aws efs describe-mount-targets --file-system-id $fs --output json | jq '.MountTargets | length')\" = 0 ]"
+    poll "마운트 타깃 삭제" 120 bash -c "[ \"\$(aws efs describe-mount-targets --file-system-id $fs --output json | jq '.MountTargets | length')\" = 0 ]" || {
+      echo "마지막 상태: $(aws efs describe-mount-targets --file-system-id "$fs" --output json | jq -c '[.MountTargets[] | {MountTargetId, LifeCycleState}]')"; exit 1; }
     aws efs delete-file-system --file-system-id "$fs"
   fi
   for vpc in $(aws ec2 describe-vpcs --filters "Name=tag:Name,Values=$TAG" --query 'Vpcs[].VpcId' --output text); do

@@ -54,7 +54,7 @@ RDS Multi-AZ **DB 인스턴스** 배포의 대기는 읽을 수 없다(가용성
 | 백업 삭제 불가(루트 포함), WORM | Backup Vault Lock 규정 준수 모드 (유예 ≥3일 후 고정) / 논리적 에어갭 볼트 |
 | S3 다른 리전 복제, 시간 보장 | S3 CRR + RTC (99.9% 15분 이내 SLA) |
 | 관계형 DB 리전 장애, 초 RPO·분 RTO | Aurora Global Database (보조 리전 최대 10개, 복제 지연 보통 <1초) |
-| NoSQL 다중 리전 다중 쓰기 | DynamoDB 전역 테이블 (강한 일관성 MRSC 옵션도 있음) |
+| NoSQL 다중 리전 다중 쓰기 | DynamoDB 글로벌 테이블 (강한 일관성 MRSC 옵션도 있음) |
 | DynamoDB 시점 복구 | PITR (1~35일) |
 | 서버를 고치지 않는 DR, 초 RPO·분 RTO | Elastic Disaster Recovery (DRS) |
 | 트래픽 전환 | Route 53 장애 조치 라우팅 + 상태 확인, ARC 라우팅 제어, Global Accelerator |

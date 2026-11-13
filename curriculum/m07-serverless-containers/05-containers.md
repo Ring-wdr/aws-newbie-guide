@@ -84,7 +84,7 @@ todayorder/order-api
 0
 ```
 
-방금 본 것: 저장소 URI는 `<계정>.dkr.ecr.<리전>.amazonaws.com/<이름>` 형식이다. `IMMUTABLE`이면 `1.0` 태그를 다른 이미지로 덮어쓸 수 없어 "어제 배포한 1.0과 오늘의 1.0이 다르다" 사고를 막는다. 실제로는 `aws ecr get-login-password | docker login --username AWS --password-stdin <URI>` 후 `docker push`한다(실습은 이미지를 푸시하지 않는다 — 이미지 수 0).
+방금 본 것: 저장소 URI는 `<계정>.dkr.ecr.<리전>.amazonaws.com/<이름>` 형식이다. `IMMUTABLE`이면 `1.0` 태그를 다른 이미지로 덮어쓸 수 없어 "어제 배포한 1.0과 오늘의 1.0이 다르다" 사고를 막는다. 실제로는 `aws ecr get-login-password | docker login --username AWS --password-stdin <URI>` 후 `docker push`한다(실습은 이미지를 푸시하지 않는다 — 이미지 수 0). (출력의 포트 9306은 저자 환경이다. 학습자 화면에는 내 `EMULATOR_PORT`, 기본 9297이 찍힌다.)
 
 **2) 클러스터·작업 정의·서비스**
 

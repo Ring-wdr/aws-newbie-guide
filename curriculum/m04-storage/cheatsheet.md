@@ -64,7 +64,7 @@
 | 다른 리전에 사본(DR·지연·규정) | CRR |
 | 같은 리전 다른 계정/버킷(로그 집계·테스트) | SRR |
 | 기존 객체까지 복제 | S3 Batch Replication |
-| 15분 내 복제 SLA | Replication Time Control (RTC) |
+| 15분 내 복제 SLA | Replication Time Control (RTC) — 99.9%를 15분 안에 |
 
 복제 조건: 원본·대상 **버전 관리 필수**, IAM 역할, 기존 객체·이미 복제된 객체는 안 넘어감(체인 비전이), 삭제 마커는 기본 미복제, 버전 지정 삭제는 복제 안 됨.
 

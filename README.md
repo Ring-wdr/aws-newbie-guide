@@ -13,7 +13,7 @@ AWS 계정도, 요금도 필요 없다. 내 노트북에서 도는 [aws-emulator
 
 1. [M00 오리엔테이션](./curriculum/m00-orientation/)을 따라 실습 환경을 만든다.
 2. 모듈을 순서대로 진행한다. 레슨마다 `왜 필요한가 → 핵심 개념 → 직접 해 보기 → 실제 AWS에서는 → 시험 포인트 → 스스로 확인`.
-3. 모듈 끝의 퀴즈를 풀고, 마지막에 캡스톤과 모의고사로 마무리한다.
+3. 모듈 끝의 퀴즈를 풀고, 마지막에 [M14](./curriculum/m14-capstone-exam/)의 캡스톤과 모의고사로 마무리한다. 시험 직전에는 [통합 치트시트](./curriculum/m14-capstone-exam/cheatsheet.md)(요구 사항 → 서비스, 도메인별) 한 장으로 복습한다.
 
 ## 빠른 시작
 
@@ -27,33 +27,41 @@ source scripts/env.sh         # 이 셸을 에뮬레이터에 연결 (실제 AWS
 aws sts get-caller-identity   # "Account": "000000000000" 이면 준비 완료
 ```
 
-끝나면 `scripts/emulator-down.sh`. 에뮬레이터가 무엇을 재현하고 무엇을 못 하는지는 [docs/FIDELITY.md](./docs/FIDELITY.md).
+끝나면 `scripts/emulator-down.sh`. 에뮬레이터가 무엇을 재현하고 무엇을 못 하는지는 각 모듈 README의 **"에뮬레이터 제약"**(모듈 저자가 직접 확인한 최신 관찰)과 서비스별 탐침 결과인 [docs/FIDELITY.md](./docs/FIDELITY.md).
 
 ## 로드맵
 
-| 모듈 | 주제 | 시험 도메인 |
-|---|---|---|
-| M00 | 오리엔테이션과 실습 환경 | – |
-| M01 | IAM과 계정 관리 | 보안 |
-| M02 | VPC 네트워킹 | 보안 · 복원력 |
-| M03 | 컴퓨트와 확장 (EC2, ELB, Auto Scaling) | 복원력 · 성능 · 비용 |
-| M04 | 스토리지 (S3, EBS, EFS, FSx…) | 보안 · 성능 · 비용 |
-| M05 | 데이터베이스 (RDS, Aurora, DynamoDB…) | 복원력 · 성능 |
-| M06 | 애플리케이션 통합 (SQS, SNS, EventBridge…) | 복원력 |
-| M07 | 서버리스와 컨테이너 (Lambda, API Gateway, ECS…) | 복원력 · 성능 |
-| M08 | DNS와 엣지 (Route 53, CloudFront…) | 복원력 · 성능 |
-| M09 | 보안 서비스와 암호화 (KMS, Secrets Manager…) | 보안 |
-| M10 | 모니터링·운영·IaC (CloudWatch, CloudFormation…) | 복원력 |
-| M11 | 데이터 분석 (Kinesis, Glue, Athena…) | 성능 |
-| M12 | 고가용성·DR·마이그레이션 | 복원력 |
-| M13 | 비용 최적화 | 비용 |
-| M14 | 캡스톤 + 모의고사 | 전체 |
+각 모듈은 `README.md`(목표·레슨·실습 등급·에뮬레이터 제약) → 레슨 → `labs/` → `cheatsheet.md` → `quiz.md` 순서다. 모듈마다 `labs/verify.sh`가 깨끗한 에뮬레이터에서 모든 실습을 다시 돌려 검증한다.
 
-권장 일정은 8주(주 10~12시간). 자세한 내용은 [커리큘럼 총 설계서](./docs/CURRICULUM.md).
+| 모듈 | 주제 | 시험 도메인 | 바로 가기 |
+|---|---|---|---|
+| [M00](./curriculum/m00-orientation/) | 오리엔테이션과 실습 환경 (에뮬레이터, CLI·boto3, 글로벌 인프라) | – | [치트시트](./curriculum/m00-orientation/cheatsheet.md) · [퀴즈](./curriculum/m00-orientation/quiz.md) |
+| [M01](./curriculum/m01-iam-identity/) | IAM과 계정 관리 (정책 평가, 역할·STS, Organizations·SCP, 연동) | 보안 | [치트시트](./curriculum/m01-iam-identity/cheatsheet.md) · [퀴즈](./curriculum/m01-iam-identity/quiz.md) |
+| [M02](./curriculum/m02-vpc-networking/) | VPC 네트워킹 (3-티어 VPC, SG·NACL, 엔드포인트, 하이브리드 연결) | 보안 · 복원력 | [치트시트](./curriculum/m02-vpc-networking/cheatsheet.md) · [퀴즈](./curriculum/m02-vpc-networking/quiz.md) |
+| [M03](./curriculum/m03-compute-scaling/) | 컴퓨트와 확장 (EC2, 구매 옵션, EBS, ELB, Auto Scaling) | 복원력 · 성능 · 비용 | [치트시트](./curriculum/m03-compute-scaling/cheatsheet.md) · [퀴즈](./curriculum/m03-compute-scaling/quiz.md) |
+| [M04](./curriculum/m04-storage/) | 스토리지 (S3 클래스·보안·복제, EFS·FSx, 하이브리드 이전) | 보안 · 성능 · 비용 | [치트시트](./curriculum/m04-storage/cheatsheet.md) · [퀴즈](./curriculum/m04-storage/quiz.md) |
+| [M05](./curriculum/m05-databases/) | 데이터베이스 (RDS·Aurora, DynamoDB, 캐시, 목적별 DB) | 복원력 · 성능 | [치트시트](./curriculum/m05-databases/cheatsheet.md) · [퀴즈](./curriculum/m05-databases/quiz.md) |
+| [M06](./curriculum/m06-integration-messaging/) | 애플리케이션 통합 (SQS, SNS, EventBridge, Step Functions, Kinesis) | 복원력 | [치트시트](./curriculum/m06-integration-messaging/cheatsheet.md) · [퀴즈](./curriculum/m06-integration-messaging/quiz.md) |
+| [M07](./curriculum/m07-serverless-containers/) | 서버리스와 컨테이너 (Lambda, API Gateway, Cognito, ECS) | 복원력 · 성능 | [치트시트](./curriculum/m07-serverless-containers/cheatsheet.md) · [퀴즈](./curriculum/m07-serverless-containers/quiz.md) |
+| [M08](./curriculum/m08-dns-edge/) | DNS와 엣지 (Route 53, CloudFront, Global Accelerator, WAF) | 복원력 · 성능 | [치트시트](./curriculum/m08-dns-edge/cheatsheet.md) · [퀴즈](./curriculum/m08-dns-edge/quiz.md) |
+| [M09](./curriculum/m09-security-encryption/) | 보안 서비스와 암호화 (KMS, Secrets Manager, ACM, CloudTrail·Config, 위협 탐지) | 보안 | [치트시트](./curriculum/m09-security-encryption/cheatsheet.md) · [퀴즈](./curriculum/m09-security-encryption/quiz.md) |
+| [M10](./curriculum/m10-monitoring-iac/) | 모니터링·운영·IaC (CloudWatch, CloudFormation, Systems Manager) | 복원력 | [치트시트](./curriculum/m10-monitoring-iac/cheatsheet.md) · [퀴즈](./curriculum/m10-monitoring-iac/quiz.md) |
+| [M11](./curriculum/m11-analytics/) | 데이터 분석 (Firehose, Glue, Athena, AI/ML 서비스) | 성능 | [치트시트](./curriculum/m11-analytics/cheatsheet.md) · [퀴즈](./curriculum/m11-analytics/quiz.md) |
+| [M12](./curriculum/m12-resilience-dr-migration/) | 고가용성·DR·마이그레이션 (SPOF, DR 4전략, AWS Backup, DMS) | 복원력 | [치트시트](./curriculum/m12-resilience-dr-migration/cheatsheet.md) · [퀴즈](./curriculum/m12-resilience-dr-migration/quiz.md) |
+| [M13](./curriculum/m13-cost-optimization/) | 비용 최적화 (과금 구조, 구매 옵션, 데이터 전송, 비용 도구) | 비용 | [치트시트](./curriculum/m13-cost-optimization/cheatsheet.md) · [퀴즈](./curriculum/m13-cost-optimization/quiz.md) |
+| [M14](./curriculum/m14-capstone-exam/) | 종합: Well-Architected 리뷰, 캡스톤(한 번에 짓고 시험하고 지우기), 모의고사 65문항 | 전체 | [통합 치트시트](./curriculum/m14-capstone-exam/cheatsheet.md) · [모의고사](./curriculum/m14-capstone-exam/mock-exam/questions.md) |
+
+권장 일정은 8주(주 10~12시간, 8주차가 M14). 자세한 내용은 [커리큘럼 총 설계서](./docs/CURRICULUM.md).
+
+### 끝났다면 — 완료 기준
+
+1. 모든 모듈의 `labs/verify.sh`가 통과하고 각 퀴즈 80% 이상.
+2. [캡스톤 자기 점검표](./curriculum/m14-capstone-exam/capstone-self-check.md) 완료.
+3. [모의고사](./curriculum/m14-capstone-exam/mock-exam/questions.md) 정답률 72% 이상(자체 기준 — 실제 합격선 720점은 환산 점수라 1:1이 아니다). 시험 접수와 마지막 1주 계획은 [M14 레슨 4](./curriculum/m14-capstone-exam/04-exam-logistics-and-study-plan.md).
 
 ## 알아 둘 것: 에뮬레이터는 AWS가 아니다
 
-aws-emulator는 생각보다 많은 것을 실제처럼 해낸다 — Lambda 코드가 실행되고, SNS 메시지가 SQS에 도착하고, CloudFormation이 리소스를 만든다. 하지만 서버가 실제로 부팅되지는 않고, 자동 조정·장애 조치·다중 리전은 재현하지 않으며, IAM 권한 평가는 서비스마다 다르다. 그래서 모든 실습에 등급을 붙였고, 근거는 [충실도 보고서](./docs/FIDELITY.md)에 있다.
+aws-emulator는 생각보다 많은 것을 실제처럼 해낸다 — Lambda 코드가 실행되고, SNS 메시지가 SQS에 도착하고, CloudFormation이 (대부분의) 리소스를 만든다. 하지만 서버가 실제로 부팅되지는 않고, 자동 조정·장애 조치·다중 리전은 재현하지 않으며, IAM 권한 평가는 서비스마다 다르다. 그래서 모든 실습에 등급을 붙였고, 근거는 각 모듈 README의 "에뮬레이터 제약"과 [충실도 보고서](./docs/FIDELITY.md)에 있다.
 
 | 등급 | 뜻 |
 |---|---|

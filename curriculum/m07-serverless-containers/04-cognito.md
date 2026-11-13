@@ -107,7 +107,7 @@ aws: [ERROR]: An error occurred (NotAuthorizedException) when calling the Initia
 발급자(iss): https://127.0.0.1:9306/us-east-1_089ef7645   (실제 AWS: https://cognito-idp.us-east-1.amazonaws.com/us-east-1_089ef7645)
 ```
 
-방금 본 것: `sub`는 사용자의 변하지 않는 고유 ID(이메일이 바뀌어도 그대로 — DB의 사용자 키로 쓴다), `aud`는 앱 클라이언트 ID, `exp - iat` = 3,600초. **`iss`가 에뮬레이터 주소**라는 점이 실제 AWS와 다르다.
+방금 본 것: `sub`는 사용자의 변하지 않는 고유 ID(이메일이 바뀌어도 그대로 — DB의 사용자 키로 쓴다), `aud`는 앱 클라이언트 ID, `exp - iat` = 3,600초. **`iss`가 에뮬레이터 주소**라는 점이 실제 AWS와 다르다. (출력의 포트 9306은 저자 환경이다. 학습자 화면에는 내 `EMULATOR_PORT`, 기본 9297이 찍힌다.)
 
 **3) JWT 권한 부여자로 API 보호**
 
@@ -167,7 +167,7 @@ SDK cognito_login OK
 - 토큰 발급자(`iss`)는 `https://cognito-idp.<리전>.amazonaws.com/<풀 ID>`다. 에뮬레이터는 `https://127.0.0.1:<포트>/<풀 ID>`를 쓰고, JWT 권한 부여자도 그 값으로 검증한다(저자 확인: Issuer를 AWS 형식으로 넣으면 유효한 토큰도 401). 그래서 실습은 토큰의 `iss`를 읽어 설정한다. 실제 AWS 스크립트에서는 AWS 형식을 쓴다.
 - ⚠️ **에뮬레이터에서 AWS 형식 Issuer를 시험해 보지 말 것.** JWT 권한 부여자는 Issuer 주소에서 서명 검증용 공개 키(JWKS)를 내려받으므로, 에뮬레이터가 실제 `cognito-idp.us-east-1.amazonaws.com`에 요청을 보낼 수 있다. 이 커리큘럼은 실제 AWS로 나가는 요청을 만들지 않는다.
 - 실습은 이메일 확인을 `admin-confirm-sign-up`으로 건너뛰었다. 실제로는 이메일·SMS 발송(SES·SNS 연동, 발송 한도)이 따른다.
-- 자격 증명 풀의 임시 자격 증명으로 S3에 실제 업로드하는 것은 이 실습에서 하지 않았다(M04·M01에서 다룬 S3 정책 평가 한계 때문에 의미 있는 시연이 어렵다).
+- 자격 증명 풀의 임시 자격 증명으로 S3에 실제 업로드하는 것은 이 실습에서 하지 않았다. 에뮬레이터의 S3는 객체 단위 요청(`PutObject` 등)에는 IAM 정책을 평가하지만 버킷 생성·목록 같은 계정 수준 요청은 정책 없이 통과시키므로(M01 README "에뮬레이터 제약", M04 레슨 4), 역할별 권한 범위를 보여 주는 시연으로는 결과를 해석하기 까다롭다.
 - 실제 AWS에서 해 보려면: Cognito 사용자 풀은 월간 활성 사용자(MAU) 기준 과금이고 소규모는 무료 범위에 든다(요금제 Lite/Essentials/Plus에 따라 다름 — 콘솔에서 확인). SMS MFA는 별도 과금. 정리: `aws cognito-idp delete-user-pool --user-pool-id <id>`, `aws cognito-identity delete-identity-pool --identity-pool-id <id>`, API·함수·역할 삭제.
 
 ## 시험 포인트

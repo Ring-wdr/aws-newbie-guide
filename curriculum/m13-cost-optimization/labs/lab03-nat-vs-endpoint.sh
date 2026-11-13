@@ -72,13 +72,15 @@ echo "프라이빗 라우팅 테이블 (엔드포인트 후):"
 aws ec2 describe-route-tables --route-table-ids "${PRIV_RTS[0]}" \
   --query 'RouteTables[0].Routes[].{Dest:DestinationCidrBlock||DestinationPrefixListId,Target:NatGatewayId||GatewayId}' --output table
 
-echo "== 3. 월 비용 비교 (예시 단가: NAT 시간당 0.05, NAT 처리 GB당 0.05, 인터페이스 엔드포인트 AZ·시간당 0.01 + GB당 0.01)"
+echo "== 3. 월 비용 비교 (예시 단가: NAT 시간당 0.05 + NAT의 퍼블릭 IPv4 시간당 0.005, NAT 처리 GB당 0.05, 인터페이스 엔드포인트 AZ·시간당 0.01 + GB당 0.01)"
 NAT_COUNT=2; S3_GB=3000; OTHER_GB=200
 costs="$(awk -v n="$NAT_COUNT" -v s3="$S3_GB" -v o="$OTHER_GB" 'BEGIN {
-  h = 730; nat_h = 0.05; nat_gb = 0.05; ie_h = 0.01; ie_gb = 0.01
-  before = n*h*nat_h + (s3+o)*nat_gb
-  gw     = n*h*nat_h + o*nat_gb
-  iface  = n*h*nat_h + o*nat_gb + n*h*ie_h + s3*ie_gb
+  # NAT 마다 퍼블릭 IPv4 주소(EIP) 하나 — 실제 AWS 는 NAT 요금과 별도로 청구한다(레슨 2, lab01 과 같은 방식)
+  h = 730; nat_h = 0.05; ip_h = 0.005; nat_gb = 0.05; ie_h = 0.01; ie_gb = 0.01
+  nat_fixed = n*h*(nat_h + ip_h)
+  before = nat_fixed + (s3+o)*nat_gb
+  gw     = nat_fixed + o*nat_gb
+  iface  = nat_fixed + o*nat_gb + n*h*ie_h + s3*ie_gb
   printf "A. 전부 NAT 경유            %8.2f\n", before
   printf "B. S3 게이트웨이 엔드포인트  %8.2f\n", gw
   printf "C. S3 인터페이스 엔드포인트  %8.2f\n", iface
@@ -93,5 +95,5 @@ for rt in "${PRIV_RTS[@]}"; do
   nat_route="$(aws ec2 describe-route-tables --route-table-ids "$rt" --query "RouteTables[0].Routes[?DestinationCidrBlock=='0.0.0.0/0'].NatGatewayId" --output text)"
   case "$nat_route" in nat-*) ;; *) echo "FAIL: 기본 경로(NAT)가 사라짐"; exit 1 ;; esac
 done
-grep -q '^COSTS 233.00 83.00 127.60$' <<<"$costs" || { echo "FAIL: 비용 계산이 워크시트와 다름"; exit 1; }
+grep -q '^COSTS 240.30 90.30 134.90$' <<<"$costs" || { echo "FAIL: 비용 계산이 워크시트와 다름"; exit 1; }
 echo "LAB03 OK"

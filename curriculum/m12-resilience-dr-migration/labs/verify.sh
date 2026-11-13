@@ -13,22 +13,28 @@ ROOT="$(git rev-parse --show-toplevel)"
 MOD_DIR="$ROOT/curriculum/m12-resilience-dr-migration"
 LOG_DIR="$(mktemp -d)"
 
-# 0) DR 포트 확인 — 아무것도 지우기 전에. 비대화형에서 DR_EMULATOR_PORT 가 없으면
-#    EMULATOR_PORT+1 (다른 에이전트·사람의 에뮬레이터일 수 있다)을 지우지 않도록 거부한다.
+# 0) 포트 확인 — 아무것도 지우기 전에. 두 포트를 **기본값까지 정한 뒤** 비교한다.
+#    - 주 포트: EMULATOR_PORT. 없으면 대화형 터미널에서만 9297(emulator-reset.sh 와 같은 규칙), 비대화형이면 거부
+#    - DR 포트: DR_EMULATOR_PORT. 없으면 대화형 터미널에서만 주 포트 + 1, 비대화형이면 거부
+#      (EMULATOR_PORT+1 은 다른 에이전트·사람의 에뮬레이터일 수 있으므로 추측해서 지우지 않는다)
+if [ -z "${EMULATOR_PORT:-}" ] && [ ! -t 0 ]; then
+  echo "오류: EMULATOR_PORT 가 설정되지 않았습니다. 비대화형 실행에서는 기본 포트를 쓰지 않습니다. 'export EMULATOR_PORT=<포트>' 후 다시 실행하세요." >&2
+  exit 1
+fi
 if [ -z "${DR_EMULATOR_PORT:-}" ] && [ ! -t 0 ]; then
   echo "오류: DR_EMULATOR_PORT 가 설정되지 않았습니다. 비대화형 실행에서는 DR 리전 포트를 추측하지 않습니다." >&2
   echo "      이 스크립트는 그 포트의 에뮬레이터를 재시작·종료합니다. 'export DR_EMULATOR_PORT=<포트>' 후 다시 실행하세요." >&2
   exit 1
 fi
-if [ -n "${DR_EMULATOR_PORT:-}" ] && [ "$DR_EMULATOR_PORT" = "${EMULATOR_PORT:-}" ]; then
+export EMULATOR_PORT="${EMULATOR_PORT:-9297}"
+export DR_EMULATOR_PORT="${DR_EMULATOR_PORT:-$((EMULATOR_PORT + 1))}"
+if [ "$DR_EMULATOR_PORT" = "$EMULATOR_PORT" ]; then
   echo "오류: DR_EMULATOR_PORT 가 EMULATOR_PORT 와 같습니다($DR_EMULATOR_PORT). 서로 다른 에뮬레이터여야 합니다." >&2
   exit 1
 fi
 
-# 1) 깨끗한 에뮬레이터 두 개 (EMULATOR_PORT 가 없으면 비대화형 셸에서는 거부된다)
+# 1) 깨끗한 에뮬레이터 두 개
 "$ROOT/scripts/emulator-reset.sh"
-export EMULATOR_PORT="${EMULATOR_PORT:-9297}"
-export DR_EMULATOR_PORT="${DR_EMULATOR_PORT:-$((EMULATOR_PORT + 1))}"
 trap 'rm -rf "$LOG_DIR"; "$ROOT/scripts/emulator-down.sh" "$DR_EMULATOR_PORT" >/dev/null 2>&1 || true' EXIT
 "$ROOT/scripts/emulator-reset.sh" "$DR_EMULATOR_PORT"
 source "$ROOT/scripts/env.sh"

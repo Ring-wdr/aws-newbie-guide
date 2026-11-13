@@ -1,0 +1,152 @@
+# TodayOrder 캡스톤 — 이벤트·메시징 계층
+#   주문 API(Lambda) → EventBridge 버스 todayorder-cap-orders (OrderPlaced)
+#     → 규칙 → SNS 토픽 order-events → 팬아웃
+#         ├─ SQS fulfillment (DLQ: maxReceiveCount 2, 14일 보존) → 주문 처리 Lambda
+#         └─ SQS notifications (필터 정책: 5만 원 이상 주문만 — 고액 주문 알림)
+#   운영 알림: CloudWatch 알람 → SNS ops-alerts → SQS ops-inbox (실제로는 이메일·메신저 구독)
+# 큐는 SQS 관리형 암호화(SSE-SQS). 고객 관리형 KMS 키로 바꾸려면 키 정책에 sns.amazonaws.com 의
+# kms:GenerateDataKey*·kms:Decrypt 를 허용해야 SNS→SQS 전달이 된다(레슨 02 "거절한 대안").
+# EventBridge 사용자 지정 버스는 lab03이 CLI로 먼저 만들고 이름을 파라미터로 넘긴다 — 에뮬레이터 1.0.322의
+# CloudFormation은 AWS::Events::EventBus 를 CREATE_COMPLETE로 보고하지만 실제 버스를 만들지 않는다(README "에뮬레이터 제약").
+AWSTemplateFormatVersion: "2010-09-09"
+Description: TodayOrder capstone - events and messaging
+Parameters:
+  Prefix:
+    Type: String
+    Default: todayorder-cap
+  BusName:
+    Type: String
+    Default: todayorder-cap-orders
+Resources:
+  OrderPlacedRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub "${Prefix}-order-placed"
+      EventBusName: !Ref BusName
+      EventPattern:
+        source: [todayorder.orders]
+        detail-type: [OrderPlaced]
+      Targets:
+        - Id: order-events-topic
+          Arn: !Ref OrderEventsTopic
+
+  OrderEventsTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub "${Prefix}-order-events"
+  OrderEventsTopicPolicy:
+    Type: AWS::SNS::TopicPolicy
+    Properties:
+      Topics: [!Ref OrderEventsTopic]
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AllowOrderPlacedRule
+            Effect: Allow
+            Principal: {Service: events.amazonaws.com}
+            Action: sns:Publish
+            Resource: !Ref OrderEventsTopic
+            Condition: {ArnEquals: {"aws:SourceArn": !GetAtt OrderPlacedRule.Arn}}
+
+  FulfillmentDlq:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub "${Prefix}-fulfillment-dlq"
+      MessageRetentionPeriod: 1209600
+      SqsManagedSseEnabled: true
+  FulfillmentQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub "${Prefix}-fulfillment"
+      # 처리 Lambda 타임아웃(5초)의 6배 — 이벤트 소스 매핑 권장값
+      VisibilityTimeout: 30
+      SqsManagedSseEnabled: true
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt FulfillmentDlq.Arn
+        maxReceiveCount: 2
+  NotificationsQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub "${Prefix}-notifications"
+      SqsManagedSseEnabled: true
+  OrderQueuesPolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues: [!Ref FulfillmentQueue, !Ref NotificationsQueue]
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AllowOrderEventsTopic
+            Effect: Allow
+            Principal: {Service: sns.amazonaws.com}
+            Action: sqs:SendMessage
+            Resource: [!GetAtt FulfillmentQueue.Arn, !GetAtt NotificationsQueue.Arn]
+            Condition: {ArnEquals: {"aws:SourceArn": !Ref OrderEventsTopic}}
+  FulfillmentSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      TopicArn: !Ref OrderEventsTopic
+      Protocol: sqs
+      Endpoint: !GetAtt FulfillmentQueue.Arn
+      RawMessageDelivery: true
+  NotificationsSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      TopicArn: !Ref OrderEventsTopic
+      Protocol: sqs
+      Endpoint: !GetAtt NotificationsQueue.Arn
+      RawMessageDelivery: true
+      FilterPolicyScope: MessageBody
+      FilterPolicy:
+        detail:
+          total: [{numeric: [">=", 50000]}]
+
+  OpsTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub "${Prefix}-ops-alerts"
+  OpsTopicPolicy:
+    Type: AWS::SNS::TopicPolicy
+    Properties:
+      Topics: [!Ref OpsTopic]
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          # 토픽 정책을 직접 쓰면 기본 정책이 대체된다 → 알람(CloudWatch)과 예산(Budgets)이 게시할 수 있게 명시
+          - Sid: AllowAlarmsAndBudgets
+            Effect: Allow
+            Principal: {Service: [cloudwatch.amazonaws.com, budgets.amazonaws.com]}
+            Action: sns:Publish
+            Resource: !Ref OpsTopic
+            Condition: {StringEquals: {"aws:SourceAccount": !Ref "AWS::AccountId"}}
+  OpsInbox:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub "${Prefix}-ops-inbox"
+      SqsManagedSseEnabled: true
+  OpsInboxPolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues: [!Ref OpsInbox]
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: {Service: sns.amazonaws.com}
+            Action: sqs:SendMessage
+            Resource: !GetAtt OpsInbox.Arn
+            Condition: {ArnEquals: {"aws:SourceArn": !Ref OpsTopic}}
+  OpsSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      TopicArn: !Ref OpsTopic
+      Protocol: sqs
+      Endpoint: !GetAtt OpsInbox.Arn
+Outputs:
+  OrderEventsTopicArn: {Value: !Ref OrderEventsTopic}
+  OpsTopicArn: {Value: !Ref OpsTopic}
+  FulfillmentQueueUrl: {Value: !Ref FulfillmentQueue}
+  FulfillmentQueueArn: {Value: !GetAtt FulfillmentQueue.Arn}
+  DlqUrl: {Value: !Ref FulfillmentDlq}
+  NotificationsQueueUrl: {Value: !Ref NotificationsQueue}
+  OpsInboxUrl: {Value: !Ref OpsInbox}
