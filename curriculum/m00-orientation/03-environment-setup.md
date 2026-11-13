@@ -44,7 +44,7 @@ flowchart LR
 scripts/install.sh
 ```
 
-처음 실행하면 빠진 프로그램을 `brew install`로 설치하고(Colima, docker, awscli, uv 중 없는 것만), Colima VM을 켜고(CPU 2개, 메모리 4 GiB, 디스크 30 GiB — `COLIMA_CPU`·`COLIMA_MEMORY`·`COLIMA_DISK`로 바꿀 수 있다), 에뮬레이터 이미지를 빌드한다. 처음에는 VM 생성과 이미지 빌드에 몇 분 걸린다. 빌드 중 마지막 줄은 이렇게 끝난다.
+처음 실행하면 빠진 프로그램을 `brew install`로 설치하고(Colima, docker, awscli, uv, jq 중 없는 것만. jq는 실습 스크립트가 JSON을 다룰 때 쓰며 macOS 15부터는 기본으로 들어 있다), Colima VM을 켜고(CPU 2개, 메모리 4 GiB, 디스크 30 GiB — `COLIMA_CPU`·`COLIMA_MEMORY`·`COLIMA_DISK`로 바꿀 수 있다), 에뮬레이터 이미지를 빌드한다. 처음에는 VM 생성과 이미지 빌드에 몇 분 걸린다. 빌드 중 마지막 줄은 이렇게 끝난다.
 
 ```
 Successfully built c891f5ea0f36
@@ -227,7 +227,18 @@ scripts/emulator-down.sh && EMULATOR_TELEMETRY=on scripts/emulator-up.sh
 
 ### Linux·WSL
 
-`scripts/install.sh`는 Linux에서 docker·aws·uv가 없으면 설치 안내 링크를 출력하고 멈춘다. 설치 후 다시 실행하면 이미지 빌드부터 진행한다. Linux에서는 `emulator-up.sh`가 자동으로 `--user $(id -u):$(id -g)`를 붙여 `~/.aws/emulator/`의 파일이 내 소유가 되게 한다. Intel/AMD 머신은 `x86_64` RPM으로 빌드된다(아키텍처 자동 감지).
+`scripts/install.sh`는 Linux에서 docker·aws·uv·jq·python3 중 없는 것이 있으면 설치 안내를 출력하고 멈춘다(배포판마다 방법이 달라 직접 설치하지 않는다). 설치 후 다시 실행하면 이미지 빌드부터 진행한다. Ubuntu 24.04(ARM, 일반 사용자)에서 확인한 순서다. AWS CLI v2만은 공식 설치 프로그램 대신 같은 버전의 소스로 설치해 확인했다.
+
+<!-- external-host-ok: 사람이 실행하는 설치 명령(apt 패키지 이름 docker.io, uv 설치 스크립트) — 실습 중에는 호출하지 않는다 -->
+```bash
+sudo apt install git curl jq python3 docker.io   # docker 는 공식 안내(docs.docker.com)의 docker-ce 도 된다
+sudo usermod -aG docker $USER                     # 그 뒤 로그아웃했다가 다시 로그인
+curl -LsSf https://astral.sh/uv/install.sh | sh   # uv. 안내대로 새 셸을 열거나 source $HOME/.local/bin/env
+# AWS CLI v2: install.sh 가 출력하는 AWS 공식 설치 안내를 따른다 (Ubuntu 24.04 apt 에는 v2 패키지가 없다)
+scripts/install.sh
+```
+
+Linux에서는 `emulator-up.sh`가 자동으로 `--user $(id -u):$(id -g)`를 붙여 `~/.aws/emulator/`의 파일이 내 소유가 되게 한다. Intel/AMD 머신은 `x86_64` RPM으로, ARM 머신은 `aarch64` RPM으로 빌드된다(아키텍처 자동 감지). VM 없이 도는 Linux에서는 위 "노트북 잠자기 뒤 시계" 문제가 호스트 시계(NTP)의 문제가 된다. WSL2는 그 자체가 VM이라 잠자기 뒤 시계가 어긋날 수 있지만, WSL은 이 저장소에서 시험하지 못했다.
 
 ## 문제 해결
 
@@ -236,16 +247,18 @@ scripts/emulator-down.sh && EMULATOR_TELEMETRY=on scripts/emulator-up.sh
 | 증상 | 원인 | 해결 |
 |---|---|---|
 | `failed to connect to the docker API at unix:///var/run/docker.sock ... no such file or directory` | Colima가 꺼져 있거나 docker 컨텍스트가 Colima가 아님 | `colima start`, 그래도 안 되면 `docker context use colima`. 이 저장소 스크립트는 "Colima가 꺼져 있는 것 같습니다"라고 알려 준다 |
+| `install.sh`가 `Homebrew(/opt/homebrew/bin/brew)는 설치돼 있지만 PATH 에 없습니다` | Homebrew를 막 설치하고, 설치 프로그램이 마지막에 안내하는 `shellenv` 단계를 건너뛰었다 | 안내된 `eval "$(/opt/homebrew/bin/brew shellenv)"`를 실행하거나 새 터미널을 연 뒤 다시 `scripts/install.sh` |
+| `install.sh`가 `Docker Desktop 이 설치돼 있지만 실행 중이 아닙니다` | Docker Desktop이 있는 맥에서는 Colima를 따로 설치하지 않는다(런타임이 둘이면 docker 컨텍스트가 엇갈린다) | Docker Desktop을 실행하고 다시 `scripts/install.sh`. Colima를 쓰고 싶으면 `brew install colima` 후 다시 실행 |
 | 빌드 중 `DEPRECATED: The legacy builder is deprecated ... Install the buildx component` | Homebrew의 docker CLI에 buildx 플러그인이 없다 | 경고일 뿐 빌드는 성공한다. 없애려면 `brew install docker-buildx` 후 안내대로 설정 |
 | `docker: unknown command: docker buildx` | 위와 같음 | 이 저장소는 buildx 없이 빌드하도록 되어 있다. 무시해도 된다 |
 | `Bind for 127.0.0.1:9297 failed: port is already allocated` | 그 포트를 다른 컨테이너·프로그램이 쓰는 중 | `scripts/emulator-status.sh`, `lsof -i :9297`로 확인. 다른 포트를 쓰거나 기존 것을 내린다 |
-| `[env.sh] 포트 9297 의 에뮬레이터 파일(...)이 없습니다` | 에뮬레이터가 꺼져 있다 | `scripts/emulator-up.sh` |
-| `[env.sh] 안전 장치: 요청이 에뮬레이터로 간다는 것을 확인하지 못했습니다 (Account='응답 없음')` | 파일은 남아 있는데 에뮬레이터가 죽었다(강제 종료·Colima 재시작 등) | `scripts/emulator-reset.sh` |
+| `[env.sh] 포트 9297 의 에뮬레이터 파일(...)이 없습니다` | 에뮬레이터가 꺼져 있다. 정상 종료(`scripts/emulator-down.sh`, `docker stop`, `colima restart`)되면 에뮬레이터가 자기 키·인증서 파일을 지우므로 이 메시지가 나온다 | `scripts/emulator-up.sh` |
+| `[env.sh] 안전 장치: 요청이 에뮬레이터로 간다는 것을 확인하지 못했습니다 (Account='응답 없음')` | 파일은 남아 있는데 에뮬레이터 컨테이너가 없다(`docker rm -f`로 지웠거나, Colima VM이 비정상 종료돼 docker에 접속할 수 없는 등). 컨테이너가 강제 종료돼 남아 있으면 대신 "컨테이너가 종료돼 있습니다"가 나온다 | `scripts/emulator-reset.sh` (Colima가 꺼져 있으면 먼저 `colima start`) |
 | `curl: (60) SSL certificate problem: self signed certificate` | 에뮬레이터는 자체 서명 인증서를 쓴다 | `curl --cacert "$AWS_CA_BUNDLE" ...` 처럼 인증서를 지정한다 |
 | 에뮬레이터를 재시작한 뒤, 계속 떠 있던 Python 프로세스(예: Jupyter, 대화형 셸)에서 `SSLError ... CERTIFICATE_VERIFY_FAILED` 또는 `AccessDenied ... Sign the request with the emulator credentials` | 재시작하면 인증서와 키가 새로 생성된다. 이미 떠 있는 프로세스는 예전 인증서·키를 메모리에 들고 있다 | 그 프로세스를 다시 시작한다. 터미널은 다시 열 필요 없다(환경 변수는 파일 경로라 그대로 맞다) |
 | `EMULATOR_PORT 가 설정되지 않았습니다. 비대화형 실행에서는 ...` | CI·AI 에이전트·`nohup`·`< /dev/null`처럼 표준 입력이 터미널이 아닌 곳에서 env.sh·lab·verify·reset·down을 포트 없이 실행 | `export EMULATOR_PORT=<포트>`. 다른 사람이 쓰는 9297을 실수로 건드리지 않게 하는 안전 장치다 |
 | `[emulator_guard] AWS_ENDPOINT_URL 이 로컬 에뮬레이터(...)가 아닙니다` | `source scripts/env.sh` 없이 boto3 예제를 실행 | env.sh를 source 한 셸에서 실행한다 ([레슨 5](./05-cli-and-boto3-survival.md)) |
-| 노트북을 덮었다(잠자기) 연 뒤 모든 요청이 `SignatureDoesNotMatch`(STS) 또는 `RequestTimeTooSkewed`(S3·DynamoDB 등), `env.sh`가 `[clock-check] 시계 어긋남 ...`을 출력 (env.sh 는 서명 거부 오류이고 시계 차이가 14분 이상일 때만 이렇게 진단한다. 그보다 작으면 측정값만 참고로 보여 준다) | 맥의 시계는 맞는데 Colima VM(=에뮬레이터 컨테이너)의 시계가 뒤처졌다. AWS 서명(SigV4)은 15분 넘게 어긋나면 거부된다. VM 안의 `systemd-timesyncd`가 주기적으로(최대 약 34분 간격) 맞추므로 기다리면 저절로 풀리기도 한다 | ⚠️ 아래 두 명령은 VM에서 실행되는 것까지는 확인했지만 **실제 잠자기로 어긋난 시계를 고치는지는 아직 검증하지 못했다**. 안 되면 `colima restart`(VM 재시작 — 에뮬레이터 상태가 모두 사라진다). VM을 끄지 않고 바로 맞추기: `colima ssh -- sudo systemctl restart systemd-timesyncd` (즉시 NTP 재동기화, 인터넷 필요). 오프라인이면 `colima ssh -- sudo date -u -s "@$(date -u +%s)"` (맥 시각을 VM에 설정). 컨테이너는 VM 커널 시계를 그대로 쓰므로 에뮬레이터를 재시작할 필요 없다. 확인: `bash scripts/clock-check.sh` (조용히 끝나면 정상), 또는 `date -u; colima ssh -- date -u` |
+| 노트북을 덮었다(잠자기) 연 뒤 모든 요청이 `SignatureDoesNotMatch`(STS·boto3) 또는 `RequestTimeTooSkewed`(S3·DynamoDB 등), `env.sh`가 `[clock-check] 시계 어긋남 ...`을 출력 (env.sh 는 서명 거부 오류이고 시계 차이가 14분 이상일 때만 이렇게 진단한다. 그보다 작으면 측정값만 참고로 보여 준다) | 맥의 시계는 맞는데 Colima VM(=에뮬레이터 컨테이너)의 시계가 뒤처졌다. AWS 서명(SigV4)은 15분 넘게 어긋나면 거부된다. Colima 0.10(Lima 2.x)에서는 VM 안의 **게스트 에이전트가 맥 시각과 비교해 몇 초 안에 맞춘다** — 이 저장소를 만든 맥의 VM 기록에 잠자기 뒤 3~15분 어긋남을 스스로 맞춘 로그(`SyncTime: ... drift was -15m5s`)가 남아 있다. 그래서 대개 잠시 기다리면 풀린다 | 몇 초 기다려 다시 `source scripts/env.sh`. 그래도 그대로면 VM을 끄지 않고 바로 맞춘다: `colima ssh -- sudo systemctl restart systemd-timesyncd` (즉시 NTP 재동기화, 인터넷 필요) 또는 오프라인이면 `colima ssh -- sudo date -u -s "@$(date -u +%s)"` (맥 시각을 VM에 설정). 컨테이너는 VM 커널 시계를 그대로 쓰므로 **에뮬레이터를 재시작할 필요 없고 만든 리소스도 그대로다.** 최후 수단은 `colima restart`(에뮬레이터가 꺼지고 상태가 사라진다. 그 뒤 `scripts/emulator-up.sh`). 확인: `bash scripts/clock-check.sh` (아무것도 출력하지 않으면 정상). 맥의 언어가 한국어면 `date -u`가 시각 대신 `#오후`처럼 깨져 나오므로 직접 비교하려면 `LC_ALL=C date -u; colima ssh -- date -u`. ※ 세 방법 모두 VM 시계를 일부러 ±20분 바꿔(게스트 에이전트·timesyncd를 잠시 멈춘 상태) 확인했다. 실제 잠자기로 생긴 어긋남에 직접 써 본 것은 아니다 |
 | `aws cloudformation wait stack-create-complete` 같은 긴 간격의 waiter가 오래 걸리거나 실제와 다르게 끝난다 | waiter는 AWS 기준 간격(예: 30초)으로 폴링하고, 에뮬레이터의 상태 전이 타이밍은 실제와 다르다 | 짧은 간격으로 직접 상태를 폴링한다. 자세한 내용은 M10(CloudFormation)에서 |
 | 잘 되던 명령이 갑자기 `Could not connect to the endpoint URL: "https://127.0.0.1:9297/"`, `env.sh`가 `메모리 상한을 넘어 강제 종료됐습니다 (... 137 ...)`, `emulator-status.sh`에 `OOM(137)` (도커가 `OOMKilled=true`로 기록한 경우만 OOM으로 표시한다. `docker kill`처럼 다른 이유로 137이면 "종료됨"으로 표시) | 에뮬레이터 컨테이너가 메모리 상한을 넘어 커널에 의해 종료됐다(OOM, 종료 코드 137). 에뮬레이터 1.0.322 에서는 **동기 Lambda 호출(`invoke`) 한 번마다 약 7 MiB가 회수되지 않고 쌓인다** — 측정: 빈 상태 175 MiB → 20회 327 MiB → 100회 883 MiB, 1 GiB 상한에서는 약 120회 만에 종료. M06·M07 실습을 리셋 없이 여러 번 돌리면 생긴다 | 리소스는 이미 사라졌다. `scripts/emulator-reset.sh`로 다시 띄운다(기본 상한 2 GiB에서는 약 270회까지 버틴다). Lambda 실습을 반복할 때는 중간중간 리셋하고, 자주 반복되면 `EMULATOR_MEMORY=3g scripts/emulator-reset.sh` |
 | 이미 실제 AWS 프로필(`AWS_PROFILE`)을 쓰던 셸에서 `source scripts/env.sh` 뒤 실제 AWS를 다시 쓰고 싶다 | `env.sh`가 그 변수들을 지웠다 | 새 터미널을 연다. 에뮬레이터용 셸과 실제 AWS용 셸을 섞지 않는 것이 가장 안전하다 |

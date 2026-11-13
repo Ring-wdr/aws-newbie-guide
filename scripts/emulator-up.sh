@@ -23,9 +23,19 @@ NAME="$(container_name "$PORT")"
 # 1g 에서는 약 120번 호출 후 OOM(137)으로 죽었다(측정과 대처: M00 레슨 3 문제 해결). 병렬 에이전트는 줄일 수 있다.
 MEMORY="${EMULATOR_MEMORY:-2g}"
 DNS="${EMULATOR_DNS:-127.0.0.1}"
+# 점으로 구분한 네 자리가 각각 0~255 이고 앞에 0이 붙지 않은 IPv4 주소인지 (999.999.999.999 · 127.0.0.01 거부)
+is_ipv4() {
+  local IFS=. o
+  # shellcheck disable=SC2086 # 점으로 나누려고 일부러 따옴표를 뺀다
+  set -- $1
+  [ $# -eq 4 ] || return 1
+  for o in "$@"; do
+    [[ "$o" =~ ^(0|[1-9][0-9]{0,2})$ ]] && [ "$o" -le 255 ] || return 1
+  done
+}
 if [ "$DNS" = "host" ]; then
   DNS=""   # 격리 해제: Docker 기본 리졸버
-elif ! [[ "$DNS" =~ ^[0-9]{1,3}(\.[0-9]{1,3}){3}$ ]]; then
+elif ! [[ "$DNS" =~ ^[0-9]+(\.[0-9]+){3}$ ]] || ! is_ipv4 "$DNS"; then
   die "EMULATOR_DNS 는 IPv4 주소이거나 host 여야 합니다 (기본 127.0.0.1, 격리 해제는 host): '$DNS'"
 fi
 
@@ -49,7 +59,10 @@ if [ "$state" = "running" ]; then
     c_grn "이미 실행 중입니다: $NAME (https://127.0.0.1:$PORT)"
     running_dns="$(container_dns "$PORT")"
     if [ "$running_dns" != "${DNS:-host}" ]; then
-      c_ylw "이 컨테이너의 DNS 설정($running_dns)이 요청한 값(${DNS:-host})과 다릅니다. 바꾸려면 scripts/emulator-reset.sh $PORT"
+      # 다시 띄울 때도 요청한 값이 그대로 쓰이도록 EMULATOR_DNS 를 명령에 넣어 보여 준다
+      # (그냥 emulator-reset.sh 를 실행하면 기본값 127.0.0.1 로 다시 뜬다).
+      c_ylw "이 컨테이너의 DNS 설정($running_dns)이 요청한 값(${DNS:-host})과 다릅니다. 컨테이너를 그대로 둡니다."
+      c_ylw "요청한 값으로 바꾸려면 (재시작 — 만든 리소스가 모두 사라짐): EMULATOR_DNS=${DNS:-host} scripts/emulator-reset.sh $PORT"
     fi
     print_next
     exit 0
