@@ -14,8 +14,13 @@
 
 from __future__ import annotations
 
+import ipaddress
 import os
+import ssl
+import subprocess
 import time
+import urllib.error
+import urllib.request
 import traceback
 import uuid
 from contextlib import contextmanager
@@ -135,6 +140,17 @@ class Probe:
     def skip(self, name: str, reason: str) -> None:
         self._record(Result(self.current_service, "behavior", name, SKIP, reason))
 
+    def target_ok(self, name: str, target: str) -> bool:
+        """접속 전에 부른다. 대상이 루프백 IP 리터럴이 아니면 그 행을 SKIP 으로 남기고 False.
+
+        에뮬레이터가 돌려준 주소(RDS·ElastiCache 엔드포인트, ALB DNSName 등)는 실제 AWS 형식의
+        이름일 수 있다. 그런 이름으로 접속하면 이름 해석만으로도 바깥 DNS 에 질의가 나간다.
+        """
+        if loopback_host(target) is not None:
+            return True
+        self.skip(name, f"외부 이름이라 접속 생략: {target}")
+        return False
+
     # ---------- 정리 ----------
     def cleanup(self, label: str, fn: Callable[[], Any]) -> None:
         """서비스 탐침이 끝나면(성공/실패 무관) 역순으로 실행할 정리 작업을 등록한다."""
@@ -151,6 +167,8 @@ class Probe:
     @contextmanager
     def service(self, name: str) -> Iterator[None]:
         self.current_service = name
+        # 서비스마다 새 접미사: 여러 checks 모듈이 같은 기본 이름(p.name("acl") 등)을 써도 충돌하지 않게
+        self.suffix = uuid.uuid4().hex[:8]
         if self.verbose:
             print(f"== {name}", flush=True)
         try:
@@ -188,3 +206,111 @@ def assert_emulator() -> str:
     if acct != "000000000000":
         raise SystemExit(f"계정이 000000000000 이 아닙니다({acct}). 중단합니다.")
     return ep
+
+
+# ---------------------------------------------------------------- 접속 관문
+# 탐침이 직접 여는 모든 연결(호스트의 TCP·HTTPS·curl, 컨테이너 안의 TCP·curl)은 아래 함수만 쓴다.
+# 대상 호스트가 루프백 IP 리터럴(127.0.0.0/8, ::1)이 아니면 연결하지 않고 ExternalTarget 을 던진다.
+# 이름 해석 자체가 바깥으로 나가는 요청이므로 "localhost" 같은 이름도 받지 않는다.
+
+class ExternalTarget(Exception):
+    """루프백이 아닌 대상으로 접속하려 했다."""
+
+
+def loopback_host(target: str) -> str | None:
+    """'127.0.0.1', '127.0.0.1:80', 'http://127.0.0.1:80/x', '[::1]:5' 에서 루프백 IP 를 꺼낸다. 아니면 None."""
+    t = (target or "").strip()
+    if "://" in t:
+        t = t.split("://", 1)[1]
+    t = t.split("/", 1)[0].split("?", 1)[0]
+    if "@" in t:
+        return None  # userinfo 로 호스트를 숨기는 형태는 받지 않는다
+    if t.startswith("["):
+        host = t[1:].split("]", 1)[0]
+    elif t.count(":") == 1:
+        host = t.split(":", 1)[0]
+    else:
+        host = t
+    try:
+        ip = ipaddress.ip_address(host)
+    except ValueError:
+        return None
+    return host if ip.is_loopback else None
+
+
+def require_loopback(target: str) -> str:
+    host = loopback_host(target)
+    if host is None:
+        raise ExternalTarget(f"루프백이 아닌 대상에는 접속하지 않는다: {target}")
+    return host
+
+
+def container() -> str:
+    return f"aws-emulator-{os.environ.get('EMULATOR_PORT', '9297')}"
+
+
+def container_tcp(host: str, port: int, send: str = "", read_bytes: int = 0) -> str:
+    """에뮬레이터 컨테이너 안에서 host:port 로 TCP 연결(bash /dev/tcp). send 가 있으면 보내고 read_bytes 만큼 읽는다.
+
+    send 가 없으면 'OPEN'/'CLOSED', 있으면 읽은 내용을 돌려준다.
+    """
+    require_loopback(host)
+    port = int(port)
+    if send:
+        cmd = f"exec 3<>/dev/tcp/{host}/{port}; printf '{send}' >&3; timeout 2 head -c {read_bytes} <&3"
+    else:
+        cmd = f"timeout 3 bash -c 'exec 3<>/dev/tcp/{host}/{port}' && echo OPEN || echo CLOSED"
+    try:
+        r = subprocess.run(["docker", "exec", container(), "bash", "-c", cmd], capture_output=True, text=True, timeout=15)
+    except Exception as e:  # noqa: BLE001
+        return type(e).__name__
+    return r.stdout if send else (r.stdout.strip() or r.stderr.strip())[:60]
+
+
+def container_curl(url: str, *curl_args: str, timeout: int = 5) -> subprocess.CompletedProcess[str]:
+    """에뮬레이터 컨테이너 안에서 curl. 리디렉션은 따라가지 않는다(-L 금지)."""
+    require_loopback(url)
+    if any(a in ("-L", "--location") for a in curl_args):
+        raise ExternalTarget("리디렉션을 따라가면 바깥 주소로 갈 수 있다")
+    return subprocess.run(["docker", "exec", container(), "curl", "-s", "-m", str(timeout), *curl_args, url],
+                          capture_output=True, text=True, timeout=timeout + 15)
+
+
+def host_tcp(host: str, port: int, timeout: float = 2.0) -> str:
+    """호스트(이 컴퓨터)에서 TCP 연결. 'OPEN' 또는 예외 이름."""
+    import socket
+
+    require_loopback(host)
+    try:
+        socket.create_connection((host, int(port)), timeout=timeout).close()
+        return "OPEN"
+    except Exception as e:  # noqa: BLE001
+        return type(e).__name__
+
+
+def host_curl(url: str, *curl_args: str, timeout: int = 20) -> subprocess.CompletedProcess[str]:
+    """호스트에서 curl (에뮬레이터 CA 사용). 리디렉션은 따라가지 않는다."""
+    require_loopback(url)
+    if any(a in ("-L", "--location") for a in curl_args):
+        raise ExternalTarget("리디렉션을 따라가면 바깥 주소로 갈 수 있다")
+    return subprocess.run(["curl", "-s", "--cacert", os.environ["AWS_CA_BUNDLE"], *curl_args, url],
+                          capture_output=True, text=True, timeout=timeout)
+
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, *a: Any, **k: Any) -> None:  # noqa: D401
+        return None
+
+
+def host_https(url: str, method: str = "GET", body: bytes | None = None,
+               headers: dict[str, str] | None = None) -> tuple[int, str]:
+    """호스트에서 HTTPS 요청(에뮬레이터 CA). 리디렉션은 따라가지 않는다."""
+    require_loopback(url)
+    ctx = ssl.create_default_context(cafile=os.environ["AWS_CA_BUNDLE"])
+    opener = urllib.request.build_opener(urllib.request.HTTPSHandler(context=ctx), _NoRedirect)
+    req = urllib.request.Request(url, data=body, method=method, headers=headers or {})
+    try:
+        with opener.open(req, timeout=10) as r:
+            return r.status, r.read().decode(errors="replace")
+    except urllib.error.HTTPError as e:
+        return e.code, e.read().decode(errors="replace")

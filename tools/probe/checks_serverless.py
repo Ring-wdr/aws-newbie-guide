@@ -5,14 +5,10 @@ from __future__ import annotations
 import io
 import json
 import os
-import ssl
 import time
-import urllib.error
-import urllib.request
 import zipfile
-from typing import Any
 
-from lib import Probe, wait_until
+from lib import Probe, host_https, wait_until
 
 HANDLER = '''
 import json, os
@@ -43,13 +39,8 @@ def _role(p: Probe, base: str, service: str, actions: list[str] | None = None) -
 
 
 def _https(url: str, method: str = "GET", body: bytes | None = None, headers: dict[str, str] | None = None) -> tuple[int, str]:
-    ctx = ssl.create_default_context(cafile=os.environ["AWS_CA_BUNDLE"])
-    req = urllib.request.Request(url, data=body, method=method, headers=headers or {})
-    try:
-        with urllib.request.urlopen(req, context=ctx, timeout=10) as r:
-            return r.status, r.read().decode(errors="replace")
-    except urllib.error.HTTPError as e:
-        return e.code, e.read().decode(errors="replace")
+    """호스트에서 HTTPS 요청. lib.host_https 관문을 거친다(루프백 IP 가 아니면 ExternalTarget)."""
+    return host_https(url, method, body, headers)
 
 
 # ---------------------------------------------------------------- Lambda
@@ -216,11 +207,12 @@ def run_apigateway(p: Probe) -> None:
             if code == 200 and "o-1" in body:
                 hit = u
                 break
-        # 호스트 기반: <api-id>.execute-api.<region>.amazonaws.com 을 Host 헤더로
+        # 호스트 기반: <api-id>.execute-api.<region>.amazonaws.com 을 Host 헤더로.
+        # 연결 대상은 127.0.0.1 이고 이 이름은 HTTP 헤더 값일 뿐이라 이름 해석이 일어나지 않는다.
         if not hit:
             try:
                 code, body = _https(f"https://127.0.0.1:{port}/dev/orders",
-                                    headers={"Host": f"{api_id}.execute-api.us-east-1.amazonaws.com"})
+                                    headers={"Host": f"{api_id}.execute-api.us-east-1.amazonaws.com"})  # external-host-ok: Host 헤더 값(접속 대상은 127.0.0.1)
             except Exception as e:  # noqa: BLE001
                 code, body = -1, str(e)
             tried.append(f"Host 헤더 방식→{code}")
@@ -250,7 +242,7 @@ def run_apigatewayv2(p: Probe) -> None:
         p.cleanup("http", lambda: ag.delete_api(ApiId=aid))
         p.behavior("HTTP API 엔드포인트 URL 발급", bool(api.get("ApiEndpoint")), api.get("ApiEndpoint", ""))
         integ = p.call("CreateIntegration(HTTP_PROXY)", ag.create_integration, ApiId=aid, IntegrationType="HTTP_PROXY",
-                       IntegrationMethod="GET", IntegrationUri="https://example.com/orders", PayloadFormatVersion="1.0")
+                       IntegrationMethod="GET", IntegrationUri="https://orders.todayorder.invalid/orders", PayloadFormatVersion="1.0")
         if integ:
             p.call("CreateRoute(GET /orders)", ag.create_route, ApiId=aid, RouteKey="GET /orders",
                    Target=f"integrations/{integ['IntegrationId']}")
@@ -258,7 +250,7 @@ def run_apigatewayv2(p: Probe) -> None:
         p.call("GetRoutes", ag.get_routes, ApiId=aid)
         p.call("CreateAuthorizer(JWT)", ag.create_authorizer, ApiId=aid, Name="jwt", AuthorizerType="JWT",
                IdentitySource=["$request.header.Authorization"],
-               JwtConfiguration={"Audience": ["client"], "Issuer": "https://cognito-idp.us-east-1.amazonaws.com/us-east-1_example"})
+               JwtConfiguration={"Audience": ["client"], "Issuer": "https://issuer.todayorder.invalid/us-east-1_example"})
     # HTTP API → Lambda 프록시 통합을 실제로 호출
     lam = p.client("lambda")
     fn = p.name("apifn")[:64]
@@ -276,10 +268,13 @@ def run_apigatewayv2(p: Probe) -> None:
         if pi:
             ag.create_route(ApiId=pid, RouteKey="GET /orders", Target=f"integrations/{pi['IntegrationId']}")
             ag.create_stage(ApiId=pid, StageName="$default", AutoDeploy=True)
-            try:
-                code, body = _https(papi["ApiEndpoint"] + "/orders?id=7")
-            except Exception as e:  # noqa: BLE001
-                code, body = -1, str(e)
+            if not p.target_ok("HTTP API → Lambda 프록시를 HTTPS로 호출", papi["ApiEndpoint"]):
+                code, body = -1, ""
+            else:
+                try:
+                    code, body = _https(papi["ApiEndpoint"] + "/orders?id=7")
+                except Exception as e:  # noqa: BLE001
+                    code, body = -1, str(e)
             p.behavior("HTTP API → Lambda 프록시를 HTTPS로 호출하면 함수가 실행되어 응답 (AddPermission 없이도 성공)",
                        code == 200 and '"routeKey": "GET /orders"' in body,
                        f"{papi['ApiEndpoint']}/orders → {code} {body[:90]}")
@@ -333,7 +328,7 @@ def run_ecs(p: Probe) -> None:
     td = p.call("RegisterTaskDefinition(Fargate, awsvpc)", ecs.register_task_definition, family=p.name("api"),
                 requiresCompatibilities=["FARGATE"], networkMode="awsvpc", cpu="256", memory="512",
                 executionRoleArn=exec_role,
-                containerDefinitions=[{"name": "api", "image": "public.ecr.aws/nginx/nginx:latest", "essential": True,
+                containerDefinitions=[{"name": "api", "image": "registry.invalid/todayorder/nginx:latest", "essential": True,
                                        "portMappings": [{"containerPort": 80, "protocol": "tcp"}]}])
     if not td:
         return
@@ -414,6 +409,7 @@ def run_cognito(p: Probe) -> None:
     ci = p.client("cognito-identity")
     ipool = p.call("CreateIdentityPool", ci.create_identity_pool, IdentityPoolName=p.name("ids").replace("-", "_"),
                    AllowUnauthenticatedIdentities=True,
+                   # external-host-ok: AWS 가 정한 공급자 식별자 형식(접속 주소가 아님). 에뮬레이터는 이 값으로 풀을 찾고 DNS 질의는 없었다
                    CognitoIdentityProviders=[{"ProviderName": f"cognito-idp.us-east-1.amazonaws.com/{pid}", "ClientId": cid}])
     if ipool:
         ipid = ipool["IdentityPoolId"]

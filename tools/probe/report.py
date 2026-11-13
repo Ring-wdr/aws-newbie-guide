@@ -4,7 +4,9 @@
 notes.md 는 `<!-- section: 이름 -->` 표시로 나뉜다:
   summary  : 맨 앞 요약
   grades   : `| 서비스키 | 등급 | 한 줄 근거 |` 표 (등급 판정. 없는 서비스는 자동 제안 등급)
-  design   : "설계와 다른 점" 본문
+  facts    : "모듈별로 확인된 사실" 본문 (탐침 근거는 서비스 키, 탐침에 없는 것은 "모듈 저자 관찰 (mNN README)")
+  env      : "환경 메모" (메모리 상한, 시계 어긋남, 컨테이너 내부 엔드포인트 등)
+  cited    : 탐침이 다시 확인하지 않은 모듈 저자 관찰 목록
 """
 
 from __future__ import annotations
@@ -22,18 +24,18 @@ NOTES = HERE / "notes.md"
 # 서비스 키 → 커리큘럼 모듈 (보고서 정렬·표시용)
 MODULE = {
     "client-config": "M00",
-    "iam": "M01", "sts": "M01", "organizations": "M01",
-    "ec2-vpc": "M02",
-    "ec2-instances": "M03", "ebs-ami": "M03", "elbv2": "M03", "autoscaling": "M03",
-    "s3": "M04", "efs": "M04",
-    "rds": "M05", "dynamodb": "M05", "elasticache": "M05",
-    "sqs": "M06", "sns": "M06", "eventbridge": "M06", "stepfunctions": "M06", "kinesis": "M06",
-    "lambda": "M07", "apigateway": "M07", "apigatewayv2": "M07", "ecr": "M07", "ecs": "M07", "cognito": "M07",
-    "route53": "M08", "cloudfront": "M08", "globalaccelerator": "M08", "wafv2": "M08",
+    "iam": "M01", "iam-enforcement": "M01", "iam-conditions": "M01", "sts": "M01", "organizations": "M01",
+    "ec2-vpc": "M02", "vpc-gaps": "M02",
+    "ec2-instances": "M03", "ebs-ami": "M03", "elbv2": "M03", "autoscaling": "M03", "compute-gaps": "M03",
+    "s3": "M04", "s3-gaps": "M04", "efs": "M04",
+    "rds": "M05", "dynamodb": "M05", "elasticache": "M05", "db-gaps": "M05",
+    "sqs": "M06", "sns": "M06", "eventbridge": "M06", "stepfunctions": "M06", "kinesis": "M06", "integration-better": "M06",
+    "lambda": "M07", "apigateway": "M07", "apigatewayv2": "M07", "ecr": "M07", "ecs": "M07", "cognito": "M07", "lambda-runtime": "M07", "lambda-permissions": "M07",
+    "route53": "M08", "cloudfront": "M08", "globalaccelerator": "M08", "wafv2": "M08", "edge-better": "M08",
     "kms": "M09", "secretsmanager": "M09", "ssm": "M09", "acm": "M09", "cloudtrail": "M09", "config": "M09",
-    "guardduty": "M09",
-    "cloudwatch": "M10", "logs": "M10", "cloudformation": "M10",
-    "firehose": "M11", "glue": "M11", "athena": "M11",
+    "guardduty": "M09", "security-better": "M09",
+    "cloudwatch": "M10", "logs": "M10", "cloudformation": "M10", "cfn-timing": "M10",
+    "firehose": "M11", "glue": "M11", "athena": "M11", "analytics-gaps": "M11",
     "backup": "M12", "dms": "M12",
     "budgets": "M13", "tagging": "M13",
     "misc-optional": "기타",
@@ -109,6 +111,9 @@ def generate(data: dict[str, Any]) -> None:
     L.append(f"| 에뮬레이터 커밋 | `{emu.get('commit', '?')}` |")
     L.append(f"| 탐침 실행 시각 | {meta.get('generated_at', '?')} |")
     L.append(f"| 클라이언트 | `{meta.get('aws_cli', '?')}` · boto3 {meta.get('boto3', '?')} · Python {meta.get('python', '?')} |")
+    dns = meta.get("container_dns")
+    dns_txt = ("Docker 기본 리졸버" if dns == [] else f"`{', '.join(dns)}` (격리 — `EMULATOR_DNS`)" if dns else "?")
+    L.append(f"| 컨테이너 DNS | {dns_txt} · 바깥 접속 확인 방법은 아래 \"환경 메모 → 외부 접속 위험\" |")
     if meta.get("partial_run"):
         L.append(f"| 마지막 부분 실행 | {', '.join(meta['partial_run'])} |")
     L.append("")
@@ -156,10 +161,20 @@ def generate(data: dict[str, Any]) -> None:
                  f"{b_ok}/{len(beh)} | {_esc(why)} |")
     L.append("")
 
-    if sec.get("design"):
-        L.append("## 설계와 다른 점 (모듈 저자 필독)")
+    if sec.get("facts"):
+        L.append("## 모듈별로 확인된 사실 (저자·학습자 필독)")
         L.append("")
-        L.append(sec["design"])
+        L.append(sec["facts"])
+        L.append("")
+    if sec.get("cited"):
+        L.append("## 탐침이 다시 확인하지 않은 모듈 저자 관찰")
+        L.append("")
+        L.append(sec["cited"])
+        L.append("")
+    if sec.get("env"):
+        L.append("## 환경 메모")
+        L.append("")
+        L.append(sec["env"])
         L.append("")
 
     # 501 목록

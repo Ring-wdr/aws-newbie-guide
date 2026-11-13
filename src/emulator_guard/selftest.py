@@ -31,17 +31,17 @@ REJECT = [
     "https://127.0.0.1:abc",
     "https://127.0.0.1:99999",
     "https://127.0.0.1:09297",
-    "https://127.0.0.1:9320@s3.amazonaws.com",
+    "https://127.0.0.1:9320@s3.amazonaws.com",  # external-host-ok: 가드가 네트워크 전에 거부해야 하는 값
     "https://user:pw@127.0.0.1:9297",
-    "https://127.0.0.1:9297\\@s3.amazonaws.com",
+    "https://127.0.0.1:9297\\@s3.amazonaws.com",  # external-host-ok: 가드가 네트워크 전에 거부해야 하는 값
     "https://127.0.0.10:9297",
-    "https://127.0.0.1.nip.io:9297",
-    "https://0x7f.0.0.1:9297",
+    "https://127.0.0.1.nip.io:9297",  # external-host-ok: 가드가 네트워크 전에 거부해야 하는 값
+    "https://0x7f.0.0.1:9297",  # external-host-ok: 가드가 네트워크 전에 거부해야 하는 값
     "https://[::1]:9297",
     "https://127.0.0.1:9297/path",
     "https://127.0.0.1:9297?x=1",
     "https://127.0.0.1:9297#frag",
-    "https://s3.amazonaws.com",
+    "https://s3.amazonaws.com",  # external-host-ok: 가드가 네트워크 전에 거부해야 하는 값
 ]
 
 # 네트워크로 나가려 하면 즉시 실패하도록 하는 환경 (실제 키 없음, 사용자 ~/.aws 를 읽지 않음)
@@ -84,12 +84,12 @@ def offline() -> None:
     cases = [
         ("AWS_ENDPOINT_URL 없음 → 네트워크 전 거부",
          "from emulator_guard import require_emulator; require_emulator()", {}),
-        ("userinfo 우회(https://127.0.0.1:9320@s3.amazonaws.com) → 네트워크 전 거부",
+        ("userinfo 우회(https://127.0.0.1:9320@s3.amazonaws.com) → 네트워크 전 거부",  # external-host-ok: 가드가 네트워크 전에 거부해야 하는 값
          "from emulator_guard import require_emulator; require_emulator()",
-         {"AWS_ENDPOINT_URL": "https://127.0.0.1:9320@s3.amazonaws.com"}),
+         {"AWS_ENDPOINT_URL": "https://127.0.0.1:9320@s3.amazonaws.com"}),  # external-host-ok: 가드가 네트워크 전에 거부해야 하는 값
         ("서비스별 AWS_ENDPOINT_URL_S3 이 실제 AWS → 네트워크 전 거부",
          "from emulator_guard import require_emulator; require_emulator()",
-         {"AWS_ENDPOINT_URL": "https://127.0.0.1:9297", "AWS_ENDPOINT_URL_S3": "https://s3.amazonaws.com"}),
+         {"AWS_ENDPOINT_URL": "https://127.0.0.1:9297", "AWS_ENDPOINT_URL_S3": "https://s3.amazonaws.com"}),  # external-host-ok: 가드가 네트워크 전에 거부해야 하는 값
         ("서비스별 AWS_ENDPOINT_URL_S3 이 다른 로컬 포트(다른 에뮬레이터) → 네트워크 전 거부",
          "from emulator_guard import require_emulator; require_emulator()",
          {"AWS_ENDPOINT_URL": "https://127.0.0.1:9297", "AWS_ENDPOINT_URL_S3": "https://127.0.0.1:9302"}),
@@ -101,7 +101,7 @@ def offline() -> None:
          {"AWS_ENDPOINT_URL": "https://127.0.0.1:9297"}),
         ("두 번째 사이트: DR 엔드포인트가 실제 AWS → 네트워크 전 거부",
          "from emulator_guard import emulator_site; emulator_site('DR_')",
-         {"DR_AWS_ENDPOINT_URL": "https://dynamodb.ap-northeast-1.amazonaws.com", "DR_AWS_CA_BUNDLE": "/dev/null",
+         {"DR_AWS_ENDPOINT_URL": "https://dynamodb.ap-northeast-1.amazonaws.com", "DR_AWS_CA_BUNDLE": "/dev/null",  # external-host-ok: 가드가 네트워크 전에 거부해야 하는 값
           "DR_AWS_SHARED_CREDENTIALS_FILE": "/dev/null", "DR_AWS_CONFIG_FILE": "/dev/null"}),
         ("두 번째 사이트: 주 사이트와 같은 포트 → 네트워크 전 거부",
          "from emulator_guard import emulator_site; emulator_site('DR_')",

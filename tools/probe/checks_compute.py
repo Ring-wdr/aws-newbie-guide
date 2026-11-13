@@ -3,12 +3,10 @@
 from __future__ import annotations
 
 import base64
-import os
-import subprocess
 import time
 from typing import Any
 
-from lib import Probe, wait_until
+from lib import ExternalTarget, Probe, container_curl, host_tcp, wait_until
 
 
 def _find_ami(p: Probe) -> str | None:
@@ -303,27 +301,19 @@ def run_elbv2(p: Probe) -> None:
             elb.create_rule(ListenerArn=la, Priority=30, Conditions=[{"Field": "path-pattern", "Values": ["/hello"]}],
                             Actions=[{"Type": "fixed-response", "FixedResponseConfig": {
                                 "StatusCode": "200", "ContentType": "text/plain", "MessageBody": "hello-from-alb"}}])
-            port = os.environ.get("EMULATOR_PORT", "9297")
-            try:
-                out = subprocess.run(["docker", "exec", f"aws-emulator-{port}", "curl", "-s", "-m", "3",
-                                      "-w", " HTTP%{http_code}", f"http://{dns}/hello"],
-                                     capture_output=True, text=True, timeout=15).stdout
-                p.behavior("ALB 리스너가 실제로 HTTP를 처리(컨테이너 안에서 fixed-response 규칙 확인)",
-                           "hello-from-alb" in out, f"DNSName={dns} → {out.strip()[:80]}")
-                out2 = subprocess.run(["docker", "exec", f"aws-emulator-{port}", "curl", "-s", "-m", "3",
-                                       "-w", " HTTP%{http_code}", f"http://{dns}/api/x"],
-                                      capture_output=True, text=True, timeout=15).stdout
-                p.behavior("ALB forward 규칙 → 대상 인스턴스(실체 없음)로 전달 시 응답", True, f"/api/x → {out2.strip()[-40:] or '응답 없음'}")
-            except Exception as e:  # noqa: BLE001
-                p.behavior("ALB 리스너가 실제로 HTTP를 처리(컨테이너 안에서 fixed-response 규칙 확인)", False, f"{type(e).__name__}: {e}")
-            host, _, hport = dns.partition(":")
-            import socket
-            try:
-                socket.create_connection((host, int(hport or 80)), timeout=2).close()
-                p.behavior("호스트(macOS)에서 ALB DNSName으로 직접 연결", True, dns)
-            except Exception as e:  # noqa: BLE001
-                p.behavior("호스트(macOS)에서 ALB DNSName으로 직접 연결", False,
-                           f"{type(e).__name__} — 리스너 포트가 컨테이너 밖으로 게시되지 않음")
+            if p.target_ok("ALB 리스너가 실제로 HTTP를 처리(컨테이너 안에서 fixed-response 규칙 확인)", dns):
+                try:
+                    out = container_curl(f"http://{dns}/hello", "-w", " HTTP%{http_code}", timeout=3).stdout
+                    p.behavior("ALB 리스너가 실제로 HTTP를 처리(컨테이너 안에서 fixed-response 규칙 확인)",
+                               "hello-from-alb" in out, f"DNSName={dns} → {out.strip()[:80]}")
+                    out2 = container_curl(f"http://{dns}/api/x", "-w", " HTTP%{http_code}", timeout=3).stdout
+                    p.behavior("ALB forward 규칙 → 대상 인스턴스(실체 없음)로 전달 시 응답", True, f"/api/x → {out2.strip()[-40:] or '응답 없음'}")
+                except Exception as e:  # noqa: BLE001
+                    p.behavior("ALB 리스너가 실제로 HTTP를 처리(컨테이너 안에서 fixed-response 규칙 확인)", False, f"{type(e).__name__}: {e}")
+                host, _, hport = dns.partition(":")
+                r = host_tcp(host, int(hport or 80))
+                p.behavior("호스트(macOS)에서 ALB DNSName으로 직접 연결", r == "OPEN",
+                           dns if r == "OPEN" else f"{r} — 리스너 포트가 컨테이너 밖으로 게시되지 않음")
 
 def run_autoscaling(p: Probe) -> None:
     asg, ec2 = p.client("autoscaling"), p.client("ec2")
@@ -399,9 +389,176 @@ def run_autoscaling(p: Probe) -> None:
         p.behavior("인스턴스를 직접 종료하면 ASG가 대체 인스턴스를 띄움(자가 치유)", ok,
                    f"20초 후에도 종료된 인스턴스가 ASG에 {vs} 로 남음" if not ok else f"Instances={len(cur)}")
 
+def run_compute_gaps(p: Probe) -> None:
+    """M03 모듈 저자가 찾은 501·동작 차이를 재현한다."""
+    ec2, asg, elb = p.client("ec2"), p.client("autoscaling"), p.client("elbv2")
+    ami = _find_ami(p)
+    vpc, subs = _subnet(p)
+    if not ami or len(subs) < 2:
+        p.skip("compute-gaps", "AMI/서브넷 준비 실패")
+        return
+
+    # 키 페어 삭제
+    kn = p.name("gapkey")
+    ec2.create_key_pair(KeyName=kn)
+    p.call("DeleteKeyPair", ec2.delete_key_pair, KeyName=kn)
+
+    # EBS IOPS:GiB 비율 (gp3 최대 500 IOPS/GiB → 10 GiB 면 5,000 이 상한)
+    vol = p.call("CreateVolume(gp3 10 GiB, 20000 IOPS — AWS: 비율 초과로 거부)", ec2.create_volume,
+                 AvailabilityZone="us-east-1a", Size=10, VolumeType="gp3", Iops=20000)
+    if vol:
+        vid = vol["VolumeId"]
+        p.cleanup("vol", lambda: ec2.delete_volume(VolumeId=vid))
+    p.behavior("gp3 10 GiB 에 20,000 IOPS 요청이 거부됨(IOPS:GiB 비율 검사)", vol is None,
+               "받아 줌 — 비율 미검사" if vol else "거부")
+
+    # 종료된 인스턴스의 루트 볼륨
+    r = ec2.run_instances(ImageId=ami, InstanceType="t3.micro", MinCount=1, MaxCount=1, SubnetId=subs[0])
+    iid = r["Instances"][0]["InstanceId"]
+    wait_until(lambda: _state(ec2, iid) == "running", 30)
+    vols = ec2.describe_volumes(Filters=[{"Name": "attachment.instance-id", "Values": [iid]}])["Volumes"]
+    root_ids = [v["VolumeId"] for v in vols]
+    ec2.terminate_instances(InstanceIds=[iid])
+    wait_until(lambda: _state(ec2, iid) == "terminated", 30)
+    if root_ids:
+        time.sleep(2)
+        after = ec2.describe_volumes(Filters=[{"Name": "volume-id", "Values": root_ids}])["Volumes"]
+        states = [v["State"] for v in after]
+        p.behavior("인스턴스 종료 시 DeleteOnTermination 루트 볼륨이 삭제됨", not after or all(s_ == "deleted" for s_ in states),
+                   f"남은 볼륨 상태 {states}")
+    else:
+        p.skip("루트 볼륨", "인스턴스에 붙은 볼륨이 조회되지 않음")
+
+    # ALB + 대상 그룹 + ASG
+    igw = ec2.create_internet_gateway()["InternetGateway"]["InternetGatewayId"]
+    ec2.attach_internet_gateway(InternetGatewayId=igw, VpcId=vpc)
+    p.cleanup("igw", lambda: (ec2.detach_internet_gateway(InternetGatewayId=igw, VpcId=vpc),
+                              ec2.delete_internet_gateway(InternetGatewayId=igw)))
+    sg = ec2.create_security_group(GroupName=p.name("gap-sg"), Description="gap", VpcId=vpc)["GroupId"]
+    p.cleanup("sg", lambda: ec2.delete_security_group(GroupId=sg))
+    lb = elb.create_load_balancer(Name=f"gap-alb-{p.suffix}", Subnets=subs, SecurityGroups=[sg],
+                                  Scheme="internet-facing", Type="application")["LoadBalancers"][0]
+    lb_arn = lb["LoadBalancerArn"]
+    p.cleanup("lb", lambda: elb.delete_load_balancer(LoadBalancerArn=lb_arn))
+    tg = elb.create_target_group(Name=f"gap-tg-{p.suffix}", Protocol="HTTP", Port=80, VpcId=vpc,
+                                 TargetType="instance")["TargetGroups"][0]["TargetGroupArn"]
+    p.cleanup("tg", lambda: elb.delete_target_group(TargetGroupArn=tg))
+    wait_until(lambda: elb.describe_load_balancers(LoadBalancerArns=[lb_arn])["LoadBalancers"][0]["State"]["Code"] == "active", 20)
+    lis = elb.create_listener(LoadBalancerArn=lb_arn, Protocol="HTTP", Port=80, DefaultActions=[{
+        "Type": "fixed-response", "FixedResponseConfig": {"StatusCode": "200", "ContentType": "text/plain",
+                                                          "MessageBody": "default"}}])["Listeners"][0]["ListenerArn"]
+    p.cleanup("lis", lambda: elb.delete_listener(ListenerArn=lis))
+
+    # 대상 헬스: 등록 직후 → healthy 까지, 그리고 대상 인스턴스를 중지하면 (M03 README 와 맞춰 보기)
+    htg = elb.create_target_group(Name=f"to-htg-{p.suffix}", Protocol="HTTP", Port=8080, VpcId=vpc,
+                                  TargetType="instance", HealthCheckPath="/health", HealthCheckIntervalSeconds=5,
+                                  HealthCheckTimeoutSeconds=2, HealthyThresholdCount=2,
+                                  UnhealthyThresholdCount=2)["TargetGroups"][0]["TargetGroupArn"]
+    p.cleanup("htg", lambda: elb.delete_target_group(TargetGroupArn=htg))
+    hr = ec2.run_instances(ImageId=ami, InstanceType="t3.micro", MinCount=2, MaxCount=2, SubnetId=subs[0])
+    hids = [i["InstanceId"] for i in hr["Instances"]]
+    p.cleanup("hterm", lambda: ec2.terminate_instances(InstanceIds=hids))
+    wait_until(lambda: all(_state(ec2, i) == "running" for i in hids), 30)
+    # 대상 그룹이 리스너에 연결돼 있어야 헬스 상태가 'unused' 가 아니다 (lab06 과 같은 구성)
+    hrule = elb.create_rule(ListenerArn=lis, Priority=5, Conditions=[{"Field": "path-pattern", "Values": ["/hc/*"]}],
+                            Actions=[{"Type": "forward", "TargetGroupArn": htg}])["Rules"][0]["RuleArn"]
+    p.cleanup("hrule", lambda: elb.delete_rule(RuleArn=hrule))
+    elb.register_targets(TargetGroupArn=htg, Targets=[{"Id": i} for i in hids])
+
+    def _th() -> dict[str, tuple[str, str]]:
+        d = elb.describe_target_health(TargetGroupArn=htg)["TargetHealthDescriptions"]
+        return {x["Target"]["Id"]: (x["TargetHealth"]["State"], x["TargetHealth"].get("Reason", "")) for x in d}
+
+    first = _th()
+    t0 = time.monotonic()
+    ok_h = wait_until(lambda: all(v[0] == "healthy" for v in _th().values()) and len(_th()) == 2, 60, 1)
+    p.behavior("등록한 running 대상이 HTTP 응답 없이도 healthy 가 됨(실제 헬스 체크 없음)", ok_h,
+               f"등록 직후 {sorted(set(first.values()))}, {time.monotonic() - t0:.0f}초 뒤 {sorted(set(_th().values()))}")
+    ec2.stop_instances(InstanceIds=[hids[0]])
+    t1 = time.monotonic()
+    wait_until(lambda: _th().get(hids[0], ("", ""))[0] not in ("healthy", ""), 60, 1)
+    st = _th()
+    p.behavior("대상 인스턴스를 중지하면 unhealthy 가 됨", st.get(hids[0], ("", ""))[0] == "unhealthy",
+               f"{time.monotonic() - t1:.0f}초 뒤 중지한 대상 {st.get(hids[0])}, 나머지 {st.get(hids[1])}, "
+               f"인스턴스 상태 {_state(ec2, hids[0])}")
+
+    p.call("CreateRule(host-header api.todayorder.example → 'host')", elb.create_rule, ListenerArn=lis, Priority=10,
+           Conditions=[{"Field": "host-header", "HostHeaderConfig": {"Values": ["api.todayorder.example"]}}],
+           Actions=[{"Type": "fixed-response", "FixedResponseConfig": {"StatusCode": "200", "ContentType": "text/plain",
+                                                                       "MessageBody": "host"}}])
+    dns = lb.get("DNSName", "")
+    try:
+        if not p.target_ok("ALB host-header 조건 규칙이 매칭됨(컨테이너 안 요청)", dns):
+            raise ExternalTarget(dns)
+        out = container_curl(f"http://{dns}/", "-H", "Host: api.todayorder.example")
+        body = out.stdout.strip()
+        if out.returncode != 0 and not body:
+            p.skip("ALB host-header 규칙 매칭", f"docker exec curl 실패: {out.stderr.strip()[:80]}")
+        else:
+            p.behavior("ALB host-header 조건 규칙이 매칭됨(컨테이너 안 요청)", body == "host", f"응답 본문 '{body[:40]}'")
+    except ExternalTarget:
+        pass  # target_ok 가 이미 SKIP 을 남겼다
+    except Exception as e:  # noqa: BLE001
+        p.skip("ALB host-header 규칙 매칭", f"docker 사용 불가: {type(e).__name__}")
+
+    lt = ec2.create_launch_template(LaunchTemplateName=p.name("gap-lt"),
+                                    LaunchTemplateData={"ImageId": ami, "InstanceType": "t3.micro"})["LaunchTemplate"]
+    p.cleanup("lt", lambda: ec2.delete_launch_template(LaunchTemplateId=lt["LaunchTemplateId"]))
+    name = p.name("gap-asg")
+
+    def _rm_asg() -> None:
+        asg.delete_auto_scaling_group(AutoScalingGroupName=name, ForceDelete=True)
+        rs = ec2.describe_instances(Filters=[{"Name": "tag:aws:autoscaling:groupName", "Values": [name]}])["Reservations"]
+        ids = [i["InstanceId"] for r_ in rs for i in r_["Instances"]]
+        if ids:
+            ec2.terminate_instances(InstanceIds=ids)
+
+    if p.call("CreateAutoScalingGroup(--target-group-arns, desired 2)", asg.create_auto_scaling_group,
+              AutoScalingGroupName=name, LaunchTemplate={"LaunchTemplateId": lt["LaunchTemplateId"], "Version": "$Latest"},
+              MinSize=1, MaxSize=3, DesiredCapacity=2, VPCZoneIdentifier=",".join(subs), TargetGroupARNs=[tg]) is None:
+        return
+    p.cleanup("asg", _rm_asg)
+
+    def _inst() -> list[dict]:
+        g = asg.describe_auto_scaling_groups(AutoScalingGroupNames=[name])["AutoScalingGroups"]
+        return g[0]["Instances"] if g else []
+
+    wait_until(lambda: len(_inst()) >= 2, 20)
+    ids = [i["InstanceId"] for i in _inst()]
+    time.sleep(3)
+    th = elb.describe_target_health(TargetGroupArn=tg)["TargetHealthDescriptions"]
+    reg = [t["Target"]["Id"] for t in th]
+    p.behavior("ASG(--target-group-arns) 인스턴스가 대상 그룹에 자동 등록됨", bool(ids) and set(ids) <= set(reg),
+               f"ASG 인스턴스 {len(ids)}개, 대상 그룹 등록 {len(reg)}개")
+
+    p.call("DescribePolicies", asg.describe_policies, AutoScalingGroupName=name)
+    p.call("DescribeLifecycleHooks", asg.describe_lifecycle_hooks, AutoScalingGroupName=name)
+    p.call("DescribeScheduledActions", asg.describe_scheduled_actions, AutoScalingGroupName=name)
+    if ids:
+        p.call("SetInstanceHealth", asg.set_instance_health, InstanceId=ids[0], HealthStatus="Unhealthy")
+
+    # 인스턴스 새로 고침
+    rf = p.call("StartInstanceRefresh", asg.start_instance_refresh, AutoScalingGroupName=name,
+                Preferences={"MinHealthyPercentage": 50, "InstanceWarmup": 0})
+    if rf:
+        rid = rf["InstanceRefreshId"]
+        status = {"s": "?"}
+
+        def _done() -> bool:
+            r_ = asg.describe_instance_refreshes(AutoScalingGroupName=name, InstanceRefreshIds=[rid])["InstanceRefreshes"]
+            status["s"] = r_[0]["Status"] if r_ else "?"
+            return status["s"] in ("Successful", "Failed", "Cancelled")
+
+        wait_until(_done, 60, 2)
+        new_ids = {i["InstanceId"] for i in _inst()}
+        p.behavior("인스턴스 새로 고침이 Successful 까지 진행(인스턴스 교체)", status["s"] == "Successful",
+                   f"Status={status['s']}, 교체 전후 겹치는 인스턴스 {len(new_ids & set(ids))}개")
+
+
 CHECKS = {
     "ec2-instances": run_instances,
     "ebs-ami": run_ebs_ami,
     "elbv2": run_elbv2,
     "autoscaling": run_autoscaling,
+    "compute-gaps": run_compute_gaps,
 }
