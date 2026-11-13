@@ -19,10 +19,11 @@ AWS 계정도, 요금도 필요 없다. 내 노트북에서 도는 [aws-emulator
 
 macOS + [Homebrew](https://brew.sh) 기준 (Linux·WSL은 [M00 레슨 3](./curriculum/m00-orientation/03-environment-setup.md) 참고).
 
+<!-- external-host-ok: 저장소를 받는 설치 안내 -->
 ```bash
 git clone https://github.com/Ring-wdr/aws-newbie-guide.git && cd aws-newbie-guide
 scripts/install.sh            # Colima·docker·AWS CLI·uv 확인/설치, 에뮬레이터 이미지 빌드, boto3 설치
-scripts/emulator-up.sh        # 에뮬레이터 시작 (https://127.0.0.1:9297)
+scripts/emulator-up.sh        # 에뮬레이터 시작 (https://127.0.0.1:9297, 컨테이너의 외부 이름 해석은 기본으로 차단)
 source scripts/env.sh         # 이 셸을 에뮬레이터에 연결 (실제 AWS로 나가면 멈추는 안전 장치 포함)
 aws sts get-caller-identity   # "Account": "000000000000" 이면 준비 완료
 ```
