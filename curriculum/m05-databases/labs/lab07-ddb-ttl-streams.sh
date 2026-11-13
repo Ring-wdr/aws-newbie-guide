@@ -16,7 +16,7 @@ aws dynamodb create-table --table-name "$T" --billing-mode PAY_PER_REQUEST \
   --key-schema AttributeName=cart_id,KeyType=HASH \
   --stream-specification StreamEnabled=true,StreamViewType=NEW_AND_OLD_IMAGES \
   --query 'TableDescription.{Status: TableStatus, Stream: StreamSpecification}'
-aws dynamodb wait table-exists --table-name "$T"
+wait_dynamodb_table_active "$T"   # = aws dynamodb wait table-exists + 준비 직후 재확인 (scripts/lab-wait.sh)
 STREAM_ARN="$(aws dynamodb describe-table --table-name "$T" --query 'Table.LatestStreamArn' --output text)"
 echo "LatestStreamArn=$STREAM_ARN"
 

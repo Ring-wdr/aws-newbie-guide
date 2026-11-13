@@ -234,7 +234,7 @@ SDK lifecycle_lint OK
 
 **문제 W2.** 영수증이 매달 500 GB씩 새로 생긴다. 한 달 동안은 자주 읽고, 이후에는 매달 그 묶음의 1%(5 GB)만 읽는다. **한 달치 묶음(500 GB)이 첫 1년 동안 내는 저장+검색 요금**을 비교하라.
 - (a) 12개월 내내 Standard
-- (b) 수명 주기: 1개월 Standard → 2개월 Standard-IA(30~90일) → 9개월 Glacier IR(90~365일)
+- (b) 수명 주기: 1개월 Standard → 2개월 Standard-IA(30\~90일) → 9개월 Glacier IR(90\~365일)
 
 **문제 W3.** 4 KB짜리 주문 이벤트 JSON 1,000,000개(합계 4 GB)를 "어차피 잘 안 읽으니" Standard-IA로 바로 저장했다. Standard 대비 한 달 저장 요금은?
 

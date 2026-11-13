@@ -40,6 +40,8 @@ poll_until() {
 # 에뮬레이터가 아직 creating 을 돌려주는 경우가 많고(1초도 안 돼 available 이 되더라도), 그러면 다음 조회까지
 # 한 간격을 통째로 기다린다. 그래서 lab 은 waiter 와 같은 성공·실패 조건을 1초 간격으로 확인하는
 # wait_rds_instance_available · wait_rds_instance_deleted · wait_state · wait_gone 등을 쓴다.
+# DynamoDB table-exists 는 빠르지만, ACTIVE 직후 VM 시계가 뒤로 옮겨지면 잠깐 "준비 안 됨"이 되므로
+# 준비 직후 한 번 더 확인하는 wait_dynamodb_table_active 를 쓴다.
 # 실제 AWS 에서는 waiter 가 정상 도구다.
 source "$(git rev-parse --show-toplevel)/scripts/lab-wait.sh"
 
@@ -147,7 +149,7 @@ create_orders_table() {
         "Projection":{"ProjectionType":"KEYS_ONLY"}}]' \
     --billing-mode PAY_PER_REQUEST \
     --query 'TableDescription.{TableStatus: TableStatus, KeySchema: KeySchema, BillingMode: BillingModeSummary.BillingMode}'
-  aws dynamodb wait table-exists --table-name todayorder-m05-orders
+  wait_dynamodb_table_active todayorder-m05-orders   # = aws dynamodb wait table-exists + 준비 직후 재확인 (scripts/lab-wait.sh)
 }
 
 # 고객 10명(c-001~c-010) × 주문 20건 = 200건을 BatchWriteItem(한 번에 최대 25건)으로 넣는다.

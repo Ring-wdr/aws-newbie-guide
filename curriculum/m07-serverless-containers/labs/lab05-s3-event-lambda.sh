@@ -25,7 +25,7 @@ echo "== 1. 버킷, 영수증 표"
 aws s3 mb "s3://$BUCKET"
 aws dynamodb create-table --table-name "$TABLE" --attribute-definitions AttributeName=orderId,AttributeType=S \
   --key-schema AttributeName=orderId,KeyType=HASH --billing-mode PAY_PER_REQUEST --query TableDescription.TableName --output text
-aws dynamodb wait table-exists --table-name "$TABLE"
+wait_dynamodb_table_active "$TABLE"   # = aws dynamodb wait table-exists + 준비 직후 재확인 (scripts/lab-wait.sh)
 
 echo "== 2. 실행 역할: 로그 + receipts/ 아래 객체 읽기 + 영수증 표 쓰기"
 ensure_role "$ROLE" lambda.amazonaws.com

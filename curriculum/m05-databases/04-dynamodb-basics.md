@@ -133,7 +133,7 @@ aws dynamodb wait table-exists --table-name todayorder-m05-orders
 }
 ```
 
-방금 본 것: 생성 응답은 항상 `CREATING`이다. 이 에뮬레이터는 1초도 안 돼 `ACTIVE`가 되는 경우가 많아 **바로 `describe-table`을 하면 실행마다 결과가 다르다**(경쟁 상태). 그래서 `wait table-exists`(boto3는 `get_waiter("table_exists")`)로 기다린 뒤에 쓴다. 실제 AWS에서도 이것이 올바른 순서다. `--attribute-definitions`에는 **키로 쓰는 속성만** 적는다(`total`은 LSI 정렬 키라서 있다. 나머지 속성은 스키마가 없다).
+방금 본 것: 생성 응답은 항상 `CREATING`이다. 이 에뮬레이터는 1초도 안 돼 `ACTIVE`가 되는 경우가 많아 **바로 `describe-table`을 하면 실행마다 결과가 다르다**(경쟁 상태). 그래서 `wait table-exists`(boto3는 `get_waiter("table_exists")`)로 기다린 뒤에 쓴다. 실제 AWS에서도 이것이 올바른 순서다. lab 스크립트는 같은 조건에 "준비 직후 재확인"을 더한 `wait_dynamodb_table_active`([`scripts/lab-wait.sh`](../../scripts/lab-wait.sh))를 쓴다 — 이 에뮬레이터는 테이블 준비 여부를 VM 시계로 판단해서, 맥 시계가 틀려 VM 시계가 뒤로 옮겨지면 막 `ACTIVE`가 된 테이블에 대한 `PutItem`이 잠깐 `ResourceNotFoundException`이 되기 때문이다([M00 레슨 3](../m00-orientation/03-environment-setup.md) 문제 해결 표). 손으로 칠 때는 waiter가 맞다. `--attribute-definitions`에는 **키로 쓰는 속성만** 적는다(`total`은 LSI 정렬 키라서 있다. 나머지 속성은 스키마가 없다).
 
 **2) 적재: BatchWriteItem은 한 번에 최대 25건**
 

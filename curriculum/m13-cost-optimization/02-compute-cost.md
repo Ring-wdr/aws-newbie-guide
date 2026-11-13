@@ -142,7 +142,7 @@ LAB01 OK
 
 <details><summary>답</summary>
 
-1. Compute·EC2 Instance Savings Plans는 RDS에 적용되지 않는다. RDS의 전통적인 약정 할인은 **예약 DB 인스턴스(Reserved DB Instances)**다. 2025년 12월에는 RDS·Aurora·DynamoDB·ElastiCache 등에 쓰는 **Database Savings Plans**(AWS 발표 기준 최대 35%)도 나왔다. 같은 워크로드에 RDS 예약 인스턴스와 겹쳐 받을 수는 없다. 시험 문제는 오랫동안 "꾸준한 RDS → 예약 인스턴스" 구도로 출제돼 왔다.
+1. Compute·EC2 Instance Savings Plans는 RDS에 적용되지 않는다. RDS의 전통적인 약정 할인은 **예약 DB 인스턴스**(Reserved DB Instances)다. 2025년 12월에는 RDS·Aurora·DynamoDB·ElastiCache 등에 쓰는 **Database Savings Plans**(AWS 발표 기준 최대 35%)도 나왔다. 같은 워크로드에 RDS 예약 인스턴스와 겹쳐 받을 수는 없다. 시험 문제는 오랫동안 "꾸준한 RDS → 예약 인스턴스" 구도로 출제돼 왔다.
 2. 약정 금액 20 USD/시간 × 시간을 그대로 낸다. 쓰지 않은 5 USD/시간분은 사라진다. 약정은 "최소 지불 금액"이다.
 3. 메시지는 삭제되지 않았으므로 가시성 타임아웃이 지나면 큐에 다시 보이고, 다른 워커가 처리한다(M06). 작업이 멱등이어야 중복 처리가 안전하다.
 

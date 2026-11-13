@@ -70,6 +70,8 @@ echo "SKIP  EC2 기본 지표·CloudWatch 에이전트 (인스턴스가 부팅�
 echo "----"
 echo "통과 $pass · 실패 $fail"
 if [ "$fail" -ne 0 ]; then
+  # 이번 실행 동안 VM 시계가 반복해서 옮겨졌다면 실패 원인 후보로 알린다 (안정·확인 불가면 아무것도 출력하지 않음, 언제나 0)
+  bash "$ROOT/scripts/clock-check.sh" --stability --summary --last "$SECONDS" || true
   echo "MODULE m10 FAIL"
   exit 1
 fi

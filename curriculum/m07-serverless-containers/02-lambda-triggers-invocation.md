@@ -43,7 +43,7 @@ flowchart TB
 
 ### 비동기 호출의 대상(destination)
 
-`PutFunctionEventInvokeConfig`로 비동기 호출 결과를 보낼 곳을 정한다: `OnSuccess`/`OnFailure` → SQS, SNS, Lambda, EventBridge 버스(실패는 S3도). 재시도 횟수(0~2)와 최대 이벤트 나이(60초~6시간)도 여기서. 함수 자체의 **DLQ**(`DeadLetterConfig`, SQS·SNS)는 예전 방식으로, 실패 이벤트만 담고 정보가 적다 — 새로 만든다면 **실패 대상**을 권장한다.
+`PutFunctionEventInvokeConfig`로 비동기 호출 결과를 보낼 곳을 정한다: `OnSuccess`/`OnFailure` → SQS, SNS, Lambda, EventBridge 버스(실패는 S3도). 재시도 횟수(0\~2)와 최대 이벤트 나이(60초\~6시간)도 여기서. 함수 자체의 **DLQ**(`DeadLetterConfig`, SQS·SNS)는 예전 방식으로, 실패 이벤트만 담고 정보가 적다 — 새로 만든다면 **실패 대상**을 권장한다.
 
 ## 직접 해 보기
 
