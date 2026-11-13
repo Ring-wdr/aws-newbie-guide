@@ -21,15 +21,16 @@ cleanup() {
   # 복제 그룹은 지우지 않는다: DeleteReplicationGroup 이 에뮬레이터에서 501 (README "에뮬레이터 제약")
   if aws elasticache describe-cache-clusters --cache-cluster-id "$MC" >/dev/null 2>&1; then
     aws elasticache delete-cache-cluster --cache-cluster-id "$MC" >/dev/null
-    poll_until 300 "Memcached 삭제" bash -c "! aws elasticache describe-cache-clusters --cache-cluster-id $MC >/dev/null 2>&1"
+    wait_elasticache_cluster_deleted "$MC"
   fi
   if aws elasticache describe-serverless-caches --serverless-cache-name "$SL" >/dev/null 2>&1; then
     aws elasticache delete-serverless-cache --serverless-cache-name "$SL" >/dev/null
-    poll_until 300 "서버리스 캐시 삭제" bash -c "! aws elasticache describe-serverless-caches --serverless-cache-name $SL >/dev/null 2>&1"
+    wait_gone "서버리스 캐시 삭제" ServerlessCacheNotFoundFault \
+      -- aws elasticache describe-serverless-caches --serverless-cache-name "$SL" --query 'ServerlessCaches[].Status' --output text
   fi
   if aws dax describe-clusters --cluster-names "$DAX" >/dev/null 2>&1; then
     aws dax delete-cluster --cluster-name "$DAX" >/dev/null
-    poll_until 300 "DAX 삭제" bash -c "! aws dax describe-clusters --cluster-names $DAX >/dev/null 2>&1"
+    wait_gone "DAX 삭제" ClusterNotFoundFault -- aws dax describe-clusters --cluster-names "$DAX" --query 'Clusters[].Status' --output text
   fi
   aws iam delete-role-policy --role-name "$DAX_ROLE" --policy-name ddb-access >/dev/null 2>&1 || true
   aws iam delete-role --role-name "$DAX_ROLE" >/dev/null 2>&1 || true
@@ -60,8 +61,7 @@ else
     --cache-subnet-group-name "$CSG" --at-rest-encryption-enabled --transit-encryption-enabled \
     --query 'ReplicationGroup.{Status: Status, Engine: Engine, AutomaticFailover: AutomaticFailover, MultiAZ: MultiAZ, Members: MemberClusters}'
 fi
-wait_status "복제 그룹 available" available \
-  aws elasticache describe-replication-groups --replication-group-id "$RG" --query 'ReplicationGroups[0].Status' --output text
+wait_elasticache_replication_group_available "$RG"
 aws elasticache describe-replication-groups --replication-group-id "$RG" --query 'ReplicationGroups[0].{
   Status: Status, ClusterMode: ClusterMode,
   Primary: NodeGroups[0].PrimaryEndpoint, Reader: NodeGroups[0].ReaderEndpoint,
@@ -95,8 +95,7 @@ aws elasticache create-cache-cluster --cache-cluster-id "$MC" --engine memcached
   --cache-node-type cache.t4g.micro --num-cache-nodes 2 --az-mode cross-az \
   --preferred-availability-zones us-east-1a us-east-1b --cache-subnet-group-name "$CSG" \
   --query 'CacheCluster.{Status: CacheClusterStatus, Engine: Engine, Nodes: NumCacheNodes}'
-wait_status "Memcached 클러스터 available" available \
-  aws elasticache describe-cache-clusters --cache-cluster-id "$MC" --query 'CacheClusters[0].CacheClusterStatus' --output text
+wait_elasticache_cluster_available "$MC"
 aws elasticache describe-cache-clusters --cache-cluster-id "$MC" --show-cache-node-info --query 'CacheClusters[0].{
   Status: CacheClusterStatus, ConfigEndpoint: ConfigurationEndpoint,
   Nodes: CacheNodes[].{Id: CacheNodeId, AZ: CustomerAvailabilityZone}}'

@@ -20,18 +20,19 @@ CLUSTER_ARN="arn:aws:rds:us-east-1:000000000000:cluster:$CLUSTER"
 
 cleanup() {
   aws rds delete-db-proxy --db-proxy-name "$PROXY" >/dev/null 2>&1 || true
-  poll_until 120 "프록시 삭제" bash -c "! aws rds describe-db-proxies --db-proxy-name $PROXY >/dev/null 2>&1"
+  wait_gone "프록시 삭제" DBProxyNotFoundFault -- aws rds describe-db-proxies --db-proxy-name "$PROXY" --query 'DBProxies[].Status' --output text
   if aws rds describe-global-clusters --global-cluster-identifier "$GLOBAL" >/dev/null 2>&1; then
     aws rds remove-from-global-cluster --global-cluster-identifier "$GLOBAL" \
       --db-cluster-identifier "$CLUSTER_ARN" >/dev/null 2>&1 || true
     aws rds delete-global-cluster --global-cluster-identifier "$GLOBAL" >/dev/null 2>&1 || true
-    poll_until 120 "글로벌 클러스터 삭제" bash -c "! aws rds describe-global-clusters --global-cluster-identifier $GLOBAL >/dev/null 2>&1"
+    wait_gone "글로벌 클러스터 삭제" GlobalClusterNotFoundFault \
+      -- aws rds describe-global-clusters --global-cluster-identifier "$GLOBAL" --query 'GlobalClusters[].Status' --output text
   fi
   rds_delete_instance "$READER"
   rds_delete_instance "$WRITER"
   if aws rds describe-db-clusters --db-cluster-identifier "$CLUSTER" >/dev/null 2>&1; then
     aws rds delete-db-cluster --db-cluster-identifier "$CLUSTER" --skip-final-snapshot >/dev/null
-    rds_wait_cluster_deleted "$CLUSTER"
+    wait_rds_cluster_deleted "$CLUSTER"
   fi
   aws rds delete-db-subnet-group --db-subnet-group-name "$SNG" >/dev/null 2>&1 || true
   aws secretsmanager delete-secret --secret-id "$SECRET" --force-delete-without-recovery >/dev/null 2>&1 || true
@@ -52,18 +53,18 @@ aws rds create-db-cluster --db-cluster-identifier "$CLUSTER" --engine aurora-pos
   --backup-retention-period 7 --storage-encrypted \
   --serverless-v2-scaling-configuration MinCapacity=0.5,MaxCapacity=4 \
   --query 'DBCluster.{Status: Status, Engine: Engine, Version: EngineVersion, AZs: AvailabilityZones, ServerlessV2: ServerlessV2ScalingConfiguration}'
-rds_wait_cluster_available "$CLUSTER"
+wait_rds_cluster_available "$CLUSTER"
 
 echo "== 2. 클러스터에 인스턴스 2대: 쓰기(db.serverless) + 리더(db.r6g.large, 다른 AZ)"
 aws rds create-db-instance --db-instance-identifier "$WRITER" --db-cluster-identifier "$CLUSTER" \
   --engine aurora-postgresql --db-instance-class db.serverless --availability-zone us-east-1a \
   --query 'DBInstance.{Id: DBInstanceIdentifier, Class: DBInstanceClass, Status: DBInstanceStatus}'
-rds_wait_instance_available "$WRITER"
+wait_rds_instance_available "$WRITER"
 aws rds create-db-instance --db-instance-identifier "$READER" --db-cluster-identifier "$CLUSTER" \
   --engine aurora-postgresql --db-instance-class db.r6g.large --availability-zone us-east-1b \
   --promotion-tier 1 \
   --query 'DBInstance.{Id: DBInstanceIdentifier, Class: DBInstanceClass, Status: DBInstanceStatus}'
-rds_wait_instance_available "$READER"
+wait_rds_instance_available "$READER"
 
 echo "== 3. 엔드포인트: 앱은 인스턴스가 아니라 '클러스터 엔드포인트(쓰기)'와 '리더 엔드포인트(읽기)'에 붙는다"
 aws rds describe-db-clusters --db-cluster-identifier "$CLUSTER" --query 'DBClusters[0].{

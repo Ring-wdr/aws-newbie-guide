@@ -16,20 +16,21 @@ KS=todayorder_m05
 cleanup() {
   if aws docdb describe-db-instances --db-instance-identifier "$DOCDB_I" >/dev/null 2>&1; then
     aws docdb delete-db-instance --db-instance-identifier "$DOCDB_I" >/dev/null
-    wait_gone "DocumentDB 인스턴스 삭제" DBInstanceNotFound \
-      aws docdb describe-db-instances --db-instance-identifier "$DOCDB_I" --query 'DBInstances[0].DBInstanceStatus' --output text
+    wait_docdb_instance_deleted "$DOCDB_I"
   fi
   if aws docdb describe-db-clusters --db-cluster-identifier "$DOCDB" >/dev/null 2>&1; then
     aws docdb delete-db-cluster --db-cluster-identifier "$DOCDB" --skip-final-snapshot >/dev/null
-    poll_until 120 "DocumentDB 클러스터 삭제" bash -c "! aws docdb describe-db-clusters --db-cluster-identifier $DOCDB >/dev/null 2>&1"
+    wait_gone "DocumentDB 클러스터 삭제" DBClusterNotFoundFault \
+      -- aws docdb describe-db-clusters --db-cluster-identifier "$DOCDB" --query 'DBClusters[].Status' --output text
   fi
   if aws neptune describe-db-clusters --db-cluster-identifier "$NEPTUNE" >/dev/null 2>&1; then
     aws neptune delete-db-cluster --db-cluster-identifier "$NEPTUNE" --skip-final-snapshot >/dev/null
-    poll_until 120 "Neptune 클러스터 삭제" bash -c "! aws neptune describe-db-clusters --db-cluster-identifier $NEPTUNE >/dev/null 2>&1"
+    wait_gone "Neptune 클러스터 삭제" DBClusterNotFoundFault \
+      -- aws neptune describe-db-clusters --db-cluster-identifier "$NEPTUNE" --query 'DBClusters[].Status' --output text
   fi
   if aws keyspaces get-keyspace --keyspace-name "$KS" >/dev/null 2>&1; then
     aws keyspaces delete-keyspace --keyspace-name "$KS"
-    poll_until 120 "키스페이스 삭제" bash -c "! aws keyspaces get-keyspace --keyspace-name $KS >/dev/null 2>&1"
+    wait_gone "키스페이스 삭제" ResourceNotFoundException -- aws keyspaces get-keyspace --keyspace-name "$KS" --query keyspaceName --output text
   fi
 }
 cleanup
@@ -40,8 +41,7 @@ aws docdb create-db-cluster --db-cluster-identifier "$DOCDB" --engine docdb \
   --query 'DBCluster.{Status: Status, Engine: Engine, Port: Port}'
 aws docdb create-db-instance --db-instance-identifier "$DOCDB_I" --db-cluster-identifier "$DOCDB" \
   --engine docdb --db-instance-class db.t3.medium --query 'DBInstance.DBInstanceStatus'
-wait_status "DocumentDB 인스턴스 available" available \
-  aws docdb describe-db-instances --db-instance-identifier "$DOCDB_I" --query 'DBInstances[0].DBInstanceStatus' --output text
+wait_docdb_instance_available "$DOCDB_I"
 aws docdb describe-db-clusters --db-cluster-identifier "$DOCDB" --query 'DBClusters[0].{
   Status: Status, Version: EngineVersion, Endpoint: Endpoint, ReaderEndpoint: ReaderEndpoint, Port: Port,
   Members: DBClusterMembers[].{Id: DBInstanceIdentifier, Writer: IsClusterWriter}}'

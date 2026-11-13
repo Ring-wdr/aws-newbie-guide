@@ -67,7 +67,7 @@ curriculum/m05-databases/labs/verify.sh
 | Multi-AZ **DB 클러스터**(`create-db-cluster --engine postgres`) | 응답은 오지만 멤버 인스턴스가 생기지 않음 → 실습하지 않음 | 레슨 2 |
 | `rds:CreateDBClusterEndpoint`, `DescribeDBClusterEndpoints` | `501 NotImplemented` (Aurora 사용자 지정 엔드포인트) | lab03 |
 | Aurora `MultiAZ` 표시 | 다른 AZ에 리더가 있어도 `false` (실제 AWS는 `true`) | lab03 |
-| RDS·Aurora·DocumentDB·ElastiCache 생성·삭제 직후 상태 | 응답은 `creating`/`deleting`이고 보통 1초 안에 `available`/삭제 완료가 되지만, CLI waiter는 첫 조회 뒤 30초(ElastiCache 15초) 간격이라 첫 조회가 경쟁에서 지면 한 간격을 통째로 기다린다(VM에 부하가 걸리면 놓치는 횟수가 는다) → lab은 같은 상태를 1초 간격으로 폴링(`_common.sh`의 `wait_status`·`wait_gone`·`rds_wait_*`) | lab01~03, lab09, lab10 |
+| RDS·Aurora·DocumentDB·ElastiCache 생성·삭제 직후 상태 | 응답은 `creating`/`deleting`이고 보통 1초 안에 `available`/삭제 완료가 되지만, CLI waiter는 첫 조회 뒤 30초(ElastiCache 15초) 간격이라 첫 조회가 경쟁에서 지면 한 간격을 통째로 기다린다(VM에 부하가 걸리면 놓치는 횟수가 는다) → lab은 waiter와 같은 성공·실패 조건을 1초 간격으로 폴링(모듈 공용 [`scripts/lab-wait.sh`](../../scripts/lab-wait.sh)의 `wait_rds_*`·`wait_docdb_*`·`wait_elasticache_*`·`wait_gone`) | lab01~03, lab09, lab10 |
 | DynamoDB `CreateTable` 직후 상태 | 응답은 `CREATING`, 1초 안에 `ACTIVE`가 되는 경우가 많아 직후 `DescribeTable`은 경쟁 상태 → 항상 waiter | lab04~08 |
 | DynamoDB TTL | 만료 항목이 **수 초 안에** 삭제됨(실제 AWS: 보통 만료 후 며칠 이내). 문자열 타입 TTL은 무시(AWS와 같음) | lab07 |
 | DynamoDB Streams의 TTL 삭제 레코드 | `REMOVE` 레코드에 `userIdentity`(`Service`/`dynamodb.amazonaws.com`)가 없음 | lab07 |
