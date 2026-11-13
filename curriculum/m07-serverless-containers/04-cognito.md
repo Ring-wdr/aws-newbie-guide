@@ -89,6 +89,7 @@ aws: [ERROR]: An error occurred (NotAuthorizedException) when calling the Initia
 
 **2) ID 토큰 들여다보기**
 
+<!-- external-host-ok: lab이 비교용으로 출력한 실제 AWS 주소 형식. 실습은 127.0.0.1 주소만 호출한다 -->
 ```
 -- ID 토큰의 payload (서명된 JSON — 누구나 읽을 수 있으니 비밀을 넣지 않는다):
 {

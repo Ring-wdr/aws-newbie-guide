@@ -57,6 +57,7 @@ flowchart LR
 bash curriculum/m07-serverless-containers/labs/lab04-serverless-order-api.sh
 ```
 
+<!-- external-host-ok: lab이 비교용으로 출력한 실제 AWS 주소 형식. 실습은 127.0.0.1 주소만 호출한다 -->
 ```
 == 3. 함수 (환경 변수 TABLE_NAME) + HTTP API 라우트 2개
 POST /orders
