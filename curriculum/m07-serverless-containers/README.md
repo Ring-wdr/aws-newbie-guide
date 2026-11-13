@@ -47,7 +47,7 @@ export EMULATOR_PORT=9297          # 대화형 터미널이면 생략 가능
 curriculum/m07-serverless-containers/labs/verify.sh
 ```
 
-`verify.sh`는 에뮬레이터를 재시작해 깨끗한 상태로 만든 뒤, sdk 예제의 안전 장치를 확인하고, 모든 lab을 **두 번씩**(멱등성 확인) 실행하고 sdk 예제를 실행한다. 마지막 줄이 `MODULE m07 OK`면 통과. lab들은 `curl`, `docker`(lab03이 에뮬레이터 로그를 읽는다), `uv`(JSON·zip 처리)를 쓴다 — 모두 M00 설치에 포함돼 있다.
+`verify.sh`는 에뮬레이터를 재시작해 깨끗한 상태로 만든 뒤, sdk 예제의 안전 장치를 확인하고, 모든 lab을 **두 번** — 1회차는 번호 순, 2회차는 역순 — 실행하고(멱등성·순서 무관성 확인) sdk 예제를 실행한다. 마지막 줄이 `MODULE m07 OK`면 통과. lab들은 `curl`, `docker`(lab03이 에뮬레이터 로그를 읽는다), `uv`(JSON·zip 처리)를 쓴다 — 모두 M00 설치에 포함돼 있다.
 
 정리 자료: [cheatsheet.md](./cheatsheet.md) · [quiz.md](./quiz.md)
 
