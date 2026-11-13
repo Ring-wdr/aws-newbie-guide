@@ -52,7 +52,8 @@ container_state() {
 # 컨테이너의 DNS 설정(--dns 값, 쉼표로 구분). --dns 없이 띄웠으면 host(Docker 기본 리졸버), 컨테이너가 없으면 '-'.
 container_dns() {
   local dns
-  dns="$(docker container inspect -f '{{join .HostConfig.Dns ","}}' "$(container_name "$1")" 2>/dev/null)" || { echo "-"; return 0; }
+  # join 대신 range: Ubuntu 패키지의 docker CLI(29.1)는 join 에 '[]interface {}' 형식 오류를 낸다.
+  dns="$(docker container inspect -f '{{range $i, $d := .HostConfig.Dns}}{{if $i}},{{end}}{{$d}}{{end}}' "$(container_name "$1")" 2>/dev/null)" || { echo "-"; return 0; }
   echo "${dns:-host}"
 }
 
