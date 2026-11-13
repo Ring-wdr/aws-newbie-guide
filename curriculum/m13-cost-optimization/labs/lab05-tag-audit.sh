@@ -8,7 +8,7 @@
 set -euo pipefail
 ROOT="$(git rev-parse --show-toplevel)"
 source "$ROOT/scripts/env.sh"
-source "$ROOT/scripts/lab-wait.sh"   # CLI waiter(EC2 15초, DynamoDB table-not-exists 20초 간격) 대신 1초 간격 대기
+source "$ROOT/scripts/lab-wait.sh"   # CLI waiter(EC2 15초, DynamoDB table-not-exists 20초 간격) 대신 1초 간격 대기, table-exists 는 준비 직후 재확인
 AUDIT="$ROOT/curriculum/m13-cost-optimization/sdk/tag_audit.py"
 P="todayorder-m13-audit"
 cd "$ROOT"
@@ -61,8 +61,8 @@ aws dynamodb create-table --table-name "$P-sessions" --billing-mode PAY_PER_REQU
 aws sqs create-queue --queue-name "$P-events" --tags project=todayorder,cost-center=orders,env=prod >/dev/null
 DLQ="$(aws sqs create-queue --queue-name "$P-dlq" --tags Project=todayorder,cost-center=orders,env=prod --query QueueUrl --output text)"
 aws sns create-topic --name "$P-alerts" --tags Key=project,Value=todayorder Key=cost-center,Value=platform Key=env,Value=prod >/dev/null
-aws dynamodb wait table-exists --table-name "$P-orders"
-aws dynamodb wait table-exists --table-name "$P-sessions"
+wait_dynamodb_table_active "$P-orders"   # = aws dynamodb wait table-exists + 준비 직후 재확인 (scripts/lab-wait.sh)
+wait_dynamodb_table_active "$P-sessions"   # = aws dynamodb wait table-exists + 준비 직후 재확인 (scripts/lab-wait.sh)
 # DynamoDB 태그는 테이블이 ACTIVE 가 된 뒤에 조회된다(최종 일관성) — 보일 때까지 기다린다
 ddb_tags_visible() {
   local n
