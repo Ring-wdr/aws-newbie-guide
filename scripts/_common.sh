@@ -57,6 +57,15 @@ container_dns() {
   echo "${dns:-host}"
 }
 
+# VM 시계가 지금 반복해서 옮겨지고 있으면(clock-check.sh --stability 종료 코드 4) 경고만 보여 준다.
+# 안정(0)·확인 못 함(2, Docker Desktop·Linux 등)은 조용히 넘어간다. 호출한 스크립트를 실패시키지 않는다.
+warn_if_clock_unstable() {
+  local out rc=0
+  out="$(bash "$(dirname "${BASH_SOURCE[0]}")/clock-check.sh" --stability 2>&1)" || rc=$?
+  if [ "$rc" -eq 4 ]; then printf '%s\n' "$out" >&2; fi
+  return 0
+}
+
 health_ok() {
   local port="$1" ca="$EMULATOR_HOME_DIR/$1/ca.pem"
   [ -f "$ca" ] || return 1

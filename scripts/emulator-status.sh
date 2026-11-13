@@ -43,3 +43,4 @@ done
 for p in $oom_hint; do
   c_red "포트 $p: 메모리 상한을 넘어 강제 종료됨(종료 코드 137). 리소스는 사라졌습니다 → scripts/emulator-reset.sh $p (반복되면 EMULATOR_MEMORY=3g)"
 done
+warn_if_clock_unstable   # VM 시계가 몇 초씩 반복해서 옮겨지는 중이면 경고 (M00 레슨 3 문제 해결)
