@@ -458,6 +458,40 @@ def run_compute_gaps(p: Probe) -> None:
         "Type": "fixed-response", "FixedResponseConfig": {"StatusCode": "200", "ContentType": "text/plain",
                                                           "MessageBody": "default"}}])["Listeners"][0]["ListenerArn"]
     p.cleanup("lis", lambda: elb.delete_listener(ListenerArn=lis))
+
+    # 대상 헬스: 등록 직후 → healthy 까지, 그리고 대상 인스턴스를 중지하면 (M03 README 와 맞춰 보기)
+    htg = elb.create_target_group(Name=f"to-htg-{p.suffix}", Protocol="HTTP", Port=8080, VpcId=vpc,
+                                  TargetType="instance", HealthCheckPath="/health", HealthCheckIntervalSeconds=5,
+                                  HealthCheckTimeoutSeconds=2, HealthyThresholdCount=2,
+                                  UnhealthyThresholdCount=2)["TargetGroups"][0]["TargetGroupArn"]
+    p.cleanup("htg", lambda: elb.delete_target_group(TargetGroupArn=htg))
+    hr = ec2.run_instances(ImageId=ami, InstanceType="t3.micro", MinCount=2, MaxCount=2, SubnetId=subs[0])
+    hids = [i["InstanceId"] for i in hr["Instances"]]
+    p.cleanup("hterm", lambda: ec2.terminate_instances(InstanceIds=hids))
+    wait_until(lambda: all(_state(ec2, i) == "running" for i in hids), 30)
+    # 대상 그룹이 리스너에 연결돼 있어야 헬스 상태가 'unused' 가 아니다 (lab06 과 같은 구성)
+    hrule = elb.create_rule(ListenerArn=lis, Priority=5, Conditions=[{"Field": "path-pattern", "Values": ["/hc/*"]}],
+                            Actions=[{"Type": "forward", "TargetGroupArn": htg}])["Rules"][0]["RuleArn"]
+    p.cleanup("hrule", lambda: elb.delete_rule(RuleArn=hrule))
+    elb.register_targets(TargetGroupArn=htg, Targets=[{"Id": i} for i in hids])
+
+    def _th() -> dict[str, tuple[str, str]]:
+        d = elb.describe_target_health(TargetGroupArn=htg)["TargetHealthDescriptions"]
+        return {x["Target"]["Id"]: (x["TargetHealth"]["State"], x["TargetHealth"].get("Reason", "")) for x in d}
+
+    first = _th()
+    t0 = time.monotonic()
+    ok_h = wait_until(lambda: all(v[0] == "healthy" for v in _th().values()) and len(_th()) == 2, 60, 1)
+    p.behavior("등록한 running 대상이 HTTP 응답 없이도 healthy 가 됨(실제 헬스 체크 없음)", ok_h,
+               f"등록 직후 {sorted(set(first.values()))}, {time.monotonic() - t0:.0f}초 뒤 {sorted(set(_th().values()))}")
+    ec2.stop_instances(InstanceIds=[hids[0]])
+    t1 = time.monotonic()
+    wait_until(lambda: _th().get(hids[0], ("", ""))[0] not in ("healthy", ""), 60, 1)
+    st = _th()
+    p.behavior("대상 인스턴스를 중지하면 unhealthy 가 됨", st.get(hids[0], ("", ""))[0] == "unhealthy",
+               f"{time.monotonic() - t1:.0f}초 뒤 중지한 대상 {st.get(hids[0])}, 나머지 {st.get(hids[1])}, "
+               f"인스턴스 상태 {_state(ec2, hids[0])}")
+
     p.call("CreateRule(host-header api.todayorder.example → 'host')", elb.create_rule, ListenerArn=lis, Priority=10,
            Conditions=[{"Field": "host-header", "HostHeaderConfig": {"Values": ["api.todayorder.example"]}}],
            Actions=[{"Type": "fixed-response", "FixedResponseConfig": {"StatusCode": "200", "ContentType": "text/plain",

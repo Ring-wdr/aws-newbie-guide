@@ -6,6 +6,7 @@ import json
 import os
 import subprocess
 import tempfile
+import time
 from typing import Any
 
 from botocore.exceptions import ClientError
@@ -356,6 +357,17 @@ def run_s3(p: Probe) -> None:
     if rr is not None:
         h = s3.head_object(Bucket=b, Key="archive.txt")
         p.behavior("복원 요청 후 HeadObject Restore 헤더", bool(h.get("Restore")), str(h.get("Restore")))
+        t0 = time.monotonic()
+        done = wait_until(lambda: 'ongoing-request="false"' in
+                          (s3.head_object(Bucket=b, Key="archive.txt").get("Restore") or ""), 60)
+        took = time.monotonic() - t0
+        try:
+            s3.get_object(Bucket=b, Key="archive.txt")["Body"].read()
+            c = "OK"
+        except ClientError as e:
+            c = e.response["Error"]["Code"]
+        p.behavior("GLACIER Standard 복원이 60초 안에 끝남(실제 AWS 는 3~5시간)", done,
+                   f"{took:.1f}초 뒤 ongoing-request=false={done}, 이후 GetObject={c}")
     p.call("PutObject(INTELLIGENT_TIERING)", s3.put_object, Bucket=b, Key="it.txt", Body=b"i", StorageClass="INTELLIGENT_TIERING")
     p.call("PutBucketAccelerateConfiguration", s3.put_bucket_accelerate_configuration, Bucket=b,
            AccelerateConfiguration={"Status": "Enabled"})

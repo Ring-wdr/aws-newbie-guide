@@ -159,6 +159,28 @@ def run_lambda_runtime(p: Probe) -> None:
     p.behavior("비동기 실패가 OnFailure 대상(SQS)에 전달됨", len(got) >= 1, f"35초 안에 {len(got)}건")
     p.behavior("MaximumRetryAttempts=0 이면 비동기 실패 함수가 1번만 실행됨", runs == 1, f"실행 {runs}번")
 
+    # 함수 자체의 DLQ(DeadLetterConfig) — OnFailure 대상 없이, 재시도 0
+    q2 = sqs.create_queue(QueueName=p.name("rtfndlq"))["QueueUrl"]
+    p.cleanup("rtq2", lambda: sqs.delete_queue(QueueUrl=q2))
+    q2arn = sqs.get_queue_attributes(QueueUrl=q2, AttributeNames=["QueueArn"])["Attributes"]["QueueArn"]
+    p.call("PutFunctionEventInvokeConfig(재시도 0, 대상 없음)", lam.put_function_event_invoke_config,
+           FunctionName=fn, MaximumRetryAttempts=0, DestinationConfig={})
+    if p.call("UpdateFunctionConfiguration(DeadLetterConfig → SQS)", lam.update_function_configuration,
+              FunctionName=fn, DeadLetterConfig={"TargetArn": q2arn}) is not None:
+        wait_until(lambda: lam.get_function_configuration(FunctionName=fn).get("LastUpdateStatus") != "InProgress", 30)
+        cfg_dlq = lam.get_function_configuration(FunctionName=fn).get("DeadLetterConfig", {}).get("TargetArn")
+        p.behavior("함수 DeadLetterConfig 설정이 조회됨", cfg_dlq == q2arn, str(cfg_dlq))
+        prefix2 = f"dlq-{uuid.uuid4().hex[:6]}-"
+        lam.invoke(FunctionName=fn, InvocationType="Event",
+                   Payload=json.dumps({"op": "fail", "table": table, "prefix": prefix2}).encode())
+        got2: list[Any] = []
+        end = time.monotonic() + 35
+        while time.monotonic() < end and not got2:
+            got2 = sqs.receive_message(QueueUrl=q2, WaitTimeSeconds=5, MaxNumberOfMessages=10).get("Messages", [])
+        runs2 = _items_with_prefix(p, table, prefix2)
+        p.behavior("비동기 실패가 함수 DLQ(DeadLetterConfig, SQS)에 전달됨", len(got2) >= 1,
+                   f"35초 안에 {len(got2)}건 (함수 실행 {runs2}번)")
+
     # 메모리: 동기 호출 15번 전후
     before = _mem_mib()
     for _ in range(15):

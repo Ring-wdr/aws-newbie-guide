@@ -24,7 +24,7 @@ NOTES = HERE / "notes.md"
 # 서비스 키 → 커리큘럼 모듈 (보고서 정렬·표시용)
 MODULE = {
     "client-config": "M00",
-    "iam": "M01", "iam-enforcement": "M01", "sts": "M01", "organizations": "M01",
+    "iam": "M01", "iam-enforcement": "M01", "iam-conditions": "M01", "sts": "M01", "organizations": "M01",
     "ec2-vpc": "M02", "vpc-gaps": "M02",
     "ec2-instances": "M03", "ebs-ami": "M03", "elbv2": "M03", "autoscaling": "M03", "compute-gaps": "M03",
     "s3": "M04", "s3-gaps": "M04", "efs": "M04",

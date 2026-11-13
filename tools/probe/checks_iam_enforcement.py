@@ -107,10 +107,22 @@ def run_iam_enforcement(p: Probe) -> None:
                 pass
 
     p.cleanup("tables", _rm_tables)
+    sm = p.client("secretsmanager")
+    secret = sm.create_secret(Name=p.name("enf"), SecretString="s3cr3t")["ARN"]
+
+    def _rm_secrets() -> None:
+        for sid in (secret, p.name("enf-byuser")):
+            try:
+                sm.delete_secret(SecretId=sid, ForceDeleteWithoutRecovery=True)
+            except ClientError:
+                pass
+
+    p.cleanup("secrets", _rm_secrets)
 
     # ---------- 1) 정책 없는 사용자
     _, ns, _ = _user(p, "noperm")
     us3, usqs, uddb = ns.client("s3", config=_CFG), ns.client("sqs", config=_CFG), ns.client("dynamodb", config=_CFG)
+    usm = ns.client("secretsmanager", config=_CFG)
     matrix: list[tuple[str, str, Callable[[], Any]]] = [
         ("계정", "s3:ListAllMyBuckets(ListBuckets)", lambda: us3.list_buckets()),
         ("계정", "s3:CreateBucket", lambda: us3.create_bucket(Bucket=p.name("enf-byuser"))),
@@ -133,11 +145,19 @@ def run_iam_enforcement(p: Probe) -> None:
         ("데이터", "dynamodb:PutItem", lambda: uddb.put_item(TableName=tables[0], Item={"pk": {"S": "u"}})),
         ("데이터", "dynamodb:Scan", lambda: uddb.scan(TableName=tables[0])),
         ("관리", "dynamodb:DeleteTable(관리자가 만든 테이블)", lambda: uddb.delete_table(TableName=tables[1])),
+        ("계정", "secretsmanager:ListSecrets", lambda: usm.list_secrets()),
+        ("계정", "secretsmanager:CreateSecret", lambda: usm.create_secret(Name=p.name("enf-byuser"), SecretString="u")),
+        ("관리", "secretsmanager:DescribeSecret", lambda: usm.describe_secret(SecretId=secret)),
+        ("데이터", "secretsmanager:GetSecretValue", lambda: usm.get_secret_value(SecretId=secret)),
     ]
     for level, label, fn in matrix:
         code = _code(fn)
         p.behavior(f"정책 없는 사용자의 {label} 거부(암묵적 Deny) [{level} 수준]", _denied(code),
                    code if code != "OK" else "허용됨")
+    # Secrets Manager 대조군: 같은 호출을 허용하면 성공해야 위 거부가 "평가"의 결과라고 말할 수 있다
+    _, sa, _ = _user(p, "smallow", _doc(_stmt("Allow", ["secretsmanager:GetSecretValue", "secretsmanager:ListSecrets"])))
+    c_sm = _code(lambda: sa.client("secretsmanager", config=_CFG).get_secret_value(SecretId=secret))
+    p.behavior("secretsmanager:GetSecretValue 를 허용한 사용자는 비밀 값 읽기 성공(대조군)", c_sm == "OK", c_sm)
     # 사용자가 만든 큐 정리
     try:
         sqs.delete_queue(QueueUrl=sqs.get_queue_url(QueueName=p.name("enf-byuser"))["QueueUrl"])
@@ -283,6 +303,59 @@ def run_iam_enforcement(p: Probe) -> None:
                    got.get("iam:ListUsers") == "allowed", str(got))
 
 
+def run_iam_conditions(p: Probe) -> None:
+    """전역 조건 키 × 서비스 행렬. 실제 AWS에서는 아래 12가지 정책 모두에서 호출이 **허용**되어야 한다
+    (Allow 조건이 맞고, Deny 조건은 맞지 않으므로). 행마다 서비스·키·문장 종류를 분리해 기록한다."""
+    s3, sqs, ddb = p.client("s3"), p.client("sqs"), p.client("dynamodb")
+    bucket = p.name("cond")
+    s3.create_bucket(Bucket=bucket)
+    s3.put_object(Bucket=bucket, Key="a.txt", Body=b"x")
+    qurl = sqs.create_queue(QueueName=p.name("cond"))["QueueUrl"]
+    table = p.name("cond")
+    ddb.create_table(TableName=table, BillingMode="PAY_PER_REQUEST",
+                     AttributeDefinitions=[{"AttributeName": "pk", "AttributeType": "S"}],
+                     KeySchema=[{"AttributeName": "pk", "KeyType": "HASH"}])
+    ddb.get_waiter("table_exists").wait(TableName=table, WaiterConfig={"Delay": 1, "MaxAttempts": 30})
+
+    def _rm() -> None:
+        for o in s3.list_objects_v2(Bucket=bucket).get("Contents", []):
+            s3.delete_object(Bucket=bucket, Key=o["Key"])
+        s3.delete_bucket(Bucket=bucket)
+        sqs.delete_queue(QueueUrl=qurl)
+        ddb.delete_table(TableName=table)
+
+    p.cleanup("cond-res", _rm)
+
+    ops: list[tuple[str, str, Callable[[Any], Any]]] = [
+        ("S3", "s3:ListBucket", lambda sess: sess.client("s3", config=_CFG).list_objects_v2(Bucket=bucket)),
+        ("SQS", "sqs:SendMessage", lambda sess: sess.client("sqs", config=_CFG).send_message(QueueUrl=qurl, MessageBody="c")),
+        ("DynamoDB", "dynamodb:Scan", lambda sess: sess.client("dynamodb", config=_CFG).scan(TableName=table)),
+        ("EC2", "ec2:DescribeVpcs", lambda sess: sess.client("ec2", config=_CFG).describe_vpcs()),
+        ("IAM", "iam:ListUsers", lambda sess: sess.client("iam", config=_CFG).list_users()),
+    ]
+    actions = [a for _, a, _ in ops]
+    keys = [
+        ("aws:SecureTransport", {"Bool": {"aws:SecureTransport": "true"}}, {"Bool": {"aws:SecureTransport": "false"}},
+         "HTTPS 호출"),
+        ("aws:RequestedRegion", {"StringEquals": {"aws:RequestedRegion": "us-east-1"}},
+         {"StringEquals": {"aws:RequestedRegion": "eu-west-1"}}, "us-east-1 호출"),
+        ("aws:PrincipalAccount", {"StringEquals": {"aws:PrincipalAccount": _ACCT}},
+         {"StringEquals": {"aws:PrincipalAccount": "999999999999"}}, "계정 000000000000의 사용자"),
+    ]
+    for key, allow_cond, deny_cond, ctx in keys:
+        short = key.split(":")[1]
+        _, sa, _ = _user(p, f"ca-{short[:6].lower()}", _doc(_stmt("Allow", actions, condition=allow_cond)))
+        _, sd, _ = _user(p, f"cd-{short[:6].lower()}", _doc(_stmt("Allow", "*"), _stmt("Deny", actions, condition=deny_cond)))
+        for svc, action, fn in ops:
+            code = _code(lambda: fn(sa))
+            p.behavior(f"조건 키 {key} · {svc} {action}: 맞는 조건의 Allow 가 적용됨({ctx})", code == "OK",
+                       "허용" if code == "OK" else f"{code} — Allow 미적용")
+            code = _code(lambda: fn(sd))
+            p.behavior(f"조건 키 {key} · {svc} {action}: 맞지 않는 조건의 Deny 는 적용 안 됨({ctx})", code == "OK",
+                       "허용" if code == "OK" else f"{code} — Deny 적용")
+
+
 CHECKS = {
     "iam-enforcement": run_iam_enforcement,
+    "iam-conditions": run_iam_conditions,
 }
