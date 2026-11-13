@@ -32,7 +32,7 @@ aws dynamodb create-table --table-name "$T" \
   --key-schema AttributeName=product_id,KeyType=HASH \
   --provisioned-throughput ReadCapacityUnits=5,WriteCapacityUnits=5 \
   --query 'TableDescription.{Status: TableStatus, Throughput: ProvisionedThroughput.{R: ReadCapacityUnits, W: WriteCapacityUnits}}'
-aws dynamodb wait table-exists --table-name "$T"
+wait_dynamodb_table_active "$T"   # = aws dynamodb wait table-exists + 준비 직후 재확인 (scripts/lab-wait.sh)
 for i in 1 2 3 4 5; do
   aws dynamodb put-item --table-name "$T" --item "{\"product_id\":{\"S\":\"P-10$i\"},\"stock\":{\"N\":\"$((i * 10))\"}}"
 done
@@ -54,7 +54,7 @@ aws dynamodb describe-backup --backup-arn "$BACKUP_ARN" \
   --query 'BackupDescription.BackupDetails.{Name: BackupName, Status: BackupStatus, Type: BackupType}'
 aws dynamodb restore-table-from-backup --target-table-name "$FROM_BACKUP" --backup-arn "$BACKUP_ARN" \
   --query 'TableDescription.{Status: TableStatus, RestoreInProgress: RestoreSummary.RestoreInProgress}'
-aws dynamodb wait table-exists --table-name "$FROM_BACKUP"
+wait_dynamodb_table_active "$FROM_BACKUP"   # = aws dynamodb wait table-exists + 준비 직후 재확인 (scripts/lab-wait.sh)
 restored_count="$(aws dynamodb scan --table-name "$FROM_BACKUP" --select COUNT --query Count --output json)"
 echo "복원된 테이블 항목 수: $restored_count"
 
@@ -72,7 +72,7 @@ aws dynamodb put-item --table-name "$T" --item '{"product_id":{"S":"P-101"},"sto
 aws dynamodb restore-table-to-point-in-time --source-table-name "$T" --target-table-name "$FROM_PITR" \
   --use-latest-restorable-time \
   --query 'TableDescription.{Status: TableStatus, Source: RestoreSummary.SourceTableArn, RestoreInProgress: RestoreSummary.RestoreInProgress}'
-aws dynamodb wait table-exists --table-name "$FROM_PITR"
+wait_dynamodb_table_active "$FROM_PITR"   # = aws dynamodb wait table-exists + 준비 직후 재확인 (scripts/lab-wait.sh)
 pitr_count="$(aws dynamodb scan --table-name "$FROM_PITR" --select COUNT --query Count --output json)"
 pitr_stock="$(aws dynamodb get-item --table-name "$FROM_PITR" --key '{"product_id":{"S":"P-101"}}' --query 'Item.stock.N' --output text)"
 aws dynamodb describe-continuous-backups --table-name "$T" \

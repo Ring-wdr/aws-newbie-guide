@@ -18,8 +18,8 @@ aws dynamodb create-table --table-name "$P" --billing-mode PAY_PER_REQUEST \
 aws dynamodb create-table --table-name "$O" --billing-mode PAY_PER_REQUEST \
   --attribute-definitions AttributeName=order_id,AttributeType=S \
   --key-schema AttributeName=order_id,KeyType=HASH --query 'TableDescription.TableStatus'
-aws dynamodb wait table-exists --table-name "$P"
-aws dynamodb wait table-exists --table-name "$O"
+wait_dynamodb_table_active "$P"   # = aws dynamodb wait table-exists + 준비 직후 재확인 (scripts/lab-wait.sh)
+wait_dynamodb_table_active "$O"   # = aws dynamodb wait table-exists + 준비 직후 재확인 (scripts/lab-wait.sh)
 
 stock() {
   aws dynamodb get-item --table-name "$P" --key '{"product_id":{"S":"P-100"}}' --consistent-read \
