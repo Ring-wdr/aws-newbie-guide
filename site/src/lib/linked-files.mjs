@@ -5,7 +5,7 @@ import { unified } from 'unified';
 import remarkParse from 'remark-parse';
 import remarkGfm from 'remark-gfm';
 import { visit } from 'unist-util-visit';
-import { REPO_ROOT, builtContentFiles } from './repo.mjs';
+import { REPO_ROOT, allContentFiles, builtContentFiles } from './repo.mjs';
 import { resolveLink } from './links.mjs';
 
 let cache;
@@ -61,15 +61,90 @@ export function langFor(rel) {
   return LANG[ext] || 'plaintext';
 }
 
-/**
- * 저장소 루트에서 이 파일을 실행하는 명령. 원고(레슨·README)에 쓰인 형태를 따른다.
- * 실행하는 파일이 아니면(라이브러리·데이터·Lambda 코드) null.
+/* ------------------------------------------------------------------ 실행 명령
+ * 소스 보기 페이지의 "실행 명령"은 저장소에 근거가 있을 때만 보인다(원고에 없는 것을 지어내지 않는다).
+ *  1) 원고(README·docs·curriculum)의 ```bash 블록에서 그 파일을 실제로 부르는 줄이 있으면 그 줄
+ *     (줄 끝 주석은 뺀다. 여러 형태면 가장 자주 쓰인 것, 같으면 짧은 것).
+ *  2) 없으면 실행 진입점일 때만 정해진 형태:
+ *     - 셸: 이름이 "_"로 시작하지 않고, 실행 비트가 있거나 labs/labNN-*.sh·labs/verify.sh 이름 규칙
+ *           → curriculum/ 안은 "bash <경로>", 그 밖은 "<경로>"
+ *     - Python: 파일에 `if __name__ == "__main__":` 이 있음 → "uv run python <경로>"
+ *  3) 그 밖에는 명령을 보이지 않는다. 셸 도우미(source 해서 쓰는 함수 모음)와 Python 모듈은 그렇다고 적는다.
+ * tools/sitecheck 의 run-commands 관문이 같은 규칙을 따로(Python으로) 구현해 산출물을 검사한다.
  */
-export function runCommandFor(rel) {
+
+/** 줄 끝의 셸 주석을 뗀다: 따옴표 밖에서 공백 뒤에 오는 "#" 부터. */
+export function stripShellComment(line) {
+  let q = null;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (q) {
+      if (c === q) q = null;
+      continue;
+    }
+    if (c === "'" || c === '"') q = c;
+    else if (c === '#' && i > 0 && /\s/.test(line[i - 1])) return line.slice(0, i).trimEnd();
+  }
+  return line.trimEnd();
+}
+
+function escapeRe(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/** 이 줄이 rel 파일을 실행(또는 source)하는가: 줄의 첫 명령이 그 파일이거나 bash/sh/source/./python/uv run python 의 인자. */
+export function invokes(line, rel) {
+  const re = new RegExp(
+    `^\\s*(?:[A-Z_][A-Z0-9_]*=\\S*\\s+)*(?:bash\\s+|sh\\s+|source\\s+|\\.\\s+|uv\\s+run\\s+(?:--\\S+\\s+)*python3?\\s+|python3?\\s+)?(?:\\./)?${escapeRe(rel)}(?=\\s|$|;|&&|\\|)`,
+  );
+  return re.test(line);
+}
+
+let manuscriptLines;
+/** 원고의 ```bash 블록 줄(이어진 줄은 합침) 목록: [{line, from}] */
+function bashLines() {
+  if (manuscriptLines) return manuscriptLines;
+  manuscriptLines = [];
+  const parser = unified().use(remarkParse).use(remarkGfm, { singleTilde: false });
+  for (const rel of allContentFiles()) {
+    const tree = parser.parse(fs.readFileSync(path.join(REPO_ROOT, rel), 'utf8'));
+    visit(tree, 'code', (node) => {
+      if ((node.lang || '').toLowerCase() !== 'bash') return;
+      const raw = node.value.split('\n');
+      for (let i = 0; i < raw.length; i++) {
+        let l = raw[i];
+        while (/\\\s*$/.test(l) && i + 1 < raw.length) l = `${l.replace(/\\\s*$/, '')} ${raw[++i].trim()}`;
+        manuscriptLines.push({ line: stripShellComment(l).trim(), from: rel });
+      }
+    });
+  }
+  return manuscriptLines;
+}
+
+/**
+ * @returns {{command: string|null, basis: 'manuscript'|'entry'|'helper'|'module'|'none', from?: string}}
+ */
+export function runInfo(rel) {
+  const hits = bashLines().filter((h) => h.line && invokes(h.line, rel));
+  if (hits.length) {
+    const count = new Map();
+    for (const h of hits) count.set(h.line, (count.get(h.line) || 0) + 1);
+    const best = [...count.entries()].sort((a, b) => b[1] - a[1] || a[0].length - b[0].length)[0][0];
+    return { command: best, basis: 'manuscript', from: hits.find((h) => h.line === best).from };
+  }
+  const abs = path.join(REPO_ROOT, rel);
   const base = rel.split('/').pop();
-  if (base.startsWith('_')) return null; // source 되는 공용 함수 모음(labs/_lib.sh 등)
-  if (/^scripts\/(env|dr-env)\.sh$/.test(rel)) return `source ${rel}`;
-  if (rel.endsWith('.sh')) return rel.startsWith('curriculum/') ? `bash ${rel}` : rel;
-  if (rel.endsWith('.py') && /\/(sdk|mock-exam)\/|^tools\//.test(rel)) return `uv run python ${rel}`;
-  return null;
+  if (rel.endsWith('.sh')) {
+    if (base.startsWith('_')) return { command: null, basis: 'helper' };
+    const exec = (fs.statSync(abs).mode & 0o111) !== 0;
+    const named = /(^|\/)labs\/(lab\d\d-[^/]+|verify)\.sh$/.test(rel);
+    if (exec || named) return { command: rel.startsWith('curriculum/') ? `bash ${rel}` : rel, basis: 'entry' };
+    return { command: null, basis: 'helper' };
+  }
+  if (rel.endsWith('.py')) {
+    const text = fs.readFileSync(abs, 'utf8');
+    if (/^if __name__ == ["']__main__["']\s*:/m.test(text)) return { command: `uv run python ${rel}`, basis: 'entry' };
+    return { command: null, basis: 'module' };
+  }
+  return { command: null, basis: 'none' };
 }

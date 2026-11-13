@@ -6,7 +6,7 @@ import path from 'node:path';
 import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
 import { Code } from 'astro:components';
 import { REPO_ROOT, fileViewRoute, routeForRepoPath, readTitle, builtContentFiles } from '../../lib/repo.mjs';
-import { collectLinkedFiles, langFor, runCommandFor } from '../../lib/linked-files.mjs';
+import { collectLinkedFiles, langFor, runInfo } from '../../lib/linked-files.mjs';
 import { ko } from '../../i18n/ko.mjs';
 
 export function getStaticPaths() {
@@ -34,7 +34,8 @@ else
       return { name: e.isDirectory() ? `${e.name}/` : e.name, href };
     });
 const lines = code ? code.split('\n').length - (code.endsWith('\n') ? 1 : 0) : 0;
-const run = kind === 'file' ? runCommandFor(rel) : null;
+const info = kind === 'file' ? runInfo(rel) : { command: null, basis: 'none' as const };
+const run = info.command;
 const title = kind === 'dir' ? `${rel}/` : rel.split('/').pop()!;
 ---
 
@@ -46,7 +47,7 @@ const title = kind === 'dir' ? `${rel}/` : rel.split('/').pop()!;
   <p>{ko.source.note}</p>
   {
     run && (
-      <div class="source-run">
+      <div class="source-run" data-run-basis={info.basis}>
         <div class="cmd-head">
           <span class="block-label">{ko.source.run}</span>
           <button type="button" class="copy-btn" data-copy hidden aria-label={`${ko.source.run} ${ko.cmd.copy}`}>
@@ -54,9 +55,21 @@ const title = kind === 'dir' ? `${rel}/` : rel.split('/').pop()!;
           </button>
         </div>
         <Code code={run} lang="bash" themes={{ light: 'github-light-default', dark: 'github-dark-default' }} defaultColor={false} />
+        <p class="source-run-basis">
+          {info.basis === 'manuscript' ? (
+            <>
+              {ko.source.basisManuscript}{' '}
+              {built.has(info.from!) ? <a href={routeForRepoPath(info.from!)}>{readTitle(info.from!)}</a> : <code>{info.from}</code>}
+            </>
+          ) : (
+            ko.source.basisEntry(rel)
+          )}
+        </p>
       </div>
     )
   }
+  {info.basis === 'helper' && <p class="source-norun">{ko.source.helper}</p>}
+  {info.basis === 'module' && <p class="source-norun">{ko.source.module}</p>}
   {
     kind === 'file' ? (
       <div class="source-code">
