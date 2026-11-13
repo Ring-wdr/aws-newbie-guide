@@ -18,8 +18,8 @@
 | 2 | 운영·분석 모듈 저자 | `author/m10-m11-ops-analytics` | `curriculum/m10-monitoring-iac/`, `curriculum/m11-analytics/` | 9310 |
 | 2 | 복원력·비용 모듈 저자 | `author/m12-m13-resilience-cost` | `curriculum/m12-resilience-dr-migration/`, `curriculum/m13-cost-optimization/` | 9312 (+9313: 두 번째 "리전") |
 | 3 | 캡스톤·모의고사 저자 | `author/m14-capstone-mock-exam` | `curriculum/m14-capstone-exam/`, 루트 `README.md` 최종 목차 | 9314 |
-| 4 | 교차 모듈 편집자 | `editor/cross-module-review-followups`, `editor/stale-fact-corrections`, `editor/final-consistency-cleanup`, `editor/verify-reverse-order-pass` | `curriculum/` 모듈 간 불일치와 검증에서 미뤄 둔 제안 | 9316 (+9317) |
-| 수시 | 환경 구축 엔지니어 (후속) | `setup/guard-hardening-and-shared-tooling`, `setup/fidelity-report-corrections`, `setup/dns-isolation-default-and-host-scan` | 가드·공용 스크립트 보강, 탐침과 `docs/FIDELITY.md` 정정 | 9297 (+9298) |
+| 4 | 교차 모듈 편집자 | `editor/cross-module-review-followups`, `editor/stale-fact-corrections`, `editor/final-consistency-cleanup`, `editor/verify-reverse-order-pass`, `editor/cli-wait-polling-all-modules` | `curriculum/` 모듈 간 불일치와 검증에서 미뤄 둔 제안, 실습 공용 도우미 `scripts/lab-wait.sh` | 9316 (+9317) |
+| 수시 | 환경 구축 엔지니어 (후속) | `setup/guard-hardening-and-shared-tooling`, `setup/fidelity-report-corrections`, `setup/dns-isolation-default-and-host-scan`, `setup/environment-verification-followups`, `setup/guard-refusal-followups`, `setup/guard-disconnect-hardening` | 가드·공용 스크립트 보강, 탐침과 `docs/FIDELITY.md` 정정 | 9297 (+9298) |
 | 수시 | 모듈 저자 (후속) | `author/<모듈>-review-followup` (예: `author/m04-storage-review-followup`, `author/m05-verify-runtime-followup`) | 병합 뒤 발견된 자기 모듈의 결함 수정 | 원래 배정 포트 |
 | 각 PR | PR 검증자 | (브랜치 없음 — 해당 PR 브랜치를 체크아웃해 검증) | [AUTHORING.md 6장](./AUTHORING.md) 체크리스트 | 9320~ |
 
@@ -45,7 +45,7 @@ flowchart LR
 - 각 저자는 자신의 git worktree에서 작업하고, 자기 담당 디렉터리만 수정한다.
 - 작업을 마치면 자기 포트의 에뮬레이터를 반드시 내린다 (`scripts/emulator-down.sh <port>`).
 - 두 번째 에뮬레이터를 쓰는 에이전트는 `DR_EMULATOR_PORT`를 반드시 명시한다(역할 표에 `+포트`가 적힌 역할만 그 포트를 쓴다). 포트가 연속 번호라, 추측한 포트는 다른 에이전트의 에뮬레이터일 수 있다.
-- `emulator-down.sh --all`, Colima 재시작, VM 시계 변경은 다른 에이전트의 작업을 깨뜨리므로 금지한다(스크립트는 `--all`에 경고만 한다 — 지키는 것은 에이전트의 몫이다).
+- `emulator-down.sh --all`, Colima 재시작, VM 시계 변경은 다른 에이전트의 작업을 깨뜨리므로 금지한다(스크립트는 `--all`에 경고만 한다 — 지키는 것은 에이전트의 몫이다). VM 시계는 손으로 바꿔도 Lima 게스트 에이전트와 timesyncd가 몇 초 안에 되돌리므로, 어긋남을 시험하려면 둘을 멈춰야 하고 그동안 다른 에이전트의 서명 요청이 모두 실패한다. 이런 시험은 다른 에뮬레이터가 하나도 없을 때만 한다.
 - `emulator-up.sh`는 포트를 주지 않으면 비대화형에서도 9297을 쓴다. 에이전트는 항상 `EMULATOR_PORT`를 export하거나 포트를 인자로 넘긴다.
 - 임시 파일은 에이전트마다 고유한 이름의 폴더에 둔다. 공용 임시 폴더에 흔한 파일명(`verify.log`, `out.txt`)으로 쓰면 서로 덮어쓴다.
 - 기본 메모리 상한은 2g다. 동시에 많은 에뮬레이터를 띄울 때만 `EMULATOR_MEMORY`로 낮춘다.
@@ -55,5 +55,6 @@ flowchart LR
 - **검증자는 작성자와 다른 에이전트여야 한다.** 저자의 `verify.sh` 통과 보고만으로는 사실 오류, 순서 의존, 정답이 한 글자에 쏠린 퀴즈, 깨진 다이어그램을 걸러내지 못했다.
 - **검증자도 틀린다.** 검증자의 제안이 낡은 수치였던 경우가 있었다. 사실 관계가 엇갈리면 1차 자료(AWS 문서·발표)를 인용해 판정한다.
 - **"외부에 닿지 않는다"는 주장도 검증 대상이다.** 첫 탐침은 ECS 검사에 실제 공개 레지스트리 이미지를 써서, 실행할 때마다 에뮬레이터가 익명 이미지 풀을 시도했다. 여러 차례의 검증을 거친 뒤에야 발견됐다. 지금은 정적 검사(`tools/probe/no_external_hosts.py`)가 M00 `verify.sh`에서 `tools`·`scripts`·`src`와 `curriculum/` 전체(M00~M14)를 막고(탐침 시작 때는 `tools/probe`만 검사한다), 에뮬레이터 컨테이너는 기본으로 이름 해석이 막힌 채(`--dns 127.0.0.1`, 해제는 `EMULATOR_DNS=host`) 뜬다.
-- **실제 AWS에 맞는 도구가 에뮬레이터에서는 느릴 수 있다.** AWS CLI의 `wait`는 RDS·DocumentDB를 30초, ElastiCache를 15초 간격으로 확인한다. 에뮬레이터는 1초 안에 상태를 바꾸지만, 생성 직후 첫 확인이 `creating`을 보면 한 간격을 통째로 기다린다. M05 `verify.sh`가 같은 조건에서 8분에서 13분까지 흔들린 원인이었다(전체 회귀에서 한 번 나온 30분도 같은 원인으로 추정하지만 재현하지는 못했다). 레슨의 명령은 `wait`를 그대로 가르치고, 실습 스크립트는 1초 간격으로 폴링한다(M05 `labs/_common.sh`의 `wait_status`·`wait_gone`). 다른 모듈의 EC2·ELB·CloudFront·Kinesis `wait`에는 같은 경합이 남아 있다.
+- **실제 AWS에 맞는 도구가 에뮬레이터에서는 느릴 수 있다.** AWS CLI의 `wait`는 RDS·DocumentDB를 30초, ElastiCache를 15초 간격으로 확인한다. 에뮬레이터는 1초 안에 상태를 바꾸지만, 생성 직후 첫 확인이 `creating`을 보면 한 간격을 통째로 기다린다. M05 `verify.sh`가 같은 조건에서 8분에서 13분까지 흔들린 원인이었고, M08은 12분 중 10분이 `wait`였다(교체 뒤 3분). 전체 회귀에서 한 번 나온 M05의 30분은 재현하지 못했다 — 수정 전 코드를 다시 돌린 실행은 525초였고 `wait` 68번 중 5번만 한 간격을 기다렸으므로, 같은 원인이라는 추정은 뒷받침되지 않은 채 남아 있다. 레슨의 명령은 `wait`를 그대로 가르치고, 실습 스크립트는 `scripts/lab-wait.sh`로 1초 간격 폴링한다. 이미 빠른 Lambda, ELB `load-balancer-available`, DynamoDB `table-exists`, S3 `bucket-exists`(M00)는 CLI `wait`로 남겼다.
+- **엔드포인트 설정을 무시하는 SDK 기능이 있다.** S3 다중 리전 액세스 포인트 ARN, Kinesis `StreamId`, sign-in 제어 작업은 `AWS_ENDPOINT_URL`과 상관없이 AWS 호스트 이름을 직접 만든다. "이 셸의 요청은 밖으로 나가지 않는다"는 문장은 검증자가 로컬 botocore 엔드포인트 규칙을 전수 대조한 뒤에야 거짓으로 드러났다. 지금은 첫째를 스위치로 끄고, 나머지는 TLS 검증(에뮬레이터 CA만 신뢰)으로 끊는다. 안전 장치의 문구는 보장되는 것만 약속하게 쓴다.
 - **병합 뒤에도 깨질 수 있다.** 부하가 달라지면 타이밍 경합이 드러난다. 공용 파일을 바꾸는 PR은 이미 병합된 모듈의 `verify.sh`를 회귀로 돌린다.

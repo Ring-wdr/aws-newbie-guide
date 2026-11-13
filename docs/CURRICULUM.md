@@ -40,7 +40,7 @@ aws-emulator는 **컨트롤 플레인(리소스 생성·조회·수정·삭제)*
 - 조정·관리·삭제 계열에 501이 몰려 있다: Auto Scaling 조정 정책·수명 주기 후크·조회, Organizations SCP·계정, IAM MFA 장치, VPC 피어링 수락·거절·삭제·`ReplaceRoute`·TGW 정적 경로·연결 삭제·Egress-only IGW·리전 NAT·VPN·Client VPN, AMI 생성, RDS PITR·복제본 승격, ElastiCache 복제 그룹 삭제, Glue 크롤러, Athena 작업 그룹 목록·삭제, SSM Session Manager·패치, Backup·DMS 목록·삭제 계열, Cost Explorer.
 - 시간 기반 동작은 빠르거나 없다: TTL 삭제·Firehose 버퍼·Glacier 복원은 수 초, EventBridge Scheduler `at()`은 지정 시각 전에 발화, S3 수명 주기 전환·Lambda 비동기 실패 대상·Route 53 상태 확인 실패는 일어나지 않는다. CloudFormation은 `DescribeStacks`가 올 때만 진행하고 대기 리소스에 약 10초 마감이 있어, NAT 경로가 있는 스택은 CLI `wait`로는 롤백되고 2초 간격 폴링으로는 성공한다.
 - 동기 Lambda 호출은 회당 약 7 MiB의 에뮬레이터 메모리를 회수하지 않는다(기본 상한 2g, 반복 실습 시 `scripts/emulator-reset.sh`). 노트북이 잠든 뒤에는 VM 시계가 어긋나 서명 오류가 날 수 있다(M00 레슨 3).
-- 일부 리소스는 **외부 호스트에 접속을 시도**할 수 있다: ECS 작업 정의에 실제 레지스트리 URI를 넣으면 에뮬레이터 컨테이너가 이미지를 받으려 한다. 실습은 `.invalid` 레지스트리와 예약 이름만 쓴다(AUTHORING 규칙 11). `tools/probe/no_external_hosts.py`가 탐침 시작 때는 탐침 코드를, M00 `verify.sh`에서는 `tools`·`scripts`·`src`·`curriculum/` 전체 소스 텍스트를 정적 검사한다. 에뮬레이터 컨테이너는 기본으로 `--dns 127.0.0.1`로 떠 이름 해석 자체가 실패한다(`EMULATOR_DNS=host`로 해제)(API 응답으로 얻은 주소, 변수로 조립한 이름은 보지 못한다).
+- 일부 리소스는 **외부 호스트에 접속을 시도**할 수 있다: ECS 작업 정의에 실제 레지스트리 URI를 넣으면 에뮬레이터 컨테이너가 이미지를 받으려 한다. 실습은 `.invalid` 레지스트리와 예약 이름만 쓴다(AUTHORING 규칙 11). `tools/probe/no_external_hosts.py`가 탐침 시작 때는 탐침 코드를, M00 `verify.sh`에서는 `tools`·`scripts`·`src`·`curriculum/` 전체 소스 텍스트를 정적 검사한다(API 응답으로 얻은 주소, 변수로 조립한 이름은 보지 못한다). 에뮬레이터 컨테이너는 기본으로 `--dns 127.0.0.1`로 떠 이름 해석 자체가 실패한다(`EMULATOR_DNS=host`로 해제).
 - 미구현 오퍼레이션은 `501 NotImplemented`를 반환한다.
 
 따라서 모든 실습에 아래 등급 중 하나를 붙인다. 등급은 추측이 아니라 **M00에서 만든 탐침(probe) 결과와 저자의 실제 실행**으로 정한다.
