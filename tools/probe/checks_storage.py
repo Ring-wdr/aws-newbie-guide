@@ -4,14 +4,13 @@ from __future__ import annotations
 
 import json
 import os
-import subprocess
 import tempfile
 import time
 from typing import Any
 
 from botocore.exceptions import ClientError
 
-from lib import Probe, wait_until
+from lib import Probe, host_curl, wait_until
 
 
 def _empty_bucket(s3: Any, bucket: str) -> None:
@@ -42,9 +41,9 @@ def _bucket(p: Probe, base: str, **kw: Any) -> str | None:
 
 
 def _curl(args: list[str]) -> tuple[int, str]:
-    ca = os.environ["AWS_CA_BUNDLE"]
-    r = subprocess.run(["curl", "-s", "-o", "-", "-w", "\n%{http_code}", "--cacert", ca, *args],
-                       capture_output=True, text=True, timeout=20)
+    """호스트에서 curl. 마지막 인자가 URL 이다. lib.host_curl 관문을 거친다(루프백 IP 만)."""
+    *opts, url = args
+    r = host_curl(url, "-o", "-", "-w", "\n%{http_code}", *opts)
     body, _, code = r.stdout.rpartition("\n")
     return int(code or 0), body
 

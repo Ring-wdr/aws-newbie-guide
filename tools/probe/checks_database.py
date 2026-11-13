@@ -2,15 +2,12 @@
 
 from __future__ import annotations
 
-import os
-import socket
-import subprocess
 import time
 from typing import Any
 
 from botocore.exceptions import ClientError
 
-from lib import Probe, wait_until
+from lib import Probe, container_tcp, host_tcp, wait_until
 
 
 def _vpc_subnets(p: Probe, cidr2: str) -> list[str]:
@@ -28,24 +25,6 @@ def _vpc_subnets(p: Probe, cidr2: str) -> list[str]:
         return []
 
 
-def _tcp_from_container(host: str, port: int) -> str:
-    """에뮬레이터 컨테이너 안에서 TCP 연결을 시도한다 (bash /dev/tcp 사용)."""
-    ep = os.environ.get("EMULATOR_PORT", "9297")
-    try:
-        r = subprocess.run(["docker", "exec", f"aws-emulator-{ep}", "bash", "-c",
-                            f"timeout 3 bash -c 'exec 3<>/dev/tcp/{host}/{port}' && echo OPEN || echo CLOSED"],
-                           capture_output=True, text=True, timeout=15)
-        return (r.stdout.strip() or r.stderr.strip())[:60]
-    except Exception as e:  # noqa: BLE001
-        return f"{type(e).__name__}"
-
-
-def _tcp_from_host(host: str, port: int) -> bool:
-    try:
-        socket.create_connection((host, port), timeout=2).close()
-        return True
-    except Exception:  # noqa: BLE001
-        return False
 
 
 def run_rds(p: Probe) -> None:
@@ -90,19 +69,12 @@ def run_rds(p: Probe) -> None:
     p.behavior("Endpoint 주소·포트 반환", bool(ep.get("Address")) and bool(ep.get("Port")), f"{ep.get('Address')}:{ep.get('Port')}")
     p.behavior("MultiAZ·SecondaryAvailabilityZone 표시", d.get("MultiAZ") is True,
                f"MultiAZ={d.get('MultiAZ')} AZ={d.get('AvailabilityZone')} Secondary={d.get('SecondaryAvailabilityZone')}")
-    if ep.get("Address") and ep.get("Port"):
-        host_ok = _tcp_from_host(ep["Address"], int(ep["Port"]))
-        inside = _tcp_from_container(ep["Address"], int(ep["Port"]))
+    if ep.get("Address") and ep.get("Port") and p.target_ok("Endpoint 포트에 실제 DB가 떠 있음(컨테이너 안 TCP)", ep["Address"]):
+        host_ok = host_tcp(ep["Address"], int(ep["Port"])) == "OPEN"
+        inside = container_tcp(ep["Address"], int(ep["Port"]))
         p.behavior("Endpoint 포트에 실제 DB가 떠 있음(컨테이너 안 TCP)", inside == "OPEN", f"컨테이너 안: {inside}")
         if inside == "OPEN":
-            ep_ = os.environ.get("EMULATOR_PORT", "9297")
-            cmd = (f"exec 3<>/dev/tcp/{ep['Address']}/{ep['Port']}; printf '\\x00\\x00\\x00\\x08\\x04\\xd2\\x16\\x2f' >&3; "
-                   "timeout 2 head -c 1 <&3")
-            try:
-                out = subprocess.run(["docker", "exec", f"aws-emulator-{ep_}", "bash", "-c", cmd],
-                                     capture_output=True, text=True, timeout=15).stdout
-            except Exception as e:  # noqa: BLE001
-                out = type(e).__name__
+            out = container_tcp(ep["Address"], int(ep["Port"]), send="\\x00\\x00\\x00\\x08\\x04\\xd2\\x16\\x2f", read_bytes=1)
             p.behavior("Endpoint가 PostgreSQL 프로토콜로 응답(SSLRequest → 'S'/'N')", out in ("S", "N"), f"응답 {out!r}")
         p.behavior("호스트(macOS)에서 Endpoint 포트로 TCP 연결", host_ok, "연결됨" if host_ok else "연결 불가(포트가 컨테이너 밖에 게시되지 않음)")
     rr = p.call("CreateDBInstanceReadReplica", rds.create_db_instance_read_replica, DBInstanceIdentifier=p.name("db-rr"),
@@ -386,8 +358,10 @@ def run_elasticache(p: Probe) -> None:
         p.behavior("기본(쓰기)·리더 엔드포인트 반환", bool(pe.get("Address")),
                    f"Primary={pe.get('Address')}:{pe.get('Port')} Reader={(ng.get('ReaderEndpoint') or {}).get('Address')} "
                    f"members={len(ng.get('NodeGroupMembers', []))}")
-        if pe.get("Address") and pe.get("Port"):
-            inside = _tcp_from_container(pe["Address"], int(pe["Port"]))
+        # 에뮬레이터는 ElastiCache 주소를 실제 AWS 형식 이름(master.<id>.000001.us-east-1.cache.amazonaws.com)으로
+        # 돌려준다. 그 이름으로 접속하면 바깥 DNS 에 질의가 나가므로 관문(target_ok)이 이 행을 SKIP 으로 남긴다.
+        if pe.get("Address") and pe.get("Port") and p.target_ok("엔드포인트 포트에 실제 캐시 서버가 떠 있음(컨테이너 안 TCP)", pe["Address"]):
+            inside = container_tcp(pe["Address"], int(pe["Port"]))
             p.behavior("엔드포인트 포트에 실제 캐시 서버가 떠 있음(컨테이너 안 TCP)", inside == "OPEN", f"컨테이너 안: {inside}")
         p.call("TestFailover", ec.test_failover, ReplicationGroupId=rgid, NodeGroupId=ng.get("NodeGroupId", "0001"))
     cc = p.call("CreateCacheCluster(memcached 2노드)", ec.create_cache_cluster, CacheClusterId=f"to-mc-{p.suffix}",

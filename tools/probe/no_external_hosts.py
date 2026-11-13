@@ -8,10 +8,21 @@ RFC 2606/6761 예약 이름(.invalid, .test, .example, .localhost)이나 루프�
   url    : http(s)/ws(s)/ftp:// 뒤의 호스트
   image  : image / imageUri / ImageUri / --image(-uri) / Dockerfile FROM 값의 레지스트리.
            레지스트리가 없는 이름(nginx:latest)은 Docker Hub 로 가므로 걸린다
-  host   : Endpoint / endpoint_url / Issuer / IntegrationUri / FullyQualifiedDomainName 같은
-           주소 키에 스킴 없이 들어간 호스트
+  host   : Endpoint / endpoint_url / Issuer / IntegrationUri / FullyQualifiedDomainName / ServerName /
+           DomainName / DNSName / Value 같은 주소 키에 스킴 없이 들어간 호스트
   email  : 메일 주소의 도메인 (example.com 류는 null MX 라 허용)
   known  : public.ecr.aws, docker.io, ghcr.io, quay.io, gcr.io 는 어디에 있든
+  fstr   : (Python) f-string 과 문자열 연결("a" + "b")의 리터럴 부분을 이어 붙인 결과에
+           amazonaws.com 이나 예약되지 않은 공개 도메인(.com·.net·.io·.aws 등)이 보이면
+
+예약 이름은 .invalid, .test, .example, .localhost 와 그 아래뿐이다. .internal 은 예약 목록에 없다
+(GCP 메타데이터 서버처럼 실제로 해석되는 곳이 있다).
+
+한계 — 이 검사는 소스 텍스트만 본다.
+  - 실행 중에 API 응답에서 얻은 주소(예: ElastiCache 가 돌려주는 *.cache.amazonaws.com 엔드포인트)는
+    볼 수 없다. 그런 주소로의 접속은 lib.py 의 접속 관문(루프백 IP 리터럴만 허용)이 막는다.
+  - 변수에 나눠 담은 호스트, % 서식·str.format·join 으로 만든 이름, 셸 변수 확장("$h.amazonaws.com")은 놓친다.
+  - 위 둘을 보완하려고 탐침은 컨테이너 DNS 를 막은 에뮬레이터(--no-dns)에서도 돌려 결과를 비교한다.
 
 같은 줄이나 바로 윗줄 주석에 `external-host-ok: <이유>` 가 있으면 의도된 것으로 보고 건너뛴다
 (예: 가드 자체 시험에서 "거부돼야 하는" 실제 AWS 주소, 설치 안내 링크).
@@ -26,6 +37,7 @@ Markdown 은 코드 블록(```) 안만 검사한다. 본문의 문서 링크는 
 from __future__ import annotations
 
 import argparse
+import ast
 import ipaddress
 import re
 import sys
@@ -40,7 +52,7 @@ SKIP_NAMES = {"results.json", "uv.lock"}
 SKIP_DIRS = {".git", ".venv", "__pycache__", "node_modules", ".worktrees"}
 MARKER = "external-host-ok"
 
-RESERVED_TLDS = (".invalid", ".test", ".example", ".localhost", ".internal")
+RESERVED_TLDS = (".invalid", ".test", ".example", ".localhost")
 EMAIL_OK = ("example.com", "example.net", "example.org")
 DOC_NETS = [ipaddress.ip_network(n) for n in ("127.0.0.0/8", "::1/128", "192.0.2.0/24", "198.51.100.0/24", "203.0.113.0/24")]
 KNOWN = re.compile(r"(?i)\b(public\.ecr\.aws|registry-1\.docker\.io|docker\.io|ghcr\.io|quay\.io|gcr\.io|registry\.k8s\.io)\b")
@@ -50,9 +62,16 @@ IMAGE = re.compile(
     r"(?i)(?:[\"']?\b(?:image|image_?uri)\b[\"']?\s*[:=]\s*|--image(?:-uri)?(?:\s+|=))"
     r"[\"']?([^\s\"',}\)]+)")
 DOCKER_FROM = re.compile(r"^\s*FROM\s+(?:--\S+\s+)*(\S+)")
+# 주소 키 값에서 호스트로 볼 꼬리: 예약 TLD 와 흔한 공개 TLD (t3.small 같은 값은 호스트로 보지 않는다)
+TLDS = "invalid|test|example|localhost|com|net|org|io|aws|dev|app|co|cloud|ai|me|info|biz|kr|jp|us|uk|de|cn|xyz|site|tech|internal"
 HOSTKEY = re.compile(
     r"(?i)[\"']?\b(endpoint(?:_url|-url|url)?|issuer|integration_?uri|fullyqualifieddomainname|hostname|"
-    r"--endpoint-url|--issuer|--integration-uri)\b[\"']?\s*[:= ]\s*[\"']?([A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.(?:(?-i:[a-z]{2,})|\d+))(?=[:/\"'\s,)}]|$)")
+    r"servername|domainname|dnsname|value|--server-name|--domain-name|--dns-name|"
+    r"--endpoint-url|--issuer|--integration-uri)\b[\"']?\s*[:= ]\s*[\"']?([A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.(?:(?-i:" + TLDS + r")|\d+))(?=[:/\"'\s,)}]|$)")
+# 공개 도메인으로 보이는 꼬리. f-string·문자열 연결의 리터럴 부분에서 찾는다.
+PUBLIC_SUFFIX = re.compile(
+    r"(?i)(?<![\w-])(?:[a-z0-9{}-]+\.)+(?:amazonaws\.com|on\.aws|amazon\.com|cloudfront\.net|"
+    r"(?:com|net|org|io|aws|dev|app|co|cloud|ai|me|info|biz|kr|jp|us|uk|de|cn|xyz|site|tech|internal))(?![\w-])")
 EMAIL = re.compile(r"\b[\w.+-]+@([A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+)\b")
 
 
@@ -137,7 +156,10 @@ def scan_text(path: str, text: str) -> list[Hit]:
             if reg and (reg.startswith("docker.io") or not host_ok(reg)):
                 hits.append(Hit(path, no, "image", f"{m.group(1)} → {reg}", line))
         for m in HOSTKEY.finditer(line):
-            if not host_ok(m.group(2)) and "://" not in line[m.start():m.end() + 3]:
+            v = m.group(2)
+            if re.fullmatch(r"[\d.]+", v) and v.count(".") != 3:
+                continue  # "Value": "5.0" 같은 숫자는 호스트가 아니다
+            if not host_ok(v) and "://" not in line[m.start():m.end() + 3]:
                 hits.append(Hit(path, no, "host", m.group(2), line))
         for m in EMAIL.finditer(line):
             if any(u.start() <= m.start() < u.end() for u in urls):
@@ -148,6 +170,50 @@ def scan_text(path: str, text: str) -> list[Hit]:
         for m in KNOWN.finditer(line):
             if not any(h.line == no and m.group(1).lower() in h.value.lower() for h in hits):
                 hits.append(Hit(path, no, "known", m.group(1), line))
+    return hits
+
+
+def _literal_parts(node: ast.AST) -> str | None:
+    """f-string 이나 문자열 연결이면 리터럴 부분을 '{}' 자리 표시로 이어 붙인 문자열, 아니면 None."""
+    if isinstance(node, ast.JoinedStr):
+        return "".join(v.value if isinstance(v, ast.Constant) and isinstance(v.value, str) else "{}" for v in node.values)
+    if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add):
+        parts = []
+        for side in (node.left, node.right):
+            if isinstance(side, ast.Constant) and isinstance(side.value, str):
+                parts.append(side.value)
+            else:
+                sub = _literal_parts(side)
+                if sub is None:
+                    return None if not parts else "".join(parts) + "{}"
+                parts.append(sub)
+        return "".join(parts)
+    return None
+
+
+def scan_python(path: str, text: str) -> list[Hit]:
+    """f-string·문자열 연결 안의 공개 도메인. 일반 문자열 상수(서비스 주체 등)는 보지 않는다."""
+    try:
+        tree = ast.parse(text)
+    except SyntaxError:
+        return []
+    lines = text.splitlines()
+    hits: list[Hit] = []
+    seen: set[int] = set()
+    for node in ast.walk(tree):
+        joined = _literal_parts(node)
+        if joined is None or id(node) in seen:
+            continue
+        for child in ast.walk(node):
+            seen.add(id(child))  # 바깥 연결식만 한 번 본다
+        no = getattr(node, "lineno", 0)
+        line = lines[no - 1] if 0 < no <= len(lines) else ""
+        if MARKER in line or (no > 1 and MARKER in lines[no - 2] and lines[no - 2].lstrip().startswith("#")):
+            continue
+        for m in list(PUBLIC_SUFFIX.finditer(joined)) + list(KNOWN.finditer(joined)):
+            host = m.group(0)
+            if not host_ok(host.replace("{}", "x")):
+                hits.append(Hit(path, no, "fstr", host, line))
     return hits
 
 
@@ -174,7 +240,11 @@ def scan(paths: list[str]) -> list[Hit]:
             text = f.read_text(encoding="utf-8")
         except (UnicodeDecodeError, OSError):
             continue
-        hits.extend(scan_text(str(f.relative_to(ROOT)), text))
+        rel = str(f.relative_to(ROOT))
+        hits.extend(scan_text(rel, text))
+        if f.suffix == ".py":
+            have = {(h.line, h.kind) for h in hits}
+            hits.extend(h for h in scan_python(rel, text) if (h.line, "url") not in have)
     return hits
 
 
@@ -191,6 +261,23 @@ BAD_SAMPLES = [
     'aws s3 ls --endpoint-url s3.amazonaws.com',
     'endpoint_url="https://127.0.0.1:9297@s3.amazonaws.com"',
     'Endpoint="ops@todayorder.com"',
+    'ServerName="db.todayorder.com"',
+    '"Value": "metadata.google.internal"',
+]
+# Python 전용(f-string·문자열 연결)
+BAD_PY_SAMPLES = [
+    'x = f"{bucket}.s3.us-east-1.amazonaws.com"',
+    'x = "s3." + "amazonaws.com"',
+    'x = "public.ecr" + ".aws/nginx/nginx:latest"',
+    'x = f"https://{svc}.amazonaws.com/path"',
+    'x = f"todayorder-{s}.com"',
+]
+GOOD_PY_SAMPLES = [
+    'x = f"{bucket}.s3.todayorder.invalid"',
+    'x = f"http://{dns}/index.html"',
+    'x = "lambda.amazonaws.com"',
+    'x = f"arn:aws:s3:::{b}/*"',
+    'x = f"{name}.json"',
 ]
 GOOD_SAMPLES = [
     '{"image": "registry.invalid/todayorder/nginx:latest"}',
@@ -204,6 +291,9 @@ GOOD_SAMPLES = [
 
 def selftest() -> list[str]:
     errs = [f"걸러야 하는데 통과: {s}" for s in BAD_SAMPLES if not scan_text("selftest.py", s)]
+    errs += [f"걸러야 하는데 통과: {s}" for s in BAD_PY_SAMPLES if not scan_python("selftest.py", s)]
+    errs += [f"통과해야 하는데 걸림: {s} → {scan_python('selftest.py', s)[0].value}"
+             for s in GOOD_PY_SAMPLES if scan_python("selftest.py", s)]
     errs += [f"통과해야 하는데 걸림: {s} → {scan_text('selftest.py', s)[0].value}"
              for s in GOOD_SAMPLES if scan_text("selftest.py", s)]
     return errs

@@ -13,6 +13,12 @@ docs/FIDELITY.md 를 다시 만든다. 시작할 때 no_external_hosts.py 로 �
     uv run python tools/probe/probe.py --list           # 서비스 목록
     uv run python tools/probe/probe.py --report-only    # results.json 으로 보고서만 재생성
     uv run python tools/probe/probe.py --dry            # 결과를 저장하지 않음 (탐침 코드 수정 중·병렬 실행)
+    EMULATOR_DNS=127.0.0.1 scripts/emulator-reset.sh    # 컨테이너 DNS 격리 후
+    uv run python tools/probe/probe.py --no-dns         # 격리된 에뮬레이터에서만 실행 (바깥 DNS 질의 0 보장)
+
+바깥 접속을 막는 장치는 세 겹이다: (1) 시작 시 no_external_hosts.py 정적 검사, (2) 탐침이 여는 모든 연결은
+lib.py 의 관문(container_curl·container_tcp·host_curl·host_https·host_tcp)을 거쳐 루프백 IP 에만 접속,
+(3) --no-dns 로 컨테이너의 이름 해석 자체를 막은 실행과 결과를 비교.
 
 같은 에뮬레이터에서 다시 실행해도 되지만, 계정에 한 번만 되는 호출(GenerateCredentialReport,
 EnableMacie, EnableSecurityHub)은 두 번째부터 409로 기록된다. 저장용 실행은 깨끗한 에뮬레이터에서.
@@ -71,6 +77,16 @@ def emulator_version(port: str) -> dict[str, str]:
     return info
 
 
+def container_dns(port: str) -> list[str] | None:
+    """에뮬레이터 컨테이너에 지정된 DNS 서버(docker run --dns). 지정이 없으면 [] (Docker 기본 리졸버)."""
+    try:
+        out = subprocess.run(["docker", "container", "inspect", "-f", "{{json .HostConfig.Dns}}", f"aws-emulator-{port}"],
+                             capture_output=True, text=True, timeout=20, check=True).stdout.strip()
+        return json.loads(out) or []
+    except Exception:  # noqa: BLE001
+        return None
+
+
 def aws_cli_version() -> str:
     try:
         return subprocess.run(["aws", "--version"], capture_output=True, text=True, timeout=20).stdout.strip()
@@ -86,6 +102,9 @@ def main() -> int:
     ap.add_argument("--quiet", "-q", action="store_true")
     ap.add_argument("--dry", action="store_true",
                     help="results.json·FIDELITY.md 를 쓰지 않는다 (탐침 코드를 고치는 중에, 또는 병렬 실행 시)")
+    ap.add_argument("--no-dns", action="store_true",
+                    help="컨테이너 DNS 가 격리된(EMULATOR_DNS 로 띄운) 에뮬레이터에서만 실행한다. "
+                         "격리: EMULATOR_DNS=127.0.0.1 scripts/emulator-reset.sh")
     ap.add_argument("--results", default="",
                     help="결과를 이 경로에 저장하고 FIDELITY.md 는 만들지 않는다 (재현성 비교용 두 번째 실행)")
     args = ap.parse_args()
@@ -104,6 +123,10 @@ def main() -> int:
     no_external_hosts.check_or_exit()
     endpoint = assert_emulator()
     port = os.environ.get("EMULATOR_PORT", endpoint.rsplit(":", 1)[-1])
+    dns = container_dns(port)
+    if args.no_dns and not dns:
+        raise SystemExit(f"--no-dns: aws-emulator-{port} 는 Docker 기본 리졸버를 쓴다(DNS={dns}). "
+                         f"EMULATOR_DNS=127.0.0.1 EMULATOR_PORT={port} scripts/emulator-reset.sh 로 다시 띄우세요.")
 
     selected = [s.strip() for s in args.service.split(",") if s.strip()] or list(checks)
     unknown = [s for s in selected if s not in checks]
@@ -121,6 +144,7 @@ def main() -> int:
         return 0
     data: dict[str, Any] = {"meta": {}, "results": []}
     if args.results:
+        data["meta"] = {"container_dns": dns}
         data["results"] = new
         Path(args.results).write_text(json.dumps(data, ensure_ascii=False, indent=1) + "\n")
         print(f"\n결과 {len(new)}건 저장: {args.results} (보고서는 만들지 않음)")
@@ -138,6 +162,7 @@ def main() -> int:
         "boto3": boto3.__version__,
         "python": sys.version.split()[0],
         "partial_run": selected if len(selected) != len(checks) else [],
+        "container_dns": dns,
     }
     RESULTS.write_text(json.dumps(data, ensure_ascii=False, indent=1) + "\n")
     report.generate(data)

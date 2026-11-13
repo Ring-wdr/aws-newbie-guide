@@ -3,12 +3,10 @@
 from __future__ import annotations
 
 import base64
-import os
-import subprocess
 import time
 from typing import Any
 
-from lib import Probe, wait_until
+from lib import ExternalTarget, Probe, container_curl, host_tcp, wait_until
 
 
 def _find_ami(p: Probe) -> str | None:
@@ -303,27 +301,19 @@ def run_elbv2(p: Probe) -> None:
             elb.create_rule(ListenerArn=la, Priority=30, Conditions=[{"Field": "path-pattern", "Values": ["/hello"]}],
                             Actions=[{"Type": "fixed-response", "FixedResponseConfig": {
                                 "StatusCode": "200", "ContentType": "text/plain", "MessageBody": "hello-from-alb"}}])
-            port = os.environ.get("EMULATOR_PORT", "9297")
-            try:
-                out = subprocess.run(["docker", "exec", f"aws-emulator-{port}", "curl", "-s", "-m", "3",
-                                      "-w", " HTTP%{http_code}", f"http://{dns}/hello"],
-                                     capture_output=True, text=True, timeout=15).stdout
-                p.behavior("ALB 리스너가 실제로 HTTP를 처리(컨테이너 안에서 fixed-response 규칙 확인)",
-                           "hello-from-alb" in out, f"DNSName={dns} → {out.strip()[:80]}")
-                out2 = subprocess.run(["docker", "exec", f"aws-emulator-{port}", "curl", "-s", "-m", "3",
-                                       "-w", " HTTP%{http_code}", f"http://{dns}/api/x"],
-                                      capture_output=True, text=True, timeout=15).stdout
-                p.behavior("ALB forward 규칙 → 대상 인스턴스(실체 없음)로 전달 시 응답", True, f"/api/x → {out2.strip()[-40:] or '응답 없음'}")
-            except Exception as e:  # noqa: BLE001
-                p.behavior("ALB 리스너가 실제로 HTTP를 처리(컨테이너 안에서 fixed-response 규칙 확인)", False, f"{type(e).__name__}: {e}")
-            host, _, hport = dns.partition(":")
-            import socket
-            try:
-                socket.create_connection((host, int(hport or 80)), timeout=2).close()
-                p.behavior("호스트(macOS)에서 ALB DNSName으로 직접 연결", True, dns)
-            except Exception as e:  # noqa: BLE001
-                p.behavior("호스트(macOS)에서 ALB DNSName으로 직접 연결", False,
-                           f"{type(e).__name__} — 리스너 포트가 컨테이너 밖으로 게시되지 않음")
+            if p.target_ok("ALB 리스너가 실제로 HTTP를 처리(컨테이너 안에서 fixed-response 규칙 확인)", dns):
+                try:
+                    out = container_curl(f"http://{dns}/hello", "-w", " HTTP%{http_code}", timeout=3).stdout
+                    p.behavior("ALB 리스너가 실제로 HTTP를 처리(컨테이너 안에서 fixed-response 규칙 확인)",
+                               "hello-from-alb" in out, f"DNSName={dns} → {out.strip()[:80]}")
+                    out2 = container_curl(f"http://{dns}/api/x", "-w", " HTTP%{http_code}", timeout=3).stdout
+                    p.behavior("ALB forward 규칙 → 대상 인스턴스(실체 없음)로 전달 시 응답", True, f"/api/x → {out2.strip()[-40:] or '응답 없음'}")
+                except Exception as e:  # noqa: BLE001
+                    p.behavior("ALB 리스너가 실제로 HTTP를 처리(컨테이너 안에서 fixed-response 규칙 확인)", False, f"{type(e).__name__}: {e}")
+                host, _, hport = dns.partition(":")
+                r = host_tcp(host, int(hport or 80))
+                p.behavior("호스트(macOS)에서 ALB DNSName으로 직접 연결", r == "OPEN",
+                           dns if r == "OPEN" else f"{r} — 리스너 포트가 컨테이너 밖으로 게시되지 않음")
 
 def run_autoscaling(p: Probe) -> None:
     asg, ec2 = p.client("autoscaling"), p.client("ec2")
@@ -496,17 +486,18 @@ def run_compute_gaps(p: Probe) -> None:
            Conditions=[{"Field": "host-header", "HostHeaderConfig": {"Values": ["api.todayorder.example"]}}],
            Actions=[{"Type": "fixed-response", "FixedResponseConfig": {"StatusCode": "200", "ContentType": "text/plain",
                                                                        "MessageBody": "host"}}])
-    port = os.environ.get("EMULATOR_PORT", "9297")
     dns = lb.get("DNSName", "")
     try:
-        out = subprocess.run(["docker", "exec", f"aws-emulator-{port}", "curl", "-s", "-m", "5",
-                              "-H", "Host: api.todayorder.example", f"http://{dns}/"],
-                             capture_output=True, text=True, timeout=20)
+        if not p.target_ok("ALB host-header 조건 규칙이 매칭됨(컨테이너 안 요청)", dns):
+            raise ExternalTarget(dns)
+        out = container_curl(f"http://{dns}/", "-H", "Host: api.todayorder.example")
         body = out.stdout.strip()
         if out.returncode != 0 and not body:
             p.skip("ALB host-header 규칙 매칭", f"docker exec curl 실패: {out.stderr.strip()[:80]}")
         else:
             p.behavior("ALB host-header 조건 규칙이 매칭됨(컨테이너 안 요청)", body == "host", f"응답 본문 '{body[:40]}'")
+    except ExternalTarget:
+        pass  # target_ok 가 이미 SKIP 을 남겼다
     except Exception as e:  # noqa: BLE001
         p.skip("ALB host-header 규칙 매칭", f"docker 사용 불가: {type(e).__name__}")
 

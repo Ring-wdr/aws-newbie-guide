@@ -111,6 +111,9 @@ def generate(data: dict[str, Any]) -> None:
     L.append(f"| 에뮬레이터 커밋 | `{emu.get('commit', '?')}` |")
     L.append(f"| 탐침 실행 시각 | {meta.get('generated_at', '?')} |")
     L.append(f"| 클라이언트 | `{meta.get('aws_cli', '?')}` · boto3 {meta.get('boto3', '?')} · Python {meta.get('python', '?')} |")
+    dns = meta.get("container_dns")
+    dns_txt = ("Docker 기본 리졸버" if dns == [] else f"`{', '.join(dns)}` (격리 — `EMULATOR_DNS`)" if dns else "?")
+    L.append(f"| 컨테이너 DNS | {dns_txt} · 바깥 접속 확인 방법은 아래 \"환경 메모 → 외부 접속 위험\" |")
     if meta.get("partial_run"):
         L.append(f"| 마지막 부분 실행 | {', '.join(meta['partial_run'])} |")
     L.append("")

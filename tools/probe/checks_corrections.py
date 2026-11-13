@@ -19,7 +19,7 @@ from typing import Any
 from botocore.exceptions import ClientError
 
 from checks_serverless import _https, _role, _zip
-from lib import Probe, wait_until
+from lib import Probe, container_curl, wait_until
 
 PORT = os.environ.get("EMULATOR_PORT", "")
 CONTAINER = f"aws-emulator-{PORT}"
@@ -37,9 +37,8 @@ def _docker_ok() -> bool:
 
 
 def _in_container_curl(url: str, *args: str) -> str:
-    r = subprocess.run(["docker", "exec", CONTAINER, "curl", "-s", "-o", "/dev/null", "-w", "%{http_code}", "-m", "5", *args, url],
-                       capture_output=True, text=True, timeout=20)
-    return r.stdout.strip()
+    """컨테이너 안 curl 의 HTTP 상태 코드. lib.container_curl 관문을 거친다."""
+    return container_curl(url, "-o", "/dev/null", "-w", "%{http_code}", *args).stdout.strip()
 
 
 def _mem_mib() -> float | None:
@@ -717,16 +716,16 @@ def run_edge_better(p: Probe) -> None:
     p.cleanup("acl", lambda: waf.delete_web_acl(Name=acl["Name"], Scope="REGIONAL", Id=acl["Id"],
                                                 LockToken=waf.get_web_acl(Name=acl["Name"], Scope="REGIONAL", Id=acl["Id"])["LockToken"]))
     waf.associate_web_acl(WebACLArn=acl["ARN"], ResourceArn=lb_arn)
-    if _docker_ok():
+    if _docker_ok() and p.target_ok("ALB 에 연결한 WAF Web ACL 이 차단 목록 IP 요청을 실제로 403 으로 막음(컨테이너 안에서 확인)", dns):
         normal = _in_container_curl(f"http://{dns}/")
         bad = _in_container_curl(f"http://{dns}/", "-H", "X-Forwarded-For: 203.0.113.5")
         p.behavior("ALB 에 연결한 WAF Web ACL 이 차단 목록 IP 요청을 실제로 403 으로 막음(컨테이너 안에서 확인)",
                    normal == "200" and bad == "403", f"정상 {normal}, 차단 목록 IP {bad}")
-    else:
+    elif not _docker_ok():
         p.skip("WAF 차단 관찰", "docker exec 불가")
 
     # Route 53
-    zone = r53.create_hosted_zone(Name=f"edge{p.suffix}.example.com", CallerReference=uuid.uuid4().hex)["HostedZone"]["Id"]
+    zone = r53.create_hosted_zone(Name=f"edge{p.suffix}.todayorder.example", CallerReference=uuid.uuid4().hex)["HostedZone"]["Id"]
 
     def _del_zone() -> None:
         for rr in r53.list_resource_record_sets(HostedZoneId=zone)["ResourceRecordSets"]:
@@ -735,7 +734,7 @@ def run_edge_better(p: Probe) -> None:
         r53.delete_hosted_zone(Id=zone)
 
     p.cleanup("zone", _del_zone)
-    name = f"api.edge{p.suffix}.example.com"
+    name = f"api.edge{p.suffix}.todayorder.example"
 
     def rr(region: str, ip: str) -> dict:
         return {"Action": "CREATE", "ResourceRecordSet": {"Name": name, "Type": "A", "SetIdentifier": region, "Region": region,
@@ -749,7 +748,7 @@ def run_edge_better(p: Probe) -> None:
 
     us, kr = answer("3.80.0.1"), answer("3.34.0.1")
     p.behavior("지연 시간 레코드: 질의자 위치(리졸버 IP)에 따라 다른 답", us != kr, f"미국 리졸버 {us}, 서울 리졸버 {kr}")
-    mix = f"mix.edge{p.suffix}.example.com"
+    mix = f"mix.edge{p.suffix}.todayorder.example"
     r53.change_resource_record_sets(HostedZoneId=zone, ChangeBatch={"Changes": [{"Action": "CREATE", "ResourceRecordSet": {
         "Name": mix, "Type": "A", "SetIdentifier": "w1", "Weight": 10, "TTL": 60, "ResourceRecords": [{"Value": "192.0.2.30"}]}}]})
     p.expect_error("ChangeResourceRecordSets(같은 이름에 가중치+지연 시간)", r53.change_resource_record_sets, "InvalidChangeBatch",
@@ -816,6 +815,8 @@ def run_integration_better(p: Probe) -> None:
                                          PayloadFormatVersion="2.0")["IntegrationId"]
         apig2.create_route(ApiId=api_id, RouteKey="GET /me", Target=f"integrations/{integ}", AuthorizationType="JWT", AuthorizerId=authz)
         apig2.create_stage(ApiId=api_id, StageName="$default", AutoDeploy=True)
+        if not p.target_ok("HTTP API JWT 권한 부여자: 토큰 없으면 401, 유효한 IdToken 이면 200", api["ApiEndpoint"]):
+            return
         c0, _ = _https(api["ApiEndpoint"] + "/me")
         c1, _ = _https(api["ApiEndpoint"] + "/me", headers={"Authorization": tok})
         p.behavior("HTTP API JWT 권한 부여자: 토큰 없으면 401, 유효한 IdToken 이면 200", c0 == 401 and c1 == 200,
