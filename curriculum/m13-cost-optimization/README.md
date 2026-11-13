@@ -45,7 +45,7 @@ export EMULATOR_PORT=9297          # 대화형 터미널이면 생략 가능
 curriculum/m13-cost-optimization/labs/verify.sh
 ```
 
-`verify.sh`는 에뮬레이터를 재시작해 깨끗한 상태로 만든 뒤, sdk 예제의 안전 장치(env.sh 없이 실행하면 네트워크 호출 전에 거부)를 확인하고, 모든 lab을 **두 번씩** 실행하고 sdk 예제를 실행한다. 마지막 줄이 `MODULE m13 OK`면 통과. 각 lab은 레슨 워크시트의 정답 숫자를 단언하므로, 계산기나 예시 단가를 바꾸면 lab이 실패한다.
+`verify.sh`는 에뮬레이터를 재시작해 깨끗한 상태로 만든 뒤, sdk 예제의 안전 장치(env.sh 없이 실행하면 네트워크 호출 전에 거부)를 확인하고, 모든 lab을 **두 번**(1회차는 번호 순, 2회차는 역순) 실행하고 sdk 예제를 실행한다. 마지막 줄이 `MODULE m13 OK`면 통과. 각 lab은 레슨 워크시트의 정답 숫자를 단언하므로, 계산기나 예시 단가를 바꾸면 lab이 실패한다.
 
 정리 자료: [cheatsheet.md](./cheatsheet.md) · [quiz.md](./quiz.md)
 
