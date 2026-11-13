@@ -21,7 +21,9 @@
 | 4 | 교차 모듈 편집자 | `editor/cross-module-review-followups`, `editor/stale-fact-corrections`, `editor/final-consistency-cleanup`, `editor/verify-reverse-order-pass`, `editor/cli-wait-polling-all-modules` | `curriculum/` 모듈 간 불일치와 검증에서 미뤄 둔 제안, 실습 공용 도우미 `scripts/lab-wait.sh` | 9316 (+9317) |
 | 수시 | 환경 구축 엔지니어 (후속) | `setup/guard-hardening-and-shared-tooling`, `setup/fidelity-report-corrections`, `setup/dns-isolation-default-and-host-scan`, `setup/environment-verification-followups`, `setup/guard-refusal-followups`, `setup/guard-disconnect-hardening` | 가드·공용 스크립트 보강, 탐침과 `docs/FIDELITY.md` 정정 | 9297 (+9298) |
 | 수시 | 모듈 저자 (후속) | `author/<모듈>-review-followup` (예: `author/m04-storage-review-followup`, `author/m05-verify-runtime-followup`) | 병합 뒤 발견된 자기 모듈의 결함 수정 | 원래 배정 포트 |
-| 각 PR | PR 검증자 | (브랜치 없음 — 해당 PR 브랜치를 체크아웃해 검증) | [AUTHORING.md 6장](./AUTHORING.md) 체크리스트 | 9320~ |
+| 5 | 가이드 사이트 환경 구축 | `setup/guide-site-toolchain` (이후 `setup/guide-*`) | `site/` 공용부, `tools/sitecheck/`, `scripts/guide-up.sh` — [GUIDE-SITE.md](./GUIDE-SITE.md) | 에뮬레이터 9297, 개발 서버 4321 |
+| 5 | UI 저자 | `ui/m06-pilot-integration-messaging`, 이후 `ui/<모듈 범위>-pages`(예: `ui/m00-m03-pages`, `ui/m14-capstone-mock-exam`), `ui/widgets-<모듈·주제>` | 브랜치명에 적힌 모듈 범위의 `site/src/widgets/mNN/`과 그 모듈 원고의 위젯 표시 줄 | 개발 서버 4331~ (에이전트마다 하나) |
+| 각 PR | PR 검증자 | (브랜치 없음 — 해당 PR 브랜치를 체크아웃해 검증) | [AUTHORING.md 6장](./AUTHORING.md) 체크리스트, 사이트 PR은 [GUIDE-SITE.md 5장](./GUIDE-SITE.md)도 | 에뮬레이터 9320~, 개발 서버·브라우저 검사 4390~ |
 
 ## 진행 순서
 
@@ -56,5 +58,5 @@ flowchart LR
 - **검증자도 틀린다.** 검증자의 제안이 낡은 수치였던 경우가 있었다. 사실 관계가 엇갈리면 1차 자료(AWS 문서·발표)를 인용해 판정한다.
 - **"외부에 닿지 않는다"는 주장도 검증 대상이다.** 첫 탐침은 ECS 검사에 실제 공개 레지스트리 이미지를 써서, 실행할 때마다 에뮬레이터가 익명 이미지 풀을 시도했다. 여러 차례의 검증을 거친 뒤에야 발견됐다. 지금은 정적 검사(`tools/probe/no_external_hosts.py`)가 M00 `verify.sh`에서 `tools`·`scripts`·`src`와 `curriculum/` 전체(M00~M14)를 막고(탐침 시작 때는 `tools/probe`만 검사한다), 에뮬레이터 컨테이너는 기본으로 이름 해석이 막힌 채(`--dns 127.0.0.1`, 해제는 `EMULATOR_DNS=host`) 뜬다.
 - **실제 AWS에 맞는 도구가 에뮬레이터에서는 느릴 수 있다.** AWS CLI의 `wait`는 RDS·DocumentDB를 30초, ElastiCache를 15초 간격으로 확인한다. 에뮬레이터는 1초 안에 상태를 바꾸지만, 생성 직후 첫 확인이 `creating`을 보면 한 간격을 통째로 기다린다. M05 `verify.sh`가 같은 조건에서 8분에서 13분까지 흔들린 원인이었고, M08은 12분 중 10분이 `wait`였다(교체 뒤 3분). 전체 회귀에서 한 번 나온 M05의 30분은 재현하지 못했다 — 수정 전 코드를 다시 돌린 실행은 525초였고 `wait` 68번 중 5번만 한 간격을 기다렸으므로, 같은 원인이라는 추정은 뒷받침되지 않은 채 남아 있다. 레슨의 명령은 `wait`를 그대로 가르치고, 실습 스크립트는 `scripts/lab-wait.sh`로 1초 간격 폴링한다. 이미 빠른 Lambda, ELB `load-balancer-available`, DynamoDB `table-exists`, S3 `bucket-exists`(M00)는 CLI `wait`로 남겼다.
-- **엔드포인트 설정을 무시하는 SDK 기능이 있다.** S3 다중 리전 액세스 포인트 ARN, Kinesis `StreamId`, sign-in 제어 작업은 `AWS_ENDPOINT_URL`과 상관없이 AWS 호스트 이름을 직접 만든다. "이 셸의 요청은 밖으로 나가지 않는다"는 문장은 검증자가 로컬 botocore 엔드포인트 규칙을 전수 대조한 뒤에야 거짓으로 드러났다. 지금은 첫째를 스위치로 끄고, 나머지는 TLS 검증(에뮬레이터 CA만 신뢰)으로 끊는다. 안전 장치의 문구는 보장되는 것만 약속하게 쓴다.
+- **엔드포인트 설정을 무시하는 SDK 기능이 있다.** S3 다중 리전 액세스 포인트 ARN, Kinesis `StreamId`, sign-in 제어 작업은 `AWS_ENDPOINT_URL`과 상관없이 AWS 호스트 이름을 직접 만든다. 요청이 이 컴퓨터 밖으로 나가지 않는다는 취지의 안내 문구는 검증자가 이 기능들로 반례를 보인 뒤에야 거짓으로 드러났다(이후 로컬 botocore 엔드포인트 규칙을 매개변수 하나씩 바꿔 가며 훑어 위 세 가지를 확인했다. 여러 매개변수의 조합은 보지 않았다). 지금은 첫째를 스위치로 끄고, 나머지는 TLS 검증으로 끊는다(연결된 셸은 에뮬레이터 CA만 신뢰하고, 분리된 셸은 인증서 묶음이 아예 없다). 안전 장치의 문구는 보장되는 것만 약속하게 쓴다.
 - **병합 뒤에도 깨질 수 있다.** 부하가 달라지면 타이밍 경합이 드러난다. 공용 파일을 바꾸는 PR은 이미 병합된 모듈의 `verify.sh`를 회귀로 돌린다.

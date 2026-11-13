@@ -22,7 +22,7 @@ macOS + [Homebrew](https://brew.sh) 기준 (Linux·WSL은 [M00 레슨 3](./curri
 <!-- external-host-ok: 저장소를 받는 설치 안내 -->
 ```bash
 git clone https://github.com/Ring-wdr/aws-newbie-guide.git && cd aws-newbie-guide
-scripts/install.sh            # Colima·docker·AWS CLI·uv 확인/설치, 에뮬레이터 이미지 빌드, boto3 설치
+scripts/install.sh            # Colima·docker·AWS CLI·uv·jq·python3 확인/설치, 에뮬레이터 이미지 빌드, boto3 설치
 scripts/emulator-up.sh        # 에뮬레이터 시작 (https://127.0.0.1:9297, 컨테이너의 외부 이름 해석은 기본으로 차단)
 source scripts/env.sh         # 이 셸을 에뮬레이터에 연결 (에뮬레이터가 아니면 연결을 거부하고 이 셸을 AWS에서 분리하는 안전 장치 포함)
 aws sts get-caller-identity   # "Account": "000000000000" 이면 준비 완료
@@ -75,6 +75,7 @@ aws-emulator는 생각보다 많은 것을 실제처럼 해낸다 — Lambda 코
 - [커리큘럼 총 설계서](./docs/CURRICULUM.md) — 모듈·레슨·실습 전체 설계
 - [작성 규칙](./docs/AUTHORING.md) — 레슨·실습 형식과 검증 기준
 - [에이전트 역할과 브랜치](./docs/AGENTS.md) — 누가 무엇을 어느 브랜치에서 만드는가
+- [가이드 사이트 설계](./docs/GUIDE-SITE.md) — Markdown 원고를 인터랙티브 사이트로 보여 주는 작업의 설계(진행 중)
 
 ## 라이선스 / 고지
 
