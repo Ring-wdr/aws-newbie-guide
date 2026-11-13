@@ -123,8 +123,10 @@ _emu_env_main() {
   return 0
 }
 
-_emu_env_main
-_emu_env_rc=$?
+# '|| rc=$?' 로 부른다: macOS 기본 bash 3.2 는 if 조건 안의 함수에서 source 될 때 set -e 무시 상태를 잃어,
+# 실패 안내 뒤 호출한 셸 전체를 끝내 버린다(M00 verify.sh 가 FAIL 줄 없이 멈춘 원인).
+_emu_env_rc=0
+_emu_env_main || _emu_env_rc=$?
 unset -f _emu_env_main _emu_env_fail
 unset _emu_env_dir
 if [ "$_emu_env_rc" -ne 0 ]; then

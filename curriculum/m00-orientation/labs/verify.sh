@@ -5,11 +5,27 @@
 #   export EMULATOR_PORT=9297     # 학습자는 생략 가능(대화형 터미널이면 9297)
 #   curriculum/m00-orientation/labs/verify.sh
 #   DR_EMULATOR_PORT=9298 curriculum/m00-orientation/labs/verify.sh   # 두 번째 에뮬레이터(미리 up)로 두 사이트 시험까지
+#     (지정했는데 그 포트에 에뮬레이터가 없으면 아무것도 리셋하지 않고 원인·해결 방법을 출력하며 멈춘다)
 set -euo pipefail
 ROOT="$(git rev-parse --show-toplevel)"
 MOD_DIR="$ROOT/curriculum/m00-orientation"
 LOG_DIR="$(mktemp -d)"
 trap 'rm -rf "$LOG_DIR"' EXIT
+
+# 0) DR_EMULATOR_PORT 를 지정했다면 두 사이트 시험을 요청한 것이다. M12 verify.sh 처럼 두 번째 사이트를
+#    빠뜨리고 넘어가지 않고, 아무것도 리셋하기 전에 원인과 해결 방법을 알리고 멈춘다.
+#    (M12 와 달리 이 스크립트는 두 번째 에뮬레이터를 직접 띄우거나 지우지 않는다 — 미리 띄워 둔 것을 쓴다)
+if [ -n "${DR_EMULATOR_PORT:-}" ]; then
+  # shellcheck source=scripts/_common.sh
+  . "$ROOT/scripts/_common.sh"
+  validate_port "$DR_EMULATOR_PORT"
+  if [ "$DR_EMULATOR_PORT" = "${EMULATOR_PORT:-9297}" ]; then
+    die "DR_EMULATOR_PORT 가 EMULATOR_PORT 와 같습니다($DR_EMULATOR_PORT). 서로 다른 에뮬레이터여야 합니다."
+  fi
+  if [ "$(container_state "$DR_EMULATOR_PORT")" != "running" ] || ! health_ok "$DR_EMULATOR_PORT"; then
+    die "DR_EMULATOR_PORT=$DR_EMULATOR_PORT 에 에뮬레이터가 떠 있지 않아 두 사이트 시험을 할 수 없습니다. 먼저 'scripts/emulator-up.sh $DR_EMULATOR_PORT' 로 띄우거나, 두 사이트 시험 없이 돌리려면 'unset DR_EMULATOR_PORT' 후 다시 실행하세요."
+  fi
+fi
 
 # 1) 깨끗한 에뮬레이터 (EMULATOR_PORT 가 없으면 비대화형 셸에서는 거부된다)
 "$ROOT/scripts/emulator-reset.sh"
@@ -85,13 +101,14 @@ drenv_bad_port_clears() {
 }
 
 # 두 번째 사이트(dr-env.sh + emulator_site("DR_")) 실시간 시험은 DR_EMULATOR_PORT 에 에뮬레이터가 떠 있을 때만.
-guard_selftest() {
+# 하위 셸에서 실행해, dr-env.sh 가 실패해도(bash 3.2 의 set -e 처리 포함) verify.sh 전체가 아니라 이 항목만 FAIL 이 되게 한다.
+guard_selftest() (
   if [ -n "${DR_EMULATOR_PORT:-}" ]; then
     # shellcheck source=scripts/dr-env.sh
-    source "$ROOT/scripts/dr-env.sh" || return 1
+    source "$ROOT/scripts/dr-env.sh" || exit 1
   fi
   uv run --quiet python -m emulator_guard.selftest --live
-}
+)
 
 # 탐침·스크립트·가드·커리큘럼(M00~M14) 코드가 바깥 호스트(이미지 레지스트리·URL·구독 엔드포인트)를 가리키지 않는지 정적으로 검사
 no_external_hosts() {
