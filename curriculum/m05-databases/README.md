@@ -73,7 +73,7 @@ curriculum/m05-databases/labs/verify.sh
 | DynamoDB PITR | `LatestRestorableDateTime`이 PITR을 켠 시각에 멈춰 있고, `--use-latest-restorable-time` 복원 결과는 "복원 요청 시점의 현재 데이터". 구간 밖 시각은 `InvalidRestoreTimeException`으로 거부(AWS와 같음) | lab08 |
 | DynamoDB 글로벌 테이블 | 복제본 추가·`ACTIVE`까지 보이지만 리전을 분리하지 않아 `--region us-west-2`로도 같은 테이블이 보임. 리전 간 복제·충돌 해결은 관찰 불가 | lab08 |
 | `elasticache:DeleteReplicationGroup` | `501 NotImplemented` → 복제 그룹이 남는다. lab09는 재실행 시 재사용, 에뮬레이터 재시작으로 사라짐 | lab09 |
-| ElastiCache 엔드포인트 | 이름은 실제와 같은 형식이지만 실제 캐시 서버가 없음(접속 불가) | lab09 |
+| ElastiCache 엔드포인트 | 실제 AWS 형식 이름(`*.cache.amazonaws.com`)이라 어디서도 해석되지 않는다(접속 불가). 접속을 시도하면 그 이름이 바깥 DNS에 질의되므로 시도하지 않는다(FIDELITY 환경 메모) | lab09는 주소를 읽기만 한다 |
 | `dax:CreateSubnetGroup` | 기본 VPC·사용자 VPC 어떤 서브넷을 줘도 `InvalidParameterValueException` → 서브넷 그룹 없이 클러스터 생성 | lab09 |
 | `timestream-write` CLI | `AmbiguousService`(내부 서비스 이름 충돌)로 호출 불가 | 레슨 7 (설명만) |
 | DocumentDB·Neptune·Keyspaces | 구성·상태만. 데이터 질의 불가 | lab10 |
