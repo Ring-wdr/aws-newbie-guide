@@ -54,7 +54,7 @@ export EMULATOR_PORT=9297          # 대화형 터미널이면 생략 가능
 curriculum/m14-capstone-exam/labs/verify.sh
 ```
 
-`verify.sh`는 에뮬레이터를 재시작해 깨끗한 상태로 만든 뒤 ① sdk 예제의 안전 장치(env.sh 없이 실행하면 네트워크 호출 전에 거부) ② 모의고사 형식 점검(65문항, 도메인 20/17/15/13, 정답표·문제·해설 일치, 단일 응답 정답 글자 30% 이하, 정답이 가장 긴 보기인 문항 30% 이하)과 채점기 자가 시험(만점·부분 점수·빈 답안지·이상한 답안 줄 경고) ③ lab07 두 번 ④ 캡스톤 1회차: lab01~05를 **두 번 연속**(두 번째는 이미 있는 환경에서 멱등) + 감사 → lab06 ⑤ 2회차: 정리된 에뮬레이터에서 **lab05 하나로 전체 구축** + 감사 → lab06 → 빈 상태에서 lab06 한 번 더를 실행한다. 마지막 줄이 `MODULE m14 OK`면 통과. 10~14분 걸린다(1회차의 두 번째 lab05는 첫 번째 실행의 실패 데이터 포인트가 알람 평가 창에서 빠질 때까지 최대 3분 기다린다 — 아래 ★ 알람 줄). 끝나면 에뮬레이터 메모리는 약 500 MiB(Lambda 호출 누적, M00 제약 참고).
+`verify.sh`는 에뮬레이터를 재시작해 깨끗한 상태로 만든 뒤 ① sdk 예제의 안전 장치(env.sh 없이 실행하면 네트워크 호출 전에 거부) ② 모의고사 형식 점검(65문항, 도메인 20/17/15/13, 정답표·문제·해설 일치, 단일 응답 정답 글자 30% 이하, 정답이 가장 긴 보기인 문항 30% 이하)과 채점기 자가 시험(만점·부분 점수·빈 답안지·이상한 답안 줄 경고) ③ lab07 두 번 ④ 캡스톤 1회차: lab01\~05를 **두 번 연속**(두 번째는 이미 있는 환경에서 멱등) + 감사 → lab06 ⑤ 2회차: 정리된 에뮬레이터에서 **lab05 하나로 전체 구축** + 감사 → lab06 → 빈 상태에서 lab06 한 번 더를 실행한다. 마지막 줄이 `MODULE m14 OK`면 통과. 10\~14분 걸린다(1회차의 두 번째 lab05는 첫 번째 실행의 실패 데이터 포인트가 알람 평가 창에서 빠질 때까지 최대 3분 기다린다 — 아래 ★ 알람 줄). 끝나면 에뮬레이터 메모리는 약 500 MiB(Lambda 호출 누적, M00 제약 참고).
 
 ## 에뮬레이터 제약
 
@@ -74,7 +74,7 @@ curriculum/m14-capstone-exam/labs/verify.sh
 | ★ AWS Config 기록 범위 | `list-discovered-resources`에 S3 버킷만 나온다. DynamoDB 테이블·RDS 인스턴스 대상 관리형 규칙(`DYNAMODB_PITR_ENABLED`, `RDS_MULTI_AZ_SUPPORT`)은 평가 상태는 성공인데 결과가 비어 있다. S3 규칙 중에서도 `S3_BUCKET_SERVER_SIDE_ENCRYPTION_ENABLED`·`S3_BUCKET_VERSIONING_ENABLED`는 평가되고 `S3_BUCKET_SSL_REQUESTS_ONLY`·`S3_BUCKET_LEVEL_PUBLIC_ACCESS_PROHIBITED`는 결과가 없었다 | Config는 S3 규칙 2개(lab04). 테이블 PITR·RDS Multi-AZ·HTTPS 강제는 `sdk/capstone_audit.py`가 직접 점검 |
 | ★ `AWS/SQS` 지표 | 에뮬레이터가 내지 않는다(`list-metrics --namespace AWS/SQS` 0개) | DLQ 깊이 알람은 구성만(`INSUFFICIENT_DATA`). 실제 알람 경로는 워커의 사용자 지정 지표로 |
 | ★ CloudWatch 알람(60초 Period) | 사용자 지정 지표 1건 뒤 수십 초 안에 `ALARM` → SNS → SQS 도착. 상태 이유 문구도 실제와 같은 형식 | 상태를 폴링(상한 150초), 시간은 단언하지 않음 |
-| ★ 알람 수동 OK 뒤 재평가 | `set-alarm-state OK` 뒤 몇 초 안에 1~2분 전 데이터 포인트로 다시 `ALARM`이 되고 그 알림도 SNS로 나간다(평가가 1~2분 늦은 창을 본다) | lab05는 수동 OK를 쓰지 않는다. 이전 실행의 마지막 실패 데이터 포인트 + 180초가 지나 알람이 스스로 ALARM이 아님을 확인한 뒤 장애 주문을 보내고, ALARM 전환 시각·운영 알림의 `StateChangeTime`·전환을 만든 데이터 포인트가 모두 그 뒤인지 단언한다(검증 A가 재현) |
+| ★ 알람 수동 OK 뒤 재평가 | `set-alarm-state OK` 뒤 몇 초 안에 1\~2분 전 데이터 포인트로 다시 `ALARM`이 되고 그 알림도 SNS로 나간다(평가가 1\~2분 늦은 창을 본다) | lab05는 수동 OK를 쓰지 않는다. 이전 실행의 마지막 실패 데이터 포인트 + 180초가 지나 알람이 스스로 ALARM이 아님을 확인한 뒤 장애 주문을 보내고, ALARM 전환 시각·운영 알림의 `StateChangeTime`·전환을 만든 데이터 포인트가 모두 그 뒤인지 단언한다(검증 A가 재현) |
 | ★ Secrets Manager — CloudFormation이 지운 비밀 | 30일 삭제 대기로 남아 같은 이름으로 다시 만들 수 없다(실제 AWS와 같음). `--force-delete-without-recovery`로 즉시 삭제됨 | lab06이 즉시 삭제 |
 | ★ Well-Architected Tool 위험 판정 | 질문의 **모든** 선택지를 고르면 `NONE`, 하나라도 빠지면 `MEDIUM`. `HIGH`는 관찰되지 않음(실제는 모범 사례별 위험 수준으로 판정) | lab07은 워크로드·답변·마일스톤 🟢, 위험 판정 🟡 |
 | RDS `--manage-master-user-password` | 동작 — `MasterUserSecret`(Secrets Manager)이 생기고 `active`. DB 삭제 시 함께 지워짐 | 🟢로 사용 |

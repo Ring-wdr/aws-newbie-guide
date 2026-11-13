@@ -254,7 +254,7 @@
 | 항목 | 값 | 모듈 |
 |---|---|---|
 | Lambda 타임아웃 / 메모리 / 동기 페이로드 | 15분 / 128 MB~10,240 MB / 6 MB | M07 |
-| SQS 메시지 / 보존 / 가시성 / 롱 폴링 / FIFO 중복 제거 | 1 MiB / 60초~14일(기본 4일) / 0~12시간 / ≤20초 / 5분 | M06 |
+| SQS 메시지 / 보존 / 가시성 / 롱 폴링 / FIFO 중복 제거 | 1 MiB / 60초\~14일(기본 4일) / 0\~12시간 / ≤20초 / 5분 | M06 |
 | S3 객체 / 단일 PUT / 파트 | 50 TB / 5 GB / 5 MiB~5 GiB × 10,000 | M04 |
 | DynamoDB 항목 / 트랜잭션 / LSI / GSI | 400 KB / 100개·4 MB, 비용 2배 / 5 / 20(기본) | M05 |
 | RDS 자동 백업 / 읽기 복제본 | 0~35일 / 15개 | M05 |
@@ -292,7 +292,7 @@
 | # | 내용 | 지금(정정된 사실) | 상태 |
 |---|---|---|---|
 | 1 | M13 README가 "잘못된 규칙(30일 미만 IA 등)도 거부하지 않는다"고 썼다 | 2026-07부터 30일 미만 IA·One Zone-IA 전환은 AWS에서도 허용(최소 보관 30일 요금은 유지). 에뮬레이터는 현재 AWS 규칙대로 검증한다([M13 README](../m13-cost-optimization/README.md), [M04 레슨 2](../m04-storage/02-storage-classes-and-lifecycle.md)) | ✅ 해결 (PR #18) |
-| 2 | S3 RTC: M04 레슨 3은 99.99%, M12는 99.9% | **99.9%**를 15분 안에([M04-03](../m04-storage/03-versioning-lock-replication.md), [S3 RTC 문서](https://docs.aws.amazon.com/AmazonS3/latest/userguide/replication-time-control.html)) | ✅ 해결 (PR #18) |
+| 2 | S3 RTC: M04 레슨 3은 99.99%, M12는 99.9% | 15분 안에 **99.9%**([M04-03](../m04-storage/03-versioning-lock-replication.md), [S3 RTC 문서](https://docs.aws.amazon.com/AmazonS3/latest/userguide/replication-time-control.html)) | ✅ 해결 (PR #18) |
 | 3 | M02 README가 "M10이 이 VPC를 재현한다"고 썼다(실제 M10 템플릿은 CIDR·NAT 수·앱 라우팅 테이블 수가 다름) | M10은 같은 요구를 만족하는 **자기 2-AZ 3-티어 VPC**를 따로 만든다. 차이는 두 README의 표에 있다([M02 README](../m02-vpc-networking/README.md#cidr-계획)). 캡스톤은 M02 계획(NAT 2개)을 따른다 | ✅ 해결 (PR #18) |
 | 4 | 보안 그룹 이름: M02 `todayorder-alb-sg`/`app-sg`/`db-sg`, M10 템플릿 `WebSg`/`AppSg`/`DbSg` | 같은 개념이고 이름 차이는 위 차이 표에 있다. 캡스톤은 M02 이름 | ✅ 해결 (PR #18) |
 | 5 | 비용 할당 태그 "소급 안 됨"(M13) | 2024-03부터 관리 계정이 **최대 12개월 백필**을 요청할 수 있다(그 기간에 태그가 붙어 있던 리소스만)([M13 레슨 5](../m13-cost-optimization/05-cost-tools.md)) | ✅ 해결 (PR #19) |
