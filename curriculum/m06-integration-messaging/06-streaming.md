@@ -74,7 +74,7 @@ CREATING
 +------------------------------------------+-----------------------+-------------------------------------------+
 ```
 
-방금 본 것: 만든 직후는 `CREATING`, `aws kinesis wait stream-exists`로 기다린 뒤 `ACTIVE`. 보존 기간 기본 24시간. 해시 공간(0 ~ 2¹²⁸−1)을 두 샤드가 반씩 나눠 가졌다.
+방금 본 것: 만든 직후는 `CREATING`, `aws kinesis wait stream-exists`로 기다린 뒤 `ACTIVE`. (이 waiter는 10초 간격으로 조회해서 첫 조회가 `CREATING`을 보면 10초를 기다린다. lab 스크립트는 같은 조건을 1초 간격으로 확인하는 `wait_kinesis_stream_active`([`scripts/lab-wait.sh`](../../scripts/lab-wait.sh))를 쓴다. 손으로 칠 때는 waiter가 맞다.) 보존 기간 기본 24시간. 해시 공간(0 ~ 2¹²⁸−1)을 두 샤드가 반씩 나눠 가졌다.
 
 ```
 == 3. 같은 주문(파티션 키 A-7001)의 이벤트 3건 → 같은 샤드, 시퀀스 번호 증가
