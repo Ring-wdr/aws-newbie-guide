@@ -153,7 +153,7 @@ export function shortLabel(rel) {
     return m ? `${m[1]}. ${m[2]}` : title;
   }
   if (kind === 'quiz') return '퀴즈';
-  if (kind === 'cheatsheet') return title.includes('통합') ? '통합 치트시트' : '치트시트';
+  if (kind === 'cheatsheet') return rel.startsWith('curriculum/m14-') ? '통합 치트시트' : '치트시트';
   if (kind === 'exam-questions') return '모의고사 (시험 모드)';
   if (kind === 'exam-key') return '모의고사 정답과 해설';
   if (kind === 'self-checklist') return '캡스톤 자기 점검표';

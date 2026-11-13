@@ -71,6 +71,7 @@ try {
         await page.evaluate(() => localStorage.clear());
         await page.reload({ waitUntil: 'networkidle' });
         if (s.prepare) await s.prepare(page);
+        await page.waitForTimeout(300); // 스크롤 직후 붙박이(sticky) 요소가 다 그려지기를 기다린다
         const file = path.join(out, `${s.name}-${theme}-${width}.png`);
         await page.screenshot({ path: file, fullPage: full });
         written.push(file);
