@@ -32,6 +32,7 @@ import mdsource  # noqa: E402
 REPO = HERE.parent.parent
 SITE = REPO / "site"
 EXAM_DIR = REPO / "curriculum/m14-capstone-exam/mock-exam"
+DIST_IN_USE = SITE / "dist"
 
 # 시범(P1)에서 확인하는 원고 — site/src/lib/repo.mjs 의 PILOT_FILES 와 같다(검사기가 그 파일을 읽어 맞춘다).
 def pilot_files() -> list[str]:
@@ -370,7 +371,8 @@ def gate_browser(port: int, which: str) -> Gate:
     g = Gate(f"브라우저 검사({which})")
     script = {"offline": "tests/offline.mjs", "a11y": "tests/a11y.mjs", "keyboard": "tests/keyboard.mjs"}[which]
     with tempfile.TemporaryDirectory(prefix="sitecheck-browser-") as d:
-        p = subprocess.run(["node", script, "--port", str(port), "--out", d], capture_output=True, text=True, cwd=SITE)
+        env = {**os.environ, "GUIDE_DIST": str(DIST_IN_USE)}
+        p = subprocess.run(["node", script, "--port", str(port), "--out", d], capture_output=True, text=True, cwd=SITE, env=env)
         sys.stdout.write(p.stdout)
         if p.returncode != 0:
             sys.stdout.write(p.stderr[-3000:])
@@ -392,13 +394,19 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="가이드 사이트 검사기 (GUIDE-SITE 5장)")
     ap.add_argument("check", choices=["all", "parity", "quiz", "exam", "links", "static", "offline", "a11y", "keyboard", "browser"])
     ap.add_argument("--pages", default="pilot", help="pilot(기본) | all | 쉼표로 구분한 경로(/curriculum/.../)")
-    ap.add_argument("--dist", default=str(SITE / "dist"))
+    ap.add_argument("--dist", default=None, help="빌드 산출물 폴더(기본: site/dist)")
+    ap.add_argument("--site", default=None, help="site/ 폴더(기본: 저장소의 site/) — 검사기 자체를 시험할 때 사본을 가리킨다")
     ap.add_argument("--port", type=int, default=int(os.environ.get("GUIDE_PORT", "0")) or None, help="브라우저 검사용 127.0.0.1 포트(필수)")
     args = ap.parse_args(argv)
-    dist = Path(args.dist)
+    global SITE
+    if args.site:
+        SITE = Path(args.site).resolve()
+    dist = Path(args.dist) if args.dist else SITE / "dist"
     if not (dist / "index.html").exists() and not any(dist.glob("**/index.html")):
         print(f"빌드 산출물이 없다: {dist} — 먼저 pnpm --dir site build", file=sys.stderr)
         return 2
+    global DIST_IN_USE
+    DIST_IN_USE = dist.resolve()
     files = select_files(args.pages)
     routes = None if args.pages == "all" else [route_for(f) for f in files]
     gates: list[Gate] = []
