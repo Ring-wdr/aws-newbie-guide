@@ -15,7 +15,8 @@
 # 기본 변수(AWS_ENDPOINT_URL 등)는 건드리지 않는다 — 이 셸의 aws CLI 는 여전히 주 사이트를 향한다.
 #   CLI  : dr_aws <명령...>               (이 명령에만 두 번째 사이트의 엔드포인트·자격 증명·CA를 끼운다)
 #   boto3: from emulator_guard import emulator_site; dr = emulator_site("DR_"); dr.client("s3")
-# 안전 장치: 포트 검증, 주 사이트와 다른 포트인지, 계정 000000000000 확인. 실패하면 0이 아닌 값으로 반환한다.
+# 안전 장치: 주 사이트가 연결돼 있는지(env.sh 가 거부해 끊긴 셸이면 거부), 포트 검증, 주 사이트와 다른 포트인지,
+# 계정 000000000000 확인. 실패하면 DR_AWS_* 를 지우고 0이 아닌 값으로 반환한다.
 
 if [ -n "${ZSH_VERSION:-}" ]; then
   eval '_dr_env_dir="${${(%):-%x}:A:h}"'
@@ -50,6 +51,13 @@ _dr_env_main() {
   _dr_env_clear
   if [ -z "${EMULATOR_PORT:-}" ] || [ -z "${AWS_ENDPOINT_URL:-}" ]; then
     _dr_env_fail "scripts/env.sh 를 먼저 source 하세요 (주 사이트 연결이 없습니다)."
+    return 1
+  fi
+  # 주 사이트가 실제로 연결돼 있어야 한다. env.sh 가 거부해 셸을 끊어 둔 상태(AWS_ENDPOINT_URL=https://127.0.0.1:9)
+  # 에서 두 번째 사이트만 연결하면 "반쪽 연결"이 되므로 거부한다.
+  if [ "$AWS_ENDPOINT_URL" != "https://127.0.0.1:$EMULATOR_PORT" ]; then
+    _dr_env_fail "주 사이트가 연결돼 있지 않습니다 (AWS_ENDPOINT_URL=$AWS_ENDPOINT_URL, EMULATOR_PORT=$EMULATOR_PORT — env.sh 가 거부했거나 중단됐습니다)." \
+      "먼저 source scripts/env.sh 가 '연결됨'으로 끝나게 한 뒤 다시 source scripts/dr-env.sh 하세요."
     return 1
   fi
   if [ -z "${DR_EMULATOR_PORT:-}" ] && [ ! -t 0 ]; then
