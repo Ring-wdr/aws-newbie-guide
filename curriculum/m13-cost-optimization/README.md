@@ -62,7 +62,7 @@ curriculum/m13-cost-optimization/labs/verify.sh
 | Resource Groups Tagging API `GetResources` | SQS만 찾고 S3·DynamoDB·EC2·EBS·SNS는 못 찾음 | 서비스별 태그 API로 감사(lab05, `sdk/tag_audit.py`) |
 | EC2 `DescribeTags` | `501 NotImplemented` | `describe_instances`·`describe_volumes`의 `Tags` 사용 |
 | DynamoDB 태그 | `CreateTable`의 태그가 ACTIVE 전에는 `ListTagsOfResource`에 안 보이고, `TagResource`·`UntagResource` 결과도 몇 초 뒤 반영 | 보일 때까지 폴링(실제 DynamoDB도 최종 일관성) |
-| S3 수명 주기 전환 | 규칙은 저장되지만 시간이 지나도 객체는 `STANDARD`에 머문다. 규칙 검증은 현재 AWS 규칙과 같다 — 30일 미만 IA 전환은 받아 주고(2026-07부터 AWS도 허용, 최소 보관 30일 요금은 그대로), 역방향 전환 등은 `InvalidArgument`로 거부한다(M04 README) | 규칙을 읽어 계산(lab02) |
+| S3 수명 주기 전환 | 규칙은 저장되지만 시간이 지나도 객체는 `STANDARD`에 머문다. 규칙 검증은 현재 AWS 규칙과 같다 — 30일 미만 IA·One Zone-IA 전환은 받아 주고(2026-07-16부터 AWS도 허용), 역방향 전환 등은 `InvalidArgument`로 거부한다(M04 README). 없어진 것은 전환 전 대기뿐이고 **최소 보관 기간 요금은 남아 있다** — IA·One Zone-IA에 들어간 객체를 30일 전에 삭제·덮어쓰기·전환하면 30일을 채운 만큼 청구된다. 또 2024-09부터 128 KB 미만 객체는 기본적으로 전환되지 않는다(`TransitionDefaultMinimumObjectSize: all_storage_classes_128K`, lab02 출력에 보임) | 규칙을 읽어 계산(lab02) |
 | 과금 전반 | 에뮬레이터는 어떤 요금도 매기지 않는다 | 모든 금액은 예시 단가로 계산 |
 
 ## 설계 대비 대체 사유
