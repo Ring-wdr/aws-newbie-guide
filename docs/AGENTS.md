@@ -22,7 +22,7 @@
 | 수시 | 환경 구축 엔지니어 (후속) | `setup/guard-hardening-and-shared-tooling`, `setup/fidelity-report-corrections`, `setup/dns-isolation-default-and-host-scan`, `setup/environment-verification-followups`, `setup/guard-refusal-followups`, `setup/guard-disconnect-hardening` | 가드·공용 스크립트 보강, 탐침과 `docs/FIDELITY.md` 정정 | 9297 (+9298) |
 | 수시 | 모듈 저자 (후속) | `author/<모듈>-review-followup` (예: `author/m04-storage-review-followup`, `author/m05-verify-runtime-followup`) | 병합 뒤 발견된 자기 모듈의 결함 수정 | 원래 배정 포트 |
 | 5 | 가이드 사이트 환경 구축 | `setup/guide-site-toolchain` (이후 `setup/guide-*`) | `site/` 공용부, `tools/sitecheck/`, `scripts/guide-up.sh` — [GUIDE-SITE.md](./GUIDE-SITE.md) | 에뮬레이터 9297, 개발 서버 4321 |
-| 5 | UI 저자 | `ui/m06-pilot-integration-messaging`, 이후 `ui/<모듈 범위>-pages`, `ui/widgets-<모듈·주제>` | `site/src/widgets/mNN/`, 자기 모듈 원고의 위젯 표시 줄 | 개발 서버 4331~ (에이전트마다 하나) |
+| 5 | UI 저자 | `ui/m06-pilot-integration-messaging`, 이후 `ui/<모듈 범위>-pages`(예: `ui/m00-m03-pages`, `ui/m14-capstone-mock-exam`), `ui/widgets-<모듈·주제>` | 브랜치명에 적힌 모듈 범위의 `site/src/widgets/mNN/`과 그 모듈 원고의 위젯 표시 줄 | 개발 서버 4331~ (에이전트마다 하나) |
 | 각 PR | PR 검증자 | (브랜치 없음 — 해당 PR 브랜치를 체크아웃해 검증) | [AUTHORING.md 6장](./AUTHORING.md) 체크리스트, 사이트 PR은 [GUIDE-SITE.md 5장](./GUIDE-SITE.md)도 | 에뮬레이터 9320~, 개발 서버·브라우저 검사 4390~ |
 
 ## 진행 순서
