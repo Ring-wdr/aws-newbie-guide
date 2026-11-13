@@ -99,6 +99,8 @@ scripts/emulator-up.sh
 | `-v ~/.aws/emulator:~/.aws/emulator`, `-e HOME=$HOME` | 에뮬레이터가 만든 키·인증서 파일을 내 홈 디렉터리에서 그대로 읽게 한다 |
 | `--memory=2g --memory-swap=2g` | 메모리 상한 2 GiB, 스왑 없음 (공식 가이드와 같음). Lambda를 많이 호출하면 에뮬레이터 메모리가 계속 늘어나므로 넉넉히 둔다(아래 "문제 해결"). 바꾸려면 `EMULATOR_MEMORY=3g scripts/emulator-up.sh` |
 | `--telemetry off` | 사용 통계 전송을 끈다 (아래 "텔레메트리") |
+| `--pull never` | 로컬에서 빌드한 이미지만 쓴다. 이미지가 없을 때 Docker가 레지스트리(Docker Hub)에서 같은 이름을 찾으러 가지 않는다 |
+| (선택) `--dns 127.0.0.1` | `EMULATOR_DNS=127.0.0.1 scripts/emulator-reset.sh`로 켠다. 컨테이너 안의 이름 해석을 모두 막아, 에뮬레이터가 실제 AWS 형식 이름(예: ElastiCache가 돌려주는 `*.cache.amazonaws.com`)을 해석하러 바깥 DNS에 묻는 일이 없게 한다. 탐침(`tools/probe/probe.py --no-dns`)의 검증용이다. 실습은 기본값(Docker 기본 리졸버)으로 한다 |
 
 이미 떠 있을 때 다시 실행해도 안전하다("이미 실행 중입니다"를 출력하고 끝난다).
 
