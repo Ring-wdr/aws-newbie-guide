@@ -1,4 +1,5 @@
-// 오프라인 검사: 헤드리스 브라우저에서 루프백 밖 요청을 모두 막고 기록한 채 시범 페이지를 연다. 기록이 0건이어야 한다.
+// 오프라인 검사: 헤드리스 브라우저에서 루프백 밖으로 나가려는 시도를 모두 막고 기록한 채 시범 페이지를 연다. 기록이 0건이어야 한다.
+// 어떤 통로를 기록하는지는 tests/lib/harness.mjs 의 offlineBrowser 주석, 각 통로가 실제로 잡히는지는 tests/offline-selftest.mjs.
 // 검색(Pagefind)·퀴즈·시험 모드처럼 열 때 추가로 파일을 불러오는 동작도 실행한다. 저장소가 막힌 브라우저에서도 동작을 본다.
 // 사용: node tests/offline.mjs --port <포트> [--all] [--out <폴더>]
 import { listPages, offlineBrowser, PILOT_PAGES, portFromArgs, serve } from './lib/harness.mjs';
@@ -11,11 +12,11 @@ const server = await serve(port);
 let opened = 0;
 
 async function run(opts, label, fn) {
-  const { browser, context, blocked } = await offlineBrowser(opts);
+  const { browser, context, blocked, auditPage } = await offlineBrowser(opts);
   const errors = [];
   context.on('weberror', (e) => errors.push(String(e.error())));
   try {
-    await fn(context);
+    await fn(context, auditPage);
   } finally {
     await browser.close();
   }
@@ -27,11 +28,12 @@ async function run(opts, label, fn) {
 try {
   for (const colorScheme of ['light', 'dark']) {
     for (const width of [1280, 360]) {
-      await run({ colorScheme, viewport: { width, height: 900 } }, `페이지 ${pages.length}개 ${colorScheme} ${width}px`, async (ctx) => {
+      await run({ colorScheme, viewport: { width, height: 900 } }, `페이지 ${pages.length}개 ${colorScheme} ${width}px`, async (ctx, auditPage) => {
         const page = await ctx.newPage();
         for (const p of pages) {
           const res = await page.goto(base + p, { waitUntil: 'networkidle' });
           if (!res || res.status() !== 200) problems.push(`${p}: 응답 ${res?.status()}`);
+          await auditPage(page);
           opened++;
         }
       });
