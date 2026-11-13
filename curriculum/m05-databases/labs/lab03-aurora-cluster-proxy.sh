@@ -31,7 +31,7 @@ cleanup() {
   rds_delete_instance "$WRITER"
   if aws rds describe-db-clusters --db-cluster-identifier "$CLUSTER" >/dev/null 2>&1; then
     aws rds delete-db-cluster --db-cluster-identifier "$CLUSTER" --skip-final-snapshot >/dev/null
-    aws rds wait db-cluster-deleted --db-cluster-identifier "$CLUSTER"
+    rds_wait_cluster_deleted "$CLUSTER"
   fi
   aws rds delete-db-subnet-group --db-subnet-group-name "$SNG" >/dev/null 2>&1 || true
   aws secretsmanager delete-secret --secret-id "$SECRET" --force-delete-without-recovery >/dev/null 2>&1 || true
@@ -52,18 +52,18 @@ aws rds create-db-cluster --db-cluster-identifier "$CLUSTER" --engine aurora-pos
   --backup-retention-period 7 --storage-encrypted \
   --serverless-v2-scaling-configuration MinCapacity=0.5,MaxCapacity=4 \
   --query 'DBCluster.{Status: Status, Engine: Engine, Version: EngineVersion, AZs: AvailabilityZones, ServerlessV2: ServerlessV2ScalingConfiguration}'
-aws rds wait db-cluster-available --db-cluster-identifier "$CLUSTER"
+rds_wait_cluster_available "$CLUSTER"
 
 echo "== 2. 클러스터에 인스턴스 2대: 쓰기(db.serverless) + 리더(db.r6g.large, 다른 AZ)"
 aws rds create-db-instance --db-instance-identifier "$WRITER" --db-cluster-identifier "$CLUSTER" \
   --engine aurora-postgresql --db-instance-class db.serverless --availability-zone us-east-1a \
   --query 'DBInstance.{Id: DBInstanceIdentifier, Class: DBInstanceClass, Status: DBInstanceStatus}'
-aws rds wait db-instance-available --db-instance-identifier "$WRITER"
+rds_wait_instance_available "$WRITER"
 aws rds create-db-instance --db-instance-identifier "$READER" --db-cluster-identifier "$CLUSTER" \
   --engine aurora-postgresql --db-instance-class db.r6g.large --availability-zone us-east-1b \
   --promotion-tier 1 \
   --query 'DBInstance.{Id: DBInstanceIdentifier, Class: DBInstanceClass, Status: DBInstanceStatus}'
-aws rds wait db-instance-available --db-instance-identifier "$READER"
+rds_wait_instance_available "$READER"
 
 echo "== 3. 엔드포인트: 앱은 인스턴스가 아니라 '클러스터 엔드포인트(쓰기)'와 '리더 엔드포인트(읽기)'에 붙는다"
 aws rds describe-db-clusters --db-cluster-identifier "$CLUSTER" --query 'DBClusters[0].{

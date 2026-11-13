@@ -16,7 +16,8 @@ KS=todayorder_m05
 cleanup() {
   if aws docdb describe-db-instances --db-instance-identifier "$DOCDB_I" >/dev/null 2>&1; then
     aws docdb delete-db-instance --db-instance-identifier "$DOCDB_I" >/dev/null
-    aws docdb wait db-instance-deleted --db-instance-identifier "$DOCDB_I"
+    wait_gone "DocumentDB 인스턴스 삭제" DBInstanceNotFound \
+      aws docdb describe-db-instances --db-instance-identifier "$DOCDB_I" --query 'DBInstances[0].DBInstanceStatus' --output text
   fi
   if aws docdb describe-db-clusters --db-cluster-identifier "$DOCDB" >/dev/null 2>&1; then
     aws docdb delete-db-cluster --db-cluster-identifier "$DOCDB" --skip-final-snapshot >/dev/null
@@ -39,7 +40,8 @@ aws docdb create-db-cluster --db-cluster-identifier "$DOCDB" --engine docdb \
   --query 'DBCluster.{Status: Status, Engine: Engine, Port: Port}'
 aws docdb create-db-instance --db-instance-identifier "$DOCDB_I" --db-cluster-identifier "$DOCDB" \
   --engine docdb --db-instance-class db.t3.medium --query 'DBInstance.DBInstanceStatus'
-aws docdb wait db-instance-available --db-instance-identifier "$DOCDB_I"
+wait_status "DocumentDB 인스턴스 available" available \
+  aws docdb describe-db-instances --db-instance-identifier "$DOCDB_I" --query 'DBInstances[0].DBInstanceStatus' --output text
 aws docdb describe-db-clusters --db-cluster-identifier "$DOCDB" --query 'DBClusters[0].{
   Status: Status, Version: EngineVersion, Endpoint: Endpoint, ReaderEndpoint: ReaderEndpoint, Port: Port,
   Members: DBClusterMembers[].{Id: DBInstanceIdentifier, Writer: IsClusterWriter}}'
