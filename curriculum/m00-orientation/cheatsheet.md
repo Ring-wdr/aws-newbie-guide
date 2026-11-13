@@ -10,6 +10,7 @@ source scripts/env.sh                  # 셸 연결 + 안전 장치  (다른 포
 aws sts get-caller-identity            # Account 000000000000 이면 에뮬레이터
 source scripts/dr-env.sh               # 두 번째 에뮬레이터(DR_EMULATOR_PORT. 터미널에서만 기본 EMULATOR_PORT+1, 비대화형은 필수) → dr_aws <명령>
 bash scripts/clock-check.sh [포트]     # 잠자기 후 서명 오류 → VM 시계 확인 (어긋나면 해결 명령 안내)
+bash scripts/clock-check.sh --stability  # "준비됨" 직후 NotFound·CREATING 으로 되돌아감 → VM 시계가 흔들리는지 확인
 scripts/emulator-status.sh             # 상태·메모리
 scripts/emulator-reset.sh [포트]       # 재시작 = 모든 리소스 삭제
 scripts/emulator-down.sh [포트|--all]  # 끄기

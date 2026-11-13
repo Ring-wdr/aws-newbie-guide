@@ -57,6 +57,44 @@ container_dns() {
   echo "${dns:-host}"
 }
 
+# 명령을 제한 시간(초) 안에서만 실행하고 표준 출력을 파일에 남긴다. 반환: 명령의 종료 코드, 시간 초과면 124.
+# macOS 에는 timeout 이 없다. 하위 셸에서 set -m 을 켜 명령을 자기 프로세스 그룹으로 띄우고, 시간이 지나면
+# 그룹 전체에 TERM, 0.5초 뒤에도 남아 있으면 KILL 을 보낸 뒤 wait 로 거둔다(TERM 을 무시하는 자식도 끝난다).
+# 출력은 파이프가 아니라 파일로 받는다 — 그룹을 떠난 손자(ssh 제어 연결 등)가 파이프를 쥐고 있어도 기다리지 않는다.
+# 하위 셸의 stderr 를 버려 작업 제어 메시지("Terminated" 등)가 보이지 않는다. bash 3.2(macOS 기본)에서 시험함.
+run_limited() {  # <초> <출력 파일> <명령...>
+  local limit="$1" out="$2"
+  shift 2
+  (
+    set -m
+    "$@" >"$out" 2>/dev/null </dev/null &
+    pid=$!
+    i=0
+    while kill -0 "$pid" 2>/dev/null; do
+      if [ "$i" -ge $((limit * 10)) ]; then
+        kill -TERM -- "-$pid" 2>/dev/null
+        j=0
+        while kill -0 "$pid" 2>/dev/null && [ "$j" -lt 5 ]; do sleep 0.1; j=$((j + 1)); done
+        kill -KILL -- "-$pid" 2>/dev/null
+        wait "$pid" 2>/dev/null
+        exit 124
+      fi
+      sleep 0.1
+      i=$((i + 1))
+    done
+    wait "$pid"
+  ) 2>/dev/null
+}
+
+# VM 시계가 지금 반복해서 옮겨지고 있으면(clock-check.sh --stability 종료 코드 4) 경고만 보여 준다.
+# 안정(0)·확인 못 함(2, Docker Desktop·Linux 등)은 조용히 넘어간다. 호출한 스크립트를 실패시키지 않는다.
+warn_if_clock_unstable() {
+  local out rc=0
+  out="$(bash "$(dirname "${BASH_SOURCE[0]}")/clock-check.sh" --stability 2>&1)" || rc=$?
+  if [ "$rc" -eq 4 ]; then printf '%s\n' "$out" >&2; fi
+  return 0
+}
+
 health_ok() {
   local port="$1" ca="$EMULATOR_HOME_DIR/$1/ca.pem"
   [ -f "$ca" ] || return 1

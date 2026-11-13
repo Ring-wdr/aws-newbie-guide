@@ -64,6 +64,7 @@ if [ "$state" = "running" ]; then
       c_ylw "이 컨테이너의 DNS 설정($running_dns)이 요청한 값(${DNS:-host})과 다릅니다. 컨테이너를 그대로 둡니다."
       c_ylw "요청한 값으로 바꾸려면 (재시작 — 만든 리소스가 모두 사라짐): EMULATOR_DNS=${DNS:-host} scripts/emulator-reset.sh $PORT"
     fi
+    warn_if_clock_unstable
     print_next
     exit 0
   fi
@@ -116,6 +117,7 @@ fi
 for _ in $(seq 60); do
   if health_ok "$PORT"; then
     c_grn "준비 완료: https://127.0.0.1:$PORT  (헬스 체크: ok)"
+    warn_if_clock_unstable   # VM 시계가 몇 초씩 반복해서 옮겨지는 중이면 경고 (M00 레슨 3 문제 해결)
     print_next
     exit 0
   fi
