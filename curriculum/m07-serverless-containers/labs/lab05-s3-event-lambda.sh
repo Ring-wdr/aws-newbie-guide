@@ -18,7 +18,7 @@ echo "== 0. 이전 실행 정리 (버킷, 표)"
 aws s3 rb "s3://$BUCKET" --force >/dev/null 2>&1 || true
 if aws dynamodb describe-table --table-name "$TABLE" >/dev/null 2>&1; then
   aws dynamodb delete-table --table-name "$TABLE" >/dev/null
-  aws dynamodb wait table-not-exists --table-name "$TABLE"
+  wait_dynamodb_table_gone "$TABLE"
 fi
 
 echo "== 1. 버킷, 영수증 표"

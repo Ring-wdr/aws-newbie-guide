@@ -22,7 +22,7 @@ for id in $(aws apigatewayv2 get-apis --output json --query "Items[?Name=='$API_
 done
 if aws dynamodb describe-table --table-name "$TABLE" >/dev/null 2>&1; then
   aws dynamodb delete-table --table-name "$TABLE" >/dev/null
-  aws dynamodb wait table-not-exists --table-name "$TABLE"
+  wait_dynamodb_table_gone "$TABLE"
 fi
 
 echo "== 1. DynamoDB 주문 표 (파티션 키 orderId, 온디맨드)"
