@@ -34,13 +34,8 @@ for tool in node pnpm; do
   fi
 done
 
-# 포트가 이미 쓰이면 빌드 전에 알린다(서버도 같은 검사를 하고 다른 포트로 옮기지 않는다).
-if ! node -e '
-  const s = require("node:net").createServer();
-  s.once("error", () => process.exit(1));
-  s.listen(Number(process.argv[1]), "127.0.0.1", () => s.close(() => process.exit(0)));
-' "$port"; then
-  echo "포트 $port 를 이미 다른 프로그램이 쓰고 있다. 다른 포트를 주거나 그 프로그램을 멈춘다." >&2
+# 포트가 이미 쓰이면 빌드 전에 알린다(127.0.0.1·0.0.0.0·[::] 어느 쪽에서 듣든). 서버도 같은 검사를 하고 다른 포트로 옮기지 않는다.
+if ! node "$SITE/scripts/serve.mjs" --port "$port" --check; then
   exit 1
 fi
 
