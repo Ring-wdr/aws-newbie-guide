@@ -11,6 +11,8 @@
 # 8) 볼트 잠금(거버넌스 모드): 보존 기간 중 복구 지점 삭제가 거부된다
 set -euo pipefail
 source "$(git rev-parse --show-toplevel)/scripts/env.sh"
+# DynamoDB 테이블은 wait_dynamodb_table_active 로 기다린다 (= table-exists + 준비 직후 재확인, scripts/lab-wait.sh)
+source "$(git rev-parse --show-toplevel)/scripts/lab-wait.sh"
 
 VAULT="todayorder-vault"
 DR_VAULT="todayorder-dr-vault"
@@ -104,7 +106,7 @@ echo "== 5. 주문 테이블(태그 backup=daily)과 온디맨드 백업"
 TABLE_ARN="$(aws dynamodb create-table --table-name "$TABLE" --billing-mode PAY_PER_REQUEST \
   --attribute-definitions AttributeName=orderId,AttributeType=S --key-schema AttributeName=orderId,KeyType=HASH \
   --tags Key=backup,Value=daily Key=project,Value=todayorder --query TableDescription.TableArn --output text)"
-aws dynamodb wait table-exists --table-name "$TABLE"
+wait_dynamodb_table_active "$TABLE"   # = aws dynamodb wait table-exists + 준비 직후 재확인 (scripts/lab-wait.sh)
 for n in 2001 2002 2003; do
   aws dynamodb put-item --table-name "$TABLE" --item "{\"orderId\":{\"S\":\"B-$n\"},\"amount\":{\"N\":\"$n\"}}"
 done
@@ -134,7 +136,7 @@ RESTORE_ID="$(aws backup start-restore-job --recovery-point-arn "$RP_ARN" --iam-
 restore_done() { case "$(aws backup describe-restore-job --restore-job-id "$RESTORE_ID" --query Status --output text)" in COMPLETED | FAILED | ABORTED) return 0 ;; *) return 1 ;; esac; }
 wait_until "복원 작업 종료" 120 restore_done
 aws backup describe-restore-job --restore-job-id "$RESTORE_ID" --query '{Status:Status,Created:CreatedResourceArn}'
-aws dynamodb wait table-exists --table-name "$RESTORED"
+wait_dynamodb_table_active "$RESTORED"   # = aws dynamodb wait table-exists + 준비 직후 재확인 (scripts/lab-wait.sh)
 orig_count="$(aws dynamodb scan --table-name "$TABLE" --select COUNT --query Count --output text)"
 restored_count="$(aws dynamodb scan --table-name "$RESTORED" --select COUNT --query Count --output text)"
 echo "원본 항목 ${orig_count}개 · 복원된 테이블 항목 ${restored_count}개 (실제 AWS라면 백업 시점의 ${orig_count}개)"

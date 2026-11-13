@@ -115,6 +115,8 @@ done
 echo "----"
 echo "통과 $pass · 실패 $fail  (DR 리전 에뮬레이터 포트 $DR_EMULATOR_PORT 는 종료합니다)"
 if [ "$fail" -ne 0 ]; then
+  # 이번 실행 동안 VM 시계가 반복해서 옮겨졌다면 실패 원인 후보로 알린다 (안정·확인 불가면 아무것도 출력하지 않음, 언제나 0)
+  bash "$ROOT/scripts/clock-check.sh" --stability --summary --last "$SECONDS" || true
   echo "MODULE m12 FAIL"
   exit 1
 fi
