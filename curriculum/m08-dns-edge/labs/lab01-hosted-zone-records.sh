@@ -8,6 +8,10 @@ source "$(dirname "$0")/_lib.sh"
 
 ZONE="todayorder.example"
 WORK="$TMP_LIB"
+# external-host-ok: AWS 문서의 CloudFront 예시 도메인. Route 53 레코드 값으로 저장만 하고 에뮬레이터는 해석·접속하지 않는다
+CF_DOMAIN=d111111abcdef8.cloudfront.net
+# external-host-ok: 이 lab 이 만드는 VPC(10.80.0.0/16) 안의 사설 IP. 프라이빗 영역 A 레코드 값으로 저장만 한다
+PRIVATE_API_IP=10.80.1.25
 
 # 이전 실행이 남긴 영역과 VPC 를 지우고 시작한다 (멱등).
 delete_zones "$ZONE"
@@ -54,14 +58,14 @@ echo "== 4. 영역 꼭대기(apex)에 CNAME 만들기 (실패해야 정상)"
 set +e
 apex_err="$(aws route53 change-resource-record-sets --hosted-zone-id "$ZID" --change-batch "{
   \"Changes\": [{\"Action\": \"UPSERT\", \"ResourceRecordSet\": {\"Name\": \"$ZONE\", \"Type\": \"CNAME\", \"TTL\": 300,
-  \"ResourceRecords\": [{\"Value\": \"d111111abcdef8.cloudfront.net\"}]}}]}" 2>&1 >/dev/null)"
+  \"ResourceRecords\": [{\"Value\": \"$CF_DOMAIN\"}]}}]}" 2>&1 >/dev/null)"
 set -e
 echo "$apex_err" | grep -m1 'error occurred'
 
 echo "== 5. apex 에는 Alias: CloudFront 배포를 가리키는 A 레코드 (Z2FDTNDATAQYW2 = CloudFront 고정 영역 ID)"
 aws route53 change-resource-record-sets --hosted-zone-id "$ZID" --change-batch "{
   \"Changes\": [{\"Action\": \"UPSERT\", \"ResourceRecordSet\": {\"Name\": \"$ZONE\", \"Type\": \"A\",
-  \"AliasTarget\": {\"HostedZoneId\": \"Z2FDTNDATAQYW2\", \"DNSName\": \"d111111abcdef8.cloudfront.net\", \"EvaluateTargetHealth\": false}}}]}" \
+  \"AliasTarget\": {\"HostedZoneId\": \"Z2FDTNDATAQYW2\", \"DNSName\": \"$CF_DOMAIN\", \"EvaluateTargetHealth\": false}}}]}" \
   --query ChangeInfo.Status --output text
 echo "-- www 는 같은 영역의 api 레코드를 가리키는 Alias"
 aws route53 change-resource-record-sets --hosted-zone-id "$ZID" --change-batch "{
@@ -89,7 +93,7 @@ PZID="$(aws route53 create-hosted-zone --name "$ZONE" --caller-reference "m08-la
   --query HostedZone.Id --output text)"
 aws route53 change-resource-record-sets --hosted-zone-id "$PZID" --change-batch "{
   \"Changes\": [{\"Action\": \"UPSERT\", \"ResourceRecordSet\": {\"Name\": \"api.$ZONE\", \"Type\": \"A\", \"TTL\": 60,
-  \"ResourceRecords\": [{\"Value\": \"10.80.1.25\"}]}}]}" >/dev/null
+  \"ResourceRecords\": [{\"Value\": \"$PRIVATE_API_IP\"}]}}]}" >/dev/null
 aws route53 list-hosted-zones-by-name --dns-name "$ZONE" \
   --query "HostedZones[?Name=='$ZONE.'].{Id: Id, Private: Config.PrivateZone, Records: ResourceRecordSetCount}" --output table
 echo "-- test-dns-answer 는 퍼블릭 영역 전용이다 (실패해야 정상)"
@@ -106,7 +110,7 @@ echo "api.$ZONE — 퍼블릭 영역: $public_answer / 프라이빗 영역(VPC �
 echo "== 8. 레코드 삭제 — DELETE 는 현재 값과 정확히 같아야 한다"
 aws route53 change-resource-record-sets --hosted-zone-id "$ZID" --change-batch "{
   \"Changes\": [{\"Action\": \"DELETE\", \"ResourceRecordSet\": {\"Name\": \"shop.$ZONE\", \"Type\": \"CNAME\", \"TTL\": 300,
-  \"ResourceRecords\": [{\"Value\": \"todayorder-shop.example.net\"}]}}]}" --query ChangeInfo.Status --output text
+  \"ResourceRecords\": [{\"Value\": \"$SHOP_TARGET\"}]}}]}" --query ChangeInfo.Status --output text
 aws route53 list-resource-record-sets --hosted-zone-id "$ZID" --no-paginate \
   --query 'ResourceRecordSets[].[Name, Type, TTL || `alias`]' --output text
 types="$(aws route53 list-resource-record-sets --hosted-zone-id "$ZID" --no-paginate --query 'ResourceRecordSets[].Type' --output text | tr '\t' ' ')"
@@ -117,7 +121,7 @@ grep -q 'already exists' <<<"$err" || fail "중복 CREATE 가 거부되지 않�
 grep -q 'InvalidChangeBatch' <<<"$apex_err" || fail "apex CNAME 이 거부되지 않음"
 assert_eq "$www_answer" "192.0.2.10,192.0.2.11" "영역 안 Alias 응답"
 assert_eq "$nx_code" "NXDOMAIN" "없는 이름의 응답 코드"
-assert_eq "$private_answer" "10.80.1.25" "프라이빗 영역 레코드"
+assert_eq "$private_answer" "$PRIVATE_API_IP" "프라이빗 영역 레코드"
 grep -q 'private hosted zone' <<<"$priv_err" || fail "프라이빗 영역 test-dns-answer 가 거부되지 않음"
 grep -q CNAME <<<"$types" && fail "CNAME 이 삭제되지 않음"
 echo "LAB01 OK"

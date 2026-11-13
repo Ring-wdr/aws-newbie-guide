@@ -13,8 +13,9 @@ docs/FIDELITY.md 를 다시 만든다. 시작할 때 no_external_hosts.py 로 �
     uv run python tools/probe/probe.py --list           # 서비스 목록
     uv run python tools/probe/probe.py --report-only    # results.json 으로 보고서만 재생성
     uv run python tools/probe/probe.py --dry            # 결과를 저장하지 않음 (탐침 코드 수정 중·병렬 실행)
-    EMULATOR_DNS=127.0.0.1 scripts/emulator-reset.sh    # 컨테이너 DNS 격리 후
-    uv run python tools/probe/probe.py --no-dns         # 격리된 에뮬레이터에서만 실행 (바깥 DNS 질의 0 보장)
+    uv run python tools/probe/probe.py --no-dns         # 컨테이너 DNS 가 격리된 에뮬레이터에서만 실행 (바깥 DNS 질의 0 보장)
+                                                        # (scripts/emulator-up.sh 의 기본값이 격리 --dns 127.0.0.1 이다.
+                                                        #  EMULATOR_DNS=host 로 띄운 에뮬레이터는 거부한다)
 
 바깥 접속을 막는 장치는 세 겹이다: (1) 시작 시 no_external_hosts.py 정적 검사, (2) 탐침이 여는 모든 연결은
 lib.py 의 관문(container_curl·container_tcp·host_curl·host_https·host_tcp)을 거쳐 루프백 IP 에만 접속,
@@ -103,8 +104,8 @@ def main() -> int:
     ap.add_argument("--dry", action="store_true",
                     help="results.json·FIDELITY.md 를 쓰지 않는다 (탐침 코드를 고치는 중에, 또는 병렬 실행 시)")
     ap.add_argument("--no-dns", action="store_true",
-                    help="컨테이너 DNS 가 격리된(EMULATOR_DNS 로 띄운) 에뮬레이터에서만 실행한다. "
-                         "격리: EMULATOR_DNS=127.0.0.1 scripts/emulator-reset.sh")
+                    help="컨테이너 DNS 가 격리된 에뮬레이터에서만 실행한다 (scripts/emulator-up.sh 기본값 --dns 127.0.0.1. "
+                         "EMULATOR_DNS=host 로 띄운 에뮬레이터는 거부)")
     ap.add_argument("--results", default="",
                     help="결과를 이 경로에 저장하고 FIDELITY.md 는 만들지 않는다 (재현성 비교용 두 번째 실행)")
     args = ap.parse_args()
@@ -126,7 +127,7 @@ def main() -> int:
     dns = container_dns(port)
     if args.no_dns and not dns:
         raise SystemExit(f"--no-dns: aws-emulator-{port} 는 Docker 기본 리졸버를 쓴다(DNS={dns}). "
-                         f"EMULATOR_DNS=127.0.0.1 EMULATOR_PORT={port} scripts/emulator-reset.sh 로 다시 띄우세요.")
+                         f"EMULATOR_DNS 를 지우고(기본값 127.0.0.1) EMULATOR_PORT={port} scripts/emulator-reset.sh 로 다시 띄우세요.")
 
     selected = [s.strip() for s in args.service.split(",") if s.strip()] or list(checks)
     unknown = [s for s in selected if s not in checks]

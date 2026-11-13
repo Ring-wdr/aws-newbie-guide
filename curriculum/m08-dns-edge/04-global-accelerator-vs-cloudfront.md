@@ -53,6 +53,7 @@ flowchart LR
 bash curriculum/m08-dns-edge/labs/lab05-global-accelerator.sh
 ```
 
+<!-- external-host-ok: 에뮬레이터가 돌려준 가속기 DnsName을 실행 출력 그대로 실었다. 실습은 이 이름에 접속하지 않는다 -->
 ```
 == 1. 가속기 만들기 — 고정 애니캐스트 IPv4 2개
 {

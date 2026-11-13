@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # 사용법: scripts/emulator-status.sh
 #
-# 이 저장소의 스크립트로 띄운 에뮬레이터 컨테이너 목록과 헬스 체크, 메모리 사용량을 보여 준다.
+# 이 저장소의 스크립트로 띄운 에뮬레이터 컨테이너 목록과 헬스 체크, DNS 설정, 메모리 사용량을 보여 준다.
+# DNS 열: 127.0.0.1 = 컨테이너 안 이름 해석 차단(기본값), host = Docker 기본 리졸버(EMULATOR_DNS=host 로 띄움).
 set -euo pipefail
 # shellcheck source=scripts/_common.sh
 . "$(dirname "$0")/_common.sh"
@@ -20,7 +21,7 @@ if [ -z "$names" ]; then
 fi
 
 oom_hint=""
-printf '%-20s %-6s %-10s %-8s %s\n' "CONTAINER" "PORT" "STATE" "HEALTH" "MEMORY(USED / LIMIT)"
+printf '%-20s %-6s %-10s %-8s %-10s %s\n' "CONTAINER" "PORT" "STATE" "HEALTH" "DNS" "MEMORY(USED / LIMIT)"
 for name in $names; do
   port="${name#aws-emulator-}"
   state="$(container_state "$port")"
@@ -37,7 +38,7 @@ for name in $names; do
     if health_ok "$port"; then health="ok"; else health="FAIL"; fi
     mem="$(docker stats --no-stream --format '{{.MemUsage}}' "$name" 2>/dev/null || echo '-')"
   fi
-  printf '%-20s %-6s %-10s %-8s %s\n' "$name" "$port" "$state" "$health" "$mem"
+  printf '%-20s %-6s %-10s %-8s %-10s %s\n' "$name" "$port" "$state" "$health" "$(container_dns "$port")" "$mem"
 done
 for p in $oom_hint; do
   c_red "포트 $p: 메모리 상한을 넘어 강제 종료됨(종료 코드 137). 리소스는 사라졌습니다 → scripts/emulator-reset.sh $p (반복되면 EMULATOR_MEMORY=3g)"

@@ -66,6 +66,7 @@ bash curriculum/m07-serverless-containers/labs/lab03-apigw-rest-http.sh
 
 **1) REST API — MOCK 통합**
 
+<!-- external-host-ok: lab이 비교용으로 출력한 실제 AWS 주소 형식. 실습은 127.0.0.1 주소만 호출한다 -->
 ```
 == 4. 배포 → 스테이지 dev
 REST 기본 주소: https://127.0.0.1:9306/_aws/execute-api/srmuqurh02/dev   (실제 AWS: https://srmuqurh02.execute-api.us-east-1.amazonaws.com/dev)

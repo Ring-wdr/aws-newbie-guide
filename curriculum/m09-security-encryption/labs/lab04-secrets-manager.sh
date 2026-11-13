@@ -30,13 +30,13 @@ echo "== 1. 비밀 만들기 — 고객 관리형 KMS 키로 암호화"
 KEY="$(aws kms create-key --description "TodayOrder 비밀 키" --query KeyMetadata.KeyId --output text)"
 aws kms create-alias --alias-name "$ALIAS" --target-key-id "$KEY"
 aws secretsmanager create-secret --name "$SECRET" --kms-key-id "$ALIAS" --description "주문 DB 접속 정보" \
-  --secret-string '{"username":"orders_app","password":"v1-Initial!","host":"orders-db.internal","port":5432}' \
+  --secret-string '{"username":"orders_app","password":"v1-Initial!","host":"orders-db.todayorder.invalid","port":5432}' \
   --query '{ARN: ARN, Name: Name}'
 echo "ARN 끝의 '-xxxxxx' 6자는 AWS가 붙이는 무작위 접미사다 (같은 이름을 지웠다 다시 만들어도 ARN 이 다르게)"
 
 echo "== 2. 새 값 저장 → AWSCURRENT 는 새 버전으로, AWSPREVIOUS 는 옛 버전으로"
 aws secretsmanager put-secret-value --secret-id "$SECRET" \
-  --secret-string '{"username":"orders_app","password":"v2-Changed!","host":"orders-db.internal","port":5432}' >/dev/null
+  --secret-string '{"username":"orders_app","password":"v2-Changed!","host":"orders-db.todayorder.invalid","port":5432}' >/dev/null
 stages
 echo "AWSCURRENT : $(current)"
 echo "AWSPREVIOUS: $(current --version-stage AWSPREVIOUS)"

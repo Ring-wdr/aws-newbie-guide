@@ -105,7 +105,7 @@ if [ "$REBUILD" = 1 ] || ! docker image inspect "$EMULATOR_IMAGE" >/dev/null 2>&
 else
   echo "이미 있습니다. 최신 에뮬레이터로 다시 빌드하려면: scripts/install.sh --rebuild"
 fi
-c_grn "$(docker run --rm --entrypoint aws-emulator "$EMULATOR_IMAGE" --version | head -1)"
+c_grn "$(docker run --rm --network none --entrypoint aws-emulator "$EMULATOR_IMAGE" --version | head -1)"
 
 # ---------------------------------------------------------------- 4. Python 의존성
 step "4/5 Python 의존성 (uv sync)"

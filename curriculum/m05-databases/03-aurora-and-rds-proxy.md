@@ -185,6 +185,7 @@ aws rds create-global-cluster --global-cluster-identifier todayorder-m05-global 
   --source-db-cluster-identifier arn:aws:rds:us-east-1:000000000000:cluster:todayorder-m05-aurora
 ```
 
+<!-- external-host-ok: 에뮬레이터가 돌려준 AWS 형식 이름을 실행 출력 그대로 실었다. 실습은 이 이름에 접속하지 않는다 -->
 ```
 {
     "Id": "todayorder-m05-global",
@@ -216,6 +217,7 @@ aws rds create-db-proxy --db-proxy-name todayorder-m05-proxy --engine-family POS
 aws rds register-db-proxy-targets --db-proxy-name todayorder-m05-proxy --db-cluster-identifiers todayorder-m05-aurora
 ```
 
+<!-- external-host-ok: 에뮬레이터가 돌려준 AWS 형식 이름을 실행 출력 그대로 실었다. 실습은 이 이름에 접속하지 않는다 -->
 ```
 {
     "Name": "todayorder-m05-proxy",

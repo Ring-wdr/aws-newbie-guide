@@ -83,7 +83,7 @@ scripts/emulator-up.sh
 ```
 
 ```
-에뮬레이터를 시작합니다: aws-emulator-9297 (포트 9297, 메모리 상한 2g)
+에뮬레이터를 시작합니다: aws-emulator-9297 (포트 9297, 메모리 상한 2g, DNS 127.0.0.1)
 준비 완료: https://127.0.0.1:9297  (헬스 체크: ok)
 
 다음 명령으로 현재 셸을 이 에뮬레이터에 연결하세요:
@@ -100,7 +100,7 @@ scripts/emulator-up.sh
 | `--memory=2g --memory-swap=2g` | 메모리 상한 2 GiB, 스왑 없음 (공식 가이드와 같음). Lambda를 많이 호출하면 에뮬레이터 메모리가 계속 늘어나므로 넉넉히 둔다(아래 "문제 해결"). 바꾸려면 `EMULATOR_MEMORY=3g scripts/emulator-up.sh` |
 | `--telemetry off` | 사용 통계 전송을 끈다 (아래 "텔레메트리") |
 | `--pull never` | 로컬에서 빌드한 이미지만 쓴다. 이미지가 없을 때 Docker가 레지스트리(Docker Hub)에서 같은 이름을 찾으러 가지 않는다 |
-| (선택) `--dns 127.0.0.1` | `EMULATOR_DNS=127.0.0.1 scripts/emulator-reset.sh`로 켠다. 컨테이너 안의 이름 해석을 모두 막아, 에뮬레이터가 실제 AWS 형식 이름(예: ElastiCache가 돌려주는 `*.cache.amazonaws.com`)을 해석하러 바깥 DNS에 묻는 일이 없게 한다. 탐침(`tools/probe/probe.py --no-dns`)의 검증용이다. 실습은 기본값(Docker 기본 리졸버)으로 한다 |
+| `--dns 127.0.0.1` | **기본값.** 컨테이너 안의 이름 해석을 모두 막아, 에뮬레이터가 실제 AWS 형식 이름(예: ElastiCache가 돌려주는 `*.cache.amazonaws.com`)이나 실습 값에 들어간 이름을 해석하러 바깥 DNS에 묻는 일이 없게 한다. 모든 모듈의 실습이 이 설정에서 통과한다. 문제를 가려내려고 Docker 기본 리졸버로 돌려 봐야 할 때만 `EMULATOR_DNS=host scripts/emulator-reset.sh`로 끈다(다시 켜려면 `EMULATOR_DNS` 없이 `scripts/emulator-reset.sh`). 지금 설정은 `scripts/emulator-status.sh`의 DNS 열에 보인다 |
 
 이미 떠 있을 때 다시 실행해도 안전하다("이미 실행 중입니다"를 출력하고 끝난다).
 
@@ -172,7 +172,7 @@ LAB01 OK
 ### 5) 상태 보기, 초기화, 끄기
 
 ```bash
-scripts/emulator-status.sh     # 떠 있는 에뮬레이터와 메모리 사용량
+scripts/emulator-status.sh     # 떠 있는 에뮬레이터, DNS 설정, 메모리 사용량
 scripts/emulator-reset.sh      # 재시작 = 깨끗한 상태 (모든 리소스 삭제)
 scripts/emulator-down.sh       # 끄기  (--all: 이 저장소로 띄운 모든 에뮬레이터 — 다른 작업 것까지 끈다)
 ```
@@ -181,11 +181,11 @@ scripts/emulator-down.sh       # 끄기  (--all: 이 저장소로 띄운 모든 
   PROFILE    STATUS     ARCH       CPUS    MEMORY    DISK     RUNTIME    ADDRESS
   default    Running    aarch64    4       8GiB      60GiB    docker     
 
-CONTAINER            PORT   STATE      HEALTH   MEMORY(USED / LIMIT)
-aws-emulator-9297    9297   running    ok       173MiB / 2GiB
+CONTAINER            PORT   STATE      HEALTH   DNS        MEMORY(USED / LIMIT)
+aws-emulator-9297    9297   running    ok       127.0.0.1  173MiB / 2GiB
 ```
 
-방금 본 것: 첫 표는 Colima VM, 두 번째 표는 에뮬레이터 컨테이너다(이 출력은 CPU 4개·8 GiB로 켠 VM에서 얻었다). 공부를 마치면 `scripts/emulator-down.sh`로 끄고, 노트북 자원을 돌려받으려면 `colima stop`.
+방금 본 것: 첫 표는 Colima VM, 두 번째 표는 에뮬레이터 컨테이너다(이 출력은 CPU 4개·8 GiB로 켠 VM에서 얻었다). DNS 열의 `127.0.0.1`은 컨테이너 안 이름 해석이 막힌 기본 상태이고, `EMULATOR_DNS=host`로 띄운 컨테이너는 `host`로 보인다. 공부를 마치면 `scripts/emulator-down.sh`로 끄고, 노트북 자원을 돌려받으려면 `colima stop`.
 
 ### 6) 여러 에뮬레이터 동시에 (M12에서 사용)
 

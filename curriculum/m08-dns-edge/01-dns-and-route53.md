@@ -103,6 +103,7 @@ PENDING
 
 Alias 레코드의 모양(스크립트 발췌). `TTL`도 `ResourceRecords`도 없고 `AliasTarget`이 있다. `HostedZoneId`는 **대상 서비스의 영역 ID**다(CloudFront는 어디서나 `Z2FDTNDATAQYW2`, ALB는 리전마다 다르다 — `describe-load-balancers`의 `CanonicalHostedZoneId`).
 
+<!-- external-host-ok: AWS 문서의 CloudFront 예시 도메인을 쓴 스크립트 발췌. Route 53 Alias 값으로 저장만 되고 에뮬레이터는 해석·접속하지 않는다 -->
 ```json
 {"Name": "todayorder.example", "Type": "A",
  "AliasTarget": {"HostedZoneId": "Z2FDTNDATAQYW2", "DNSName": "d111111abcdef8.cloudfront.net", "EvaluateTargetHealth": false}}

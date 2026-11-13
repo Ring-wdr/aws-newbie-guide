@@ -56,6 +56,7 @@ EC2에 SSH로 접속할 때 쓰는 공개 키/개인 키 쌍. AWS는 **공개 �
 
 **IMDSv2**는 먼저 `PUT`으로 세션 토큰을 받아야 메타데이터를 읽을 수 있게 해 SSRF를 막는다. `HttpTokens=required`가 "v2만 허용"이다. `HttpPutResponseHopLimit=1`은 토큰 응답이 한 홉(인스턴스 자신)을 넘지 못하게 한다. 컨테이너 안에서 IMDS를 써야 하면 2로 둔다.
 
+<!-- external-host-ok: 실제 EC2 인스턴스 안에서만 쓰는 IMDS 링크 로컬 주소. 실습 스크립트는 이 명령을 실행하지 않는다 -->
 ```bash
 # 인스턴스 안에서 (실제 AWS)
 TOKEN=$(curl -s -X PUT http://169.254.169.254/latest/api/token -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")

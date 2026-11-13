@@ -112,7 +112,9 @@ def generate(data: dict[str, Any]) -> None:
     L.append(f"| 탐침 실행 시각 | {meta.get('generated_at', '?')} |")
     L.append(f"| 클라이언트 | `{meta.get('aws_cli', '?')}` · boto3 {meta.get('boto3', '?')} · Python {meta.get('python', '?')} |")
     dns = meta.get("container_dns")
-    dns_txt = ("Docker 기본 리졸버" if dns == [] else f"`{', '.join(dns)}` (격리 — `EMULATOR_DNS`)" if dns else "?")
+    dns_txt = ("Docker 기본 리졸버 (이 결과를 만든 실행의 설정. 지금 `scripts/emulator-up.sh` 기본값은 격리 `127.0.0.1`, 해제는 `EMULATOR_DNS=host`)" if dns == []
+               else f"`{', '.join(dns)}` (격리 — `scripts/emulator-up.sh` 기본값)" if dns == ["127.0.0.1"]
+               else f"`{', '.join(dns)}` (`EMULATOR_DNS`로 지정)" if dns else "?")
     L.append(f"| 컨테이너 DNS | {dns_txt} · 바깥 접속 확인 방법은 아래 \"환경 메모 → 외부 접속 위험\" |")
     if meta.get("partial_run"):
         L.append(f"| 마지막 부분 실행 | {', '.join(meta['partial_run'])} |")

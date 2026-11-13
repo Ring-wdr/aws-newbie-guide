@@ -8,9 +8,10 @@
 #   EMULATOR_MEMORY       컨테이너 메모리 상한 (기본 2g, 스왑 없음)
 #   EMULATOR_TELEMETRY    on 으로 두면 텔레메트리를 끄지 않는다 (기본: 끔)
 #   EMULATOR_IDLE_TIMEOUT 지정한 초 동안 API 호출이 없으면 에뮬레이터가 스스로 종료
-#   EMULATOR_DNS          컨테이너가 쓸 DNS 서버 IP (docker run --dns). 127.0.0.1 로 두면 컨테이너 안의
-#                         이름 해석이 모두 실패해 바깥으로 DNS 질의가 나가지 않는다(탐침 검증용, M00 레슨 3).
-#                         비우면 Docker 기본 리졸버를 쓴다(기본값).
+#   EMULATOR_DNS          컨테이너가 쓸 DNS 서버 IP (docker run --dns). 기본값 127.0.0.1: 컨테이너 안의
+#                         이름 해석이 모두 실패해 바깥으로 DNS 질의가 나가지 않는다(M00 레슨 3).
+#                         host 로 두면 --dns 를 붙이지 않아 Docker 기본 리졸버를 쓴다(격리 해제, 문제 해결용).
+#                         비워 두거나 설정하지 않으면 기본값(127.0.0.1)이다.
 set -euo pipefail
 # shellcheck source=scripts/_common.sh
 . "$(dirname "$0")/_common.sh"
@@ -21,9 +22,11 @@ NAME="$(container_name "$PORT")"
 # 기본 2g(공식 가이드와 같음). 동기 Lambda Invoke 한 번마다 약 7 MiB가 회수되지 않고 쌓여서
 # 1g 에서는 약 120번 호출 후 OOM(137)으로 죽었다(측정과 대처: M00 레슨 3 문제 해결). 병렬 에이전트는 줄일 수 있다.
 MEMORY="${EMULATOR_MEMORY:-2g}"
-DNS="${EMULATOR_DNS:-}"
-if [ -n "$DNS" ] && ! [[ "$DNS" =~ ^[0-9]{1,3}(\.[0-9]{1,3}){3}$ ]]; then
-  die "EMULATOR_DNS 는 IPv4 주소여야 합니다 (예: 127.0.0.1): '$DNS'"
+DNS="${EMULATOR_DNS:-127.0.0.1}"
+if [ "$DNS" = "host" ]; then
+  DNS=""   # 격리 해제: Docker 기본 리졸버
+elif ! [[ "$DNS" =~ ^[0-9]{1,3}(\.[0-9]{1,3}){3}$ ]]; then
+  die "EMULATOR_DNS 는 IPv4 주소이거나 host 여야 합니다 (기본 127.0.0.1, 격리 해제는 host): '$DNS'"
 fi
 
 require_docker
@@ -44,6 +47,10 @@ state="$(container_state "$PORT")"
 if [ "$state" = "running" ]; then
   if health_ok "$PORT"; then
     c_grn "이미 실행 중입니다: $NAME (https://127.0.0.1:$PORT)"
+    running_dns="$(container_dns "$PORT")"
+    if [ "$running_dns" != "${DNS:-host}" ]; then
+      c_ylw "이 컨테이너의 DNS 설정($running_dns)이 요청한 값(${DNS:-host})과 다릅니다. 바꾸려면 scripts/emulator-reset.sh $PORT"
+    fi
     print_next
     exit 0
   fi
@@ -86,7 +93,7 @@ if [ -z "$state" ]; then
     emu_args+=(--idle-timeout "$EMULATOR_IDLE_TIMEOUT")
   fi
 
-  echo "에뮬레이터를 시작합니다: $NAME (포트 $PORT, 메모리 상한 $MEMORY${DNS:+, DNS $DNS})"
+  echo "에뮬레이터를 시작합니다: $NAME (포트 $PORT, 메모리 상한 $MEMORY, DNS ${DNS:-host(Docker 기본 리졸버)})"
   if ! docker "${run_args[@]}" "$EMULATOR_IMAGE" "${emu_args[@]}" >/dev/null; then
     die "컨테이너를 시작하지 못했습니다. 포트 $PORT 를 다른 프로그램이 쓰고 있지 않은지 확인하세요 (lsof -i :$PORT)."
   fi

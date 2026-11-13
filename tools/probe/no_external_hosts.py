@@ -27,10 +27,14 @@ RFC 2606/6761 예약 이름(.invalid, .test, .example, .localhost)이나 루프�
 같은 줄이나 바로 윗줄 주석에 `external-host-ok: <이유>` 가 있으면 의도된 것으로 보고 건너뛴다
 (예: 가드 자체 시험에서 "거부돼야 하는" 실제 AWS 주소, 설치 안내 링크).
 Markdown 은 코드 블록(```) 안만 검사한다. 본문의 문서 링크는 학습자가 브라우저로 여는 것이다.
+에뮬레이터가 실제로 돌려준 출력처럼 블록 안을 고칠 수 없으면, 여는 ``` 바로 윗줄에
+`<!-- external-host-ok: <이유> -->` 를 달아 그 블록 전체를 건너뛴다(이유가 비어 있으면 무효).
+
+기본 범위: tools, scripts, src, curriculum(M00~M14 전체). 탐침 시작 때는 탐침 코드(tools/probe)만 본다.
 
 사용법 (저장소 루트에서):
     uv run python tools/probe/no_external_hosts.py                 # 기본 범위, 위반 시 종료 코드 1
-    uv run python tools/probe/no_external_hosts.py curriculum      # 경로 지정
+    uv run python tools/probe/no_external_hosts.py curriculum/m08-dns-edge  # 경로 지정
     uv run python tools/probe/no_external_hosts.py --report curriculum  # 목록만, 실패하지 않음
 """
 
@@ -45,19 +49,21 @@ from dataclasses import dataclass
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_PATHS = ["tools", "scripts", "src", "curriculum/m00-orientation"]
+DEFAULT_PATHS = ["tools", "scripts", "src", "curriculum"]
 PROBE_PATHS = ["tools/probe"]
 SUFFIXES = {".py", ".sh", ".bash", ".zsh", ".json", ".yaml", ".yml", ".toml", ".md", ".txt", ".tf", ".cfg", ".ini", ""}
 SKIP_NAMES = {"results.json", "uv.lock"}
 SKIP_DIRS = {".git", ".venv", "__pycache__", "node_modules", ".worktrees"}
 MARKER = "external-host-ok"
+# Markdown 코드 블록 전체 표시: 여는 ``` 바로 윗줄의 HTML 주석 (렌더링되지 않으므로 실제 출력 블록을 고치지 않는다)
+MD_BLOCK_MARKER = re.compile(r"^\s*<!--\s*" + MARKER + r":\s*\S.*-->\s*$")
 
 RESERVED_TLDS = (".invalid", ".test", ".example", ".localhost")
 EMAIL_OK = ("example.com", "example.net", "example.org")
 DOC_NETS = [ipaddress.ip_network(n) for n in ("127.0.0.0/8", "::1/128", "192.0.2.0/24", "198.51.100.0/24", "203.0.113.0/24")]
 KNOWN = re.compile(r"(?i)\b(public\.ecr\.aws|registry-1\.docker\.io|docker\.io|ghcr\.io|quay\.io|gcr\.io|registry\.k8s\.io)\b")
 
-URL = re.compile(r"(?i)\b(?:https?|wss?|ftp)://([^/\s\"'`)<>\]|,;]+)")
+URL = re.compile(r"(?i)\b(?:https?|wss?|ftp)://([^/\s\\\"'`)<>\]|,;]+)")
 IMAGE = re.compile(
     r"(?i)(?:[\"']?\b(?:image|image_?uri)\b[\"']?\s*[:=]\s*|--image(?:-uri)?(?:\s+|=))"
     r"[\"']?([^\s\"',}\)]+)")
@@ -65,9 +71,9 @@ DOCKER_FROM = re.compile(r"^\s*FROM\s+(?:--\S+\s+)*(\S+)")
 # 주소 키 값에서 호스트로 볼 꼬리: 예약 TLD 와 흔한 공개 TLD (t3.small 같은 값은 호스트로 보지 않는다)
 TLDS = "invalid|test|example|localhost|com|net|org|io|aws|dev|app|co|cloud|ai|me|info|biz|kr|jp|us|uk|de|cn|xyz|site|tech|internal"
 HOSTKEY = re.compile(
-    r"(?i)[\"']?\b(endpoint(?:_url|-url|url)?|issuer|integration_?uri|fullyqualifieddomainname|hostname|"
+    r"(?i)\\?[\"']?\b(endpoint(?:_url|-url|url)?|issuer|integration_?uri|fullyqualifieddomainname|hostname|"
     r"servername|domainname|dnsname|value|--server-name|--domain-name|--dns-name|"
-    r"--endpoint-url|--issuer|--integration-uri)\b[\"']?\s*[:= ]\s*[\"']?([A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.(?:(?-i:" + TLDS + r")|\d+))(?=[:/\"'\s,)}]|$)")
+    r"--endpoint-url|--issuer|--integration-uri)\b\\?[\"']?\s*[:= ]\s*\\?[\"']?([A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.(?:(?-i:" + TLDS + r")|\d+))(?=[:/\\\"'\s,)}]|$)")
 # 공개 도메인으로 보이는 꼬리. f-string·문자열 연결의 리터럴 부분에서 찾는다.
 PUBLIC_SUFFIX = re.compile(
     r"(?i)(?<![\w-])(?:[a-z0-9{}-]+\.)+(?:amazonaws\.com|on\.aws|amazon\.com|cloudfront\.net|"
@@ -134,7 +140,8 @@ def scan_text(path: str, text: str) -> list[Hit]:
     for no, line in enumerate(lines, 1):
         if is_md and line.lstrip().startswith("```"):
             in_code = not in_code
-            skip_block = in_code and line.strip().lower() == "```mermaid"  # 그림은 코드가 아니다
+            skip_block = in_code and (line.strip().lower() == "```mermaid"  # 그림은 코드가 아니다
+                                      or (no > 1 and MD_BLOCK_MARKER.match(lines[no - 2]) is not None))
             continue
         if is_md and (not in_code or skip_block):
             continue
@@ -263,6 +270,9 @@ BAD_SAMPLES = [
     'Endpoint="ops@todayorder.com"',
     'ServerName="db.todayorder.com"',
     '"Value": "metadata.google.internal"',
+    # 셸 큰따옴표 문자열 안의 이스케이프된 JSON
+    '--change-batch "{\\"ResourceRecords\\": [{\\"Value\\": \\"d111111abcdef8.cloudfront.net\\"}]}"',
+    '\\"AliasTarget\\": {\\"HostedZoneId\\": \\"Z2FDTNDATAQYW2\\", \\"DNSName\\": \\"d111111abcdef8.cloudfront.net\\"}',
 ]
 # Python 전용(f-string·문자열 연결)
 BAD_PY_SAMPLES = [
@@ -286,6 +296,19 @@ GOOD_SAMPLES = [
     'Principal={"Service": "lambda.amazonaws.com"}',
     'Endpoint="dev@example.com"',
     'curl http://{dns}/hello',
+    '\\"DNSName\\": \\"api.todayorder.example\\"',
+    '--endpoint-url \\"https://hook.todayorder.invalid\\"',
+]
+# Markdown: 블록 표시가 있으면 블록 전체를 건너뛰고, 이유가 없거나 한 줄 떨어져 있으면 무효
+MD_BAD_SAMPLES = [
+    "```\nhttps://sqs.us-east-1.amazonaws.com/000000000000/q\n```",
+    "<!-- external-host-ok: -->\n```\nhttps://sqs.us-east-1.amazonaws.com/000000000000/q\n```",
+    "<!-- external-host-ok: 이유 -->\n\n```\nhttps://sqs.us-east-1.amazonaws.com/000000000000/q\n```",
+    "<!-- external-host-ok: 앞 블록만 -->\n```\nok\n```\n```\nhttps://sqs.us-east-1.amazonaws.com/000000000000/q\n```",
+]
+MD_GOOD_SAMPLES = [
+    "<!-- external-host-ok: 에뮬레이터가 돌려준 큐 URL -->\n```\nhttps://sqs.us-east-1.amazonaws.com/000000000000/q\n```",
+    "본문 링크 https://docs.aws.amazon.com/ 는 검사하지 않는다",
 ]
 
 
@@ -296,6 +319,8 @@ def selftest() -> list[str]:
              for s in GOOD_PY_SAMPLES if scan_python("selftest.py", s)]
     errs += [f"통과해야 하는데 걸림: {s} → {scan_text('selftest.py', s)[0].value}"
              for s in GOOD_SAMPLES if scan_text("selftest.py", s)]
+    errs += [f"걸러야 하는데 통과(md): {s!r}" for s in MD_BAD_SAMPLES if not scan_text("selftest.md", s)]
+    errs += [f"통과해야 하는데 걸림(md): {s!r}" for s in MD_GOOD_SAMPLES if scan_text("selftest.md", s)]
     return errs
 
 
