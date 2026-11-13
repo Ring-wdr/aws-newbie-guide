@@ -1,0 +1,33 @@
+{
+  "name": "aws-newbie-guide-site",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "ASTRO_TELEMETRY_DISABLED=1 ASTRO_DISABLE_UPDATE_CHECK=true astro dev --host 127.0.0.1",
+    "build": "ASTRO_TELEMETRY_DISABLED=1 ASTRO_DISABLE_UPDATE_CHECK=true astro build --force",
+    "build:pilot": "GUIDE_SCOPE=pilot ASTRO_TELEMETRY_DISABLED=1 ASTRO_DISABLE_UPDATE_CHECK=true astro build --force",
+    "preview": "ASTRO_TELEMETRY_DISABLED=1 ASTRO_DISABLE_UPDATE_CHECK=true astro preview --host 127.0.0.1",
+    "report": "node scripts/converter-report.mjs"
+  },
+  "dependencies": {
+    "@astrojs/markdown-remark": "7.3.8",
+    "@astrojs/preact": "6.1.5",
+    "@astrojs/starlight": "0.42.11",
+    "astro": "7.4.11",
+    "axe-core": "4.14.0",
+    "github-slugger": "2.0.0",
+    "hast-util-to-string": "3.0.1",
+    "mdast-util-to-string": "4.0.0",
+    "mermaid-isomorphic": "3.1.0",
+    "playwright": "1.64.1",
+    "preact": "11.2.0",
+    "remark-gfm": "4.0.1",
+    "remark-parse": "11.0.0",
+    "unified": "11.0.5",
+    "unist-util-visit": "5.2.0",
+    "vfile": "6.0.3"
+  }
+}
