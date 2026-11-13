@@ -57,6 +57,7 @@ aws docdb create-db-instance --db-instance-identifier todayorder-m05-reviews-1 \
   --db-cluster-identifier todayorder-m05-reviews --engine docdb --db-instance-class db.t3.medium
 ```
 
+<!-- external-host-ok: 에뮬레이터가 돌려준 AWS 형식 이름을 실행 출력 그대로 실었다. 실습은 이 이름에 접속하지 않는다 -->
 ```
 {
     "Status": "available",
@@ -103,6 +104,7 @@ aws keyspaces create-table --keyspace-name todayorder_m05 --table-name order_eve
 
 **3) Neptune: 그래프 DB 클러스터**
 
+<!-- external-host-ok: 에뮬레이터가 돌려준 AWS 형식 이름을 실행 출력 그대로 실었다. 실습은 이 이름에 접속하지 않는다 -->
 ```
 {
     "Status": "available",
