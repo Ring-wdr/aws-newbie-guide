@@ -11,7 +11,7 @@
    - 그 밖에 실행되는 것: Glue Python shell 작업, Athena SQL, Secrets Manager 교체 Lambda, Config 자동 수정, ASG 인스턴스 새로 고침, ALB 앞의 WAF 차단(컨테이너 안).
 2. **IAM은 "평가 안 함"이 아니라 "부분 평가"다.**
    - 사용자 정책을 평가하는 곳:
-     - IAM·EC2·KMS·Secrets Manager
+     - IAM·EC2·KMS·Secrets Manager(정책 없는 사용자의 `GetSecretValue`·`ListSecrets`·`CreateSecret`·`DescribeSecret` 모두 거부, 허용하면 성공)
      - S3·SQS·DynamoDB의 **리소스 단위 데이터 요청**(GetObject·PutObject·ListObjectsV2, SendMessage·ReceiveMessage, PutItem·Scan 등)
      - Lambda 실행 역할·Glue 작업 역할로 하는 호출
    - 평가하지 않는 곳:
@@ -20,11 +20,14 @@
      - EC2에 대한 세션 정책
      - `iam:PassRole`
    - 비활성 액세스 키는 IAM API만 거부한다.
-   - 자격 증명 정책에 전역 조건 키를 걸면 Deny는 항상, Allow는 결코 적용되지 않는다. 정책 시뮬레이터와 신뢰 정책 조건은 올바르게 판정한다.
+   - 자격 증명 정책의 전역 조건 키는 **서비스와 키마다 다르게** 평가된다(`iam-conditions`: S3 `ListObjectsV2`, SQS `SendMessage`, DynamoDB `Scan`, EC2 `DescribeVpcs`, IAM `ListUsers` × 세 키 × 조건부 Allow·조건부 Deny).
+     - S3·SQS: `aws:SecureTransport`·`aws:PrincipalAccount`는 AWS처럼 판정한다(맞는 조건의 Allow는 적용, 맞지 않는 조건의 Deny는 미적용). `aws:RequestedRegion`이 붙은 문장은 Allow는 결코, Deny는 항상 적용된다.
+     - DynamoDB·EC2·IAM: 세 키 모두 Allow는 결코, Deny는 항상 적용된다.
+     - 정책 시뮬레이터(`--context-entries`)와 역할 신뢰 정책의 조건은 올바르게 판정한다.
 3. **VPC·EC2 컨트롤 플레인은 🟢 수준이다.** 다만 삭제·교체 계열(피어링 삭제/거절/수락, `ReplaceRoute`, TGW 경로·연결 삭제)과 Egress-only IGW·리전 NAT·VPN·Client VPN은 501이다.
 4. **시간이 걸리는 동작은 빠르거나 일어나지 않는다.**
-   - 빠른 것: TTL 삭제·Firehose 버퍼·Glacier 복원·CloudTrail 로그는 수 초, Scheduler `at()`은 지정 시각 전에 발화.
-   - 일어나지 않는 것: 수명 주기 전환, Lambda 비동기 대상·DLQ 전달.
+   - 빠른 것: TTL 삭제·Firehose 버퍼·CloudTrail 로그는 수 초, Glacier Standard 복원은 1초 안에 끝남(`s3`), Scheduler `at()`은 지정 시각 전에 발화.
+   - 일어나지 않는 것: 수명 주기 전환, Lambda 비동기 실패의 OnFailure 대상·함수 DLQ(`DeadLetterConfig`) 전달(`lambda-runtime`, 35초 관찰).
    - CloudFormation은 조회할 때만 진행하고 대기 리소스에 약 10초 마감이 있어, 30초 간격의 CLI waiter로는 NAT 경로가 있는 스택이 롤백된다.
 5. **리소스 엔드포인트는 컨테이너 안에만 있다.** RDS, ALB, CloudFront가 실제로 응답하지만 호스트에서는 닿지 않는다. API Gateway 실행 URL만 호스트에서 열린다.
 
@@ -45,17 +48,18 @@
 |---|---|---|
 | client-config | 🟢 | 127.0.0.1 필수·S3 Control 도달 불가·호스트 접두사 문제가 문서대로 재현됨 |
 | iam | 🟢 | CRUD·정책 버전·시뮬레이터 완전. MFA 장치 활성화·조회 501, GetAccountSummary 미지원. 권한 집행은 `iam-enforcement` |
-| iam-enforcement | 🟡 | 데이터 요청·IAM·EC2는 거부를 재현. 계정·관리 요청, AssumeRole 호출자 정책, EC2 세션 정책, PassRole, 비활성 키(IAM 외), 전역 조건 키는 AWS와 다름 |
+| iam-enforcement | 🟡 | 데이터 요청·IAM·EC2·Secrets Manager는 거부를 재현. S3·SQS·DynamoDB 계정·관리 요청, AssumeRole 호출자 정책, EC2 세션 정책, PassRole, 비활성 키(IAM 외)는 AWS와 다름 |
+| iam-conditions | 🟡 | S3·SQS는 `aws:SecureTransport`·`aws:PrincipalAccount`를 정확히 판정, `aws:RequestedRegion`은 Allow 미적용·Deny 항상. DynamoDB·EC2·IAM은 세 키 모두 Allow 미적용·Deny 항상 |
 | sts | 🟢 | AssumeRole 임시 자격 증명·신뢰 정책 거부까지 재현 (키 접두사만 ASIA가 아니라 EMULATOR) |
 | organizations | 🟡 | 조직·루트·OU만. SCP(활성화·생성·목록·연결)와 계정(생성·목록·조회·이동)·ListChildren은 501 |
 | ec2-vpc | 🟢 | VPC·서브넷·라우팅·IGW·NAT·SG·NACL·엔드포인트·TGW 생성·조회. 트래픽은 흐르지 않음 |
 | vpc-gaps | 🟡 | 피어링 수락·거절·삭제, ReplaceRoute, TGW 경로·연결 삭제, Egress-only IGW, 리전 NAT, Client VPN 501. TGW 기본 연결·전파 무시, NAT 삭제 후 경로 active, 기본 VPC에 IGW 없음 |
 | ec2-instances | 🟡 | 상태 전이는 실제처럼 관찰되지만 부팅·사용자 데이터 실행 없음. DescribeInstanceStatus·ModifyInstanceAttribute·DescribeTags 501 |
 | ebs-ami | 🟡 | 볼륨·스냅샷·시작 템플릿(버전 포함) OK. CreateImage·RegisterImage 501, 스냅샷에서 볼륨 복원 실패 |
-| compute-gaps | 🟡 | DeleteKeyPair 501, 종료 후 루트 볼륨 in-use, IOPS 비율 미검사, ALB host-header 미매칭, ASG 대상 그룹 미등록, ASG 조회·SetInstanceHealth 501. 인스턴스 새로 고침은 동작 |
-| elbv2 | 🟡 | 구성 전부 OK, ALB가 컨테이너 안에서 HTTP 응답. 호스트에서 접속 불가, 대상 헬스는 검사 없이 healthy |
+| compute-gaps | 🟡 | DeleteKeyPair 501, 종료 후 루트 볼륨 in-use, IOPS 비율 미검사, ALB host-header 미매칭, ASG 대상 그룹 미등록, ASG 조회·SetInstanceHealth 501. 인스턴스 새로 고침은 동작. 대상 헬스는 HTTP 검사 없이 running이면 healthy, 중지하면 unhealthy |
+| elbv2 | 🟡 | 구성 전부 OK, ALB가 컨테이너 안에서 HTTP 응답. 호스트에서 접속 불가, 대상 헬스는 HTTP 검사 없이 인스턴스 상태를 따름(`compute-gaps`) |
 | autoscaling | 🟡 | ASG가 Desired만큼 인스턴스를 띄우고 인스턴스 새로 고침도 됨. 조정 정책·예약·수명 주기 후크 501, 자가 치유 없음 |
-| s3 | 🟢 | 버전·삭제 마커·미리 서명 URL(curl)·멀티파트·객체 잠금·복제·이벤트 알림·버킷 정책 Deny·수명 주기 검증(2026-07 규칙) 실제처럼. 전환은 시간이 흘러도 안 일어남, SSE-KMS 키 비활성 무시 |
+| s3 | 🟢 | 버전·삭제 마커·미리 서명 URL(curl)·멀티파트·객체 잠금·복제·이벤트 알림·버킷 정책 Deny·수명 주기 검증(현재 AWS 규칙) 실제처럼. 전환은 시간이 흘러도 안 일어남, SSE-KMS 키 비활성 무시 |
 | s3-gaps | 🟡 | MFA Delete 미집행, 객체 잠금 버킷 일시 중지 허용, 복제 구성 검증 느슨, SSE-C 차단 미집행, 퍼블릭 정책 익명 GET 403, DataSync 0개 복사, Storage Gateway·DataSync 일부 501 |
 | efs | 🟡 | 파일 시스템·마운트 타깃·액세스 포인트 생성. 마운트 타깃 AZ·IP가 서브넷 CIDR을 따르지 않음, 마운트 불가 |
 | rds | 🟡 | 인스턴스·복제본·스냅샷·Aurora 클러스터 OK, 컨테이너 안에 실제 DB. 호스트 접속 불가, Multi-AZ 장애 조치 재현 안 됨 |
@@ -70,12 +74,12 @@
 | kinesis | 🟢 | 상태 전이·파티션 키→샤드·GetRecords 순서·리샤딩 |
 | firehose | 🟢 | S3에 실제 객체가 생김. 버퍼 시간 무시, 역할은 신뢰 정책만 검사(`analytics-gaps`) |
 | lambda | 🟢 | 생성·버전·별칭·동시성·Invoke(실제 실행)·이벤트 소스 매핑 소비·함수 URL 발급. 로그 그룹은 역할에 logs 권한이 있을 때만 |
-| lambda-runtime | 🟡 | RustPython 런타임, 실행 역할 정책 집행(AWS와 같음). 비동기 실패 대상·재시도 설정 무시, 동기 호출마다 메모리 누수 |
+| lambda-runtime | 🟡 | RustPython 런타임, 실행 역할 정책 집행(AWS와 같음). 비동기 실패의 OnFailure 대상·함수 DLQ 미전달, 재시도 설정 무시, 동기 호출마다 메모리 누수 |
 | lambda-permissions | 🟢 | REST API·SNS·S3 → Lambda는 리소스 정책을 AWS처럼 요구. HTTP API만 검사하지 않음(`apigatewayv2`) |
 | apigateway | 🟢 | REST API MOCK·Lambda 프록시를 `https://127.0.0.1:<포트>/_aws/execute-api/<id>/<stage>/<경로>` 로 실제 호출 |
 | apigatewayv2 | 🟢 | HTTP API → Lambda 프록시 실제 실행. Lambda 리소스 정책(AddPermission) 없이도 통과함은 AWS와 다름 |
 | ecr | 🟢 | 저장소·수명 주기 정책·인증 토큰 (이미지 푸시는 시험 안 함) |
-| ecs | 🟡 | 클러스터·작업 정의·서비스 생성. 태스크는 이미지를 실제로 내려받으려다 STOPPED(외부 접속 위험 — 환경 메모) |
+| ecs | 🟡 | 클러스터·작업 정의·서비스 생성. 태스크는 이미지를 실제로 내려받으려다 STOPPED(탐침은 `registry.invalid` 이미지를 씀. 외부 접속 위험 — 환경 메모) |
 | cognito | 🟢 | 사용자 풀 가입·확인·로그인으로 JWT 발급, 자격 증명 풀 임시 자격 증명 |
 | route53 | 🟡 | 영역·레코드 CRUD·가중치 응답 OK. 상태 확인은 항상 Success, 실제 DNS 질의 불가. 응답 선택은 `edge-better` |
 | edge-better | 🟡 | WAF가 ALB 앞에서 실제 403 차단(컨테이너 안). Route 53 지연 시간 응답이 위치와 무관, 라우팅 정책 혼용 허용, CIDR 컬렉션 조회 501 |
@@ -83,7 +87,7 @@
 | globalaccelerator | 🟡 | 가속기·리스너·엔드포인트 그룹, 정적 IP 2개 표시. 트래픽 없음 |
 | wafv2 | 🟢 | IP 세트·Web ACL(속도 기반·관리형 규칙)·ALB 연결. 차단은 `edge-better`에서 실제 403 확인 |
 | kms | 🟢 | 암복호화·데이터 키(봉투)·서명·교체·삭제 예약·다중 리전 키·키 정책 Deny 집행·비활성 키 DisabledException |
-| secretsmanager | 🟢 | 버전 스테이지 이동·복구, 교체 Lambda가 실제로 실행(`security-better`) |
+| secretsmanager | 🟢 | 버전 스테이지 이동·복구, 교체 Lambda가 실제로 실행(`security-better`), 사용자 정책 평가(`iam-enforcement`) |
 | ssm | 🟢 | 파라미터 계층·SecureString·버전·레이블. Session Manager 501, 공개 리전 파라미터 없음, 비활성 CMK의 SecureString도 복호화됨 |
 | security-better | 🟢 | Secrets Manager 교체, Config 자동 수정 실제 실행, KMS DisabledException. SSM의 비활성 CMK 무시, Audit Manager 501, CloudTrail KMS 이벤트 없음 |
 | acm | 🟡 | 가져온 인증서는 ISSUED. DNS 검증 인증서는 PENDING_VALIDATION에서 끝나지 않음 |
@@ -97,7 +101,7 @@
 | glue | 🟡 | 데이터베이스·테이블·Python shell 작업 실행. 크롤러 실행·GetPartitions 501, Spark 작업 실패(m11 README) |
 | athena | 🟡 | Glue 테이블(S3 JSON)에 SQL이 실제로 실행. 결과 파일 안 씀, SQL 방언·파티션은 `analytics-gaps` |
 | analytics-gaps | 🟡 | Athena: 파티션 열 미지원·위치 아래 파일 전부 읽음·Trino 함수 없음·작업 그룹 목록/삭제 501. Glue Python shell 실제 실행, Firehose는 역할 권한 정책 미검사 |
-| backup | 🟢 | 볼트·계획·선택, 온디맨드 백업 COMPLETED와 복구 지점. 복원은 빈 테이블, 목록 계열 501(m12 README) |
+| backup | 🟡 | 볼트·계획·선택, 온디맨드 백업 COMPLETED와 복구 지점은 탐침 확인. 복원하면 **빈 테이블**이 생기고 목록 계열은 501이라(모듈 저자 관찰 (m12 README)) 백업→복원 흐름은 재현되지 않음 |
 | dms | 🟡 | 복제 인스턴스·엔드포인트·작업 생성. TestConnection 등 501, 실제 복제 없음 |
 | budgets | 🟡 | 예산·알림 저장(실제 지출 0). Cost Explorer GetCostAndUsage 501 |
 | tagging | 🟡 | TagResources 동작. GetResources가 SQS만 찾고 S3·DynamoDB·EC2는 못 찾음 |
@@ -113,13 +117,18 @@
 |---|---|
 | IAM 사용자·그룹·역할·정책·정책 버전·인스턴스 프로파일 CRUD는 AWS와 같다 | `iam` |
 | `simulate-custom-policy`·`simulate-principal-policy`는 명시적/암묵적 Deny와 `--context-entries` 조건을 올바르게 판정한다 → 정책 판정 워크시트의 채점기로 쓸 수 있다 | `iam`, `iam-enforcement` |
-| 정책 없는 사용자는 IAM·EC2·KMS 요청과 S3 `GetObject`·`PutObject`·`ListObjectsV2`, SQS `SendMessage`·`ReceiveMessage`, DynamoDB `PutItem`·`Scan`에서 거부된다. `Allow *` + 명시적 Deny `s3:GetObject`도 집행된다 | `iam-enforcement` |
+| 정책 없는 사용자는 IAM·EC2·KMS 요청, Secrets Manager `GetSecretValue`·`ListSecrets`·`CreateSecret`·`DescribeSecret`, S3 `GetObject`·`PutObject`·`ListObjectsV2`, SQS `SendMessage`·`ReceiveMessage`, DynamoDB `PutItem`·`Scan`에서 거부된다. `Allow *` + 명시적 Deny `s3:GetObject`도 집행된다 | `iam-enforcement` |
 | 같은 사용자가 S3 `ListBuckets`·`CreateBucket`·`PutBucketVersioning`·`DeleteBucket`, SQS `ListQueues`·`CreateQueue`, DynamoDB `ListTables`·`CreateTable`·`DescribeTable`·`DeleteTable`은 **통과**한다(남의 버킷·테이블도 지울 수 있다). 이 계정 수준 요청에는 명시적 Deny도 적용되지 않는다 | `iam-enforcement` |
 | AssumeRole은 **역할의 신뢰 정책만** 본다. 신뢰 정책이 계정 루트를 믿으면, 정책이 없는 사용자도 `sts:AssumeRole`을 명시적으로 Deny 당한 사용자도 역할을 맡는다. 신뢰 정책의 주체·조건(`sts:ExternalId`)은 집행된다 | `iam-enforcement`, `sts` |
 | 세션 정책은 IAM 요청에는 적용되고 EC2 요청에는 적용되지 않는다(Deny도 무시) | `iam-enforcement` |
 | `iam:PassRole`을 검사하지 않는다(`run-instances --iam-instance-profile`이 명시적 Deny에도 통과) | `iam-enforcement` |
 | `Inactive`로 바꾼 액세스 키는 IAM API만 거부한다(`InvalidClientTokenId`). STS·S3·EC2 등은 받아 준다 | `iam-enforcement` |
-| 자격 증명 정책에서 전역 조건 키(`aws:RequestedRegion`, `aws:SecureTransport`, `aws:PrincipalAccount` 등)를 쓰면, 실제 호출에서는 Deny가 **항상** 적용되고 Allow는 **결코** 적용되지 않는다. 예외로 IAM API의 `aws:username`은 정확하다. EC2에서는 `aws:username` Deny도 항상 적용된다. 조건이 있는 정책은 시뮬레이터로만 판정한다 | `iam-enforcement` (`aws:username`·`aws:PrincipalAccount`: 모듈 저자 관찰 (m01 README)) |
+| 자격 증명 정책의 전역 조건 키는 서비스·키마다 다르게 평가된다. 시험: 각 키마다 조건부 Allow만 가진 사용자와 `Allow *` + 조건부 Deny 사용자, 조건은 실제 요청에 맞는 값(Allow)·맞지 않는 값(Deny) | `iam-conditions` |
+| ↳ S3 `ListObjectsV2`·SQS `SendMessage`: `aws:SecureTransport`(`true`/`false`)와 `aws:PrincipalAccount`(`000000000000`/다른 계정)는 **AWS와 같다** — 조건부 Allow로 통과하고, 맞지 않는 조건부 Deny는 적용되지 않는다 | `iam-conditions` |
+| ↳ S3·SQS의 `aws:RequestedRegion`(`us-east-1`/`eu-west-1`): 조건부 Allow는 **결코** 적용되지 않고(거부), 맞지 않는 조건부 Deny가 **항상** 적용된다(거부) | `iam-conditions` |
+| ↳ DynamoDB `Scan`·EC2 `DescribeVpcs`·IAM `ListUsers`: 세 키 모두 조건부 Allow는 결코 적용되지 않고 조건부 Deny는 항상 적용된다 | `iam-conditions` |
+| ↳ `aws:username`은 IAM API에서 정확하고 EC2에서는 Deny가 항상 적용된다 | 모듈 저자 관찰 (m01 README) |
+| ↳ 그러므로 조건 키 실습의 판정은 시뮬레이터로 한다. 실제 호출로 보여 주려면 S3·SQS의 `aws:SecureTransport`·`aws:PrincipalAccount`만 쓴다 | `iam`, `iam-conditions` |
 | 자격 증명 정책에 `Principal`이 있어도 받아 준다(AWS: `MalformedPolicyDocument`) | `iam` |
 | MFA 장치 활성화·조회·비활성화·삭제는 501이다. `CreateVirtualMFADevice`만 동작한다. `GetAccountSummary`·`GetAccountPasswordPolicy`는 `InvalidAction`이다 | `iam` |
 | 조직은 처음부터 있다. OU만 만들 수 있고 SCP와 계정 API는 501이다 | `organizations` |
@@ -145,7 +154,8 @@
 | 인스턴스 상태 전이(pending→running→stopped→terminated), 프라이빗 IP, IMDSv2 설정, 사용자 데이터 저장이 된다. 부팅과 실행은 하지 않는다 | `ec2-instances` |
 | `DescribeInstanceStatus`, `ModifyInstanceAttribute`, `DescribeTags`, `DeleteKeyPair`, `CreateImage`, `RegisterImage`는 501이다. 스냅샷에서 볼륨을 복원하면 실패한다 | `ec2-instances`, `ebs-ami`, `compute-gaps` |
 | 종료된 인스턴스의 루트 볼륨이 `in-use`로 남고, EBS IOPS:GiB 비율을 검사하지 않는다 | `compute-gaps` |
-| ALB: 구성·리스너 규칙(path·header·query)과 컨테이너 안 HTTP 응답은 동작한다. **host-header 조건은 매칭되지 않는다.** 대상 헬스는 검사 없이 healthy다 | `elbv2`, `compute-gaps` |
+| ALB: 구성·리스너 규칙(path·header·query)과 컨테이너 안 HTTP 응답은 동작한다. **host-header 조건은 매칭되지 않는다** | `elbv2`, `compute-gaps` |
+| 대상 헬스는 HTTP 검사를 하지 않고 인스턴스 상태를 따른다: 리스너에 연결된 대상 그룹에 등록하면 `initial`(`Elb.RegistrationInProgress`) → 약 1초 뒤 `healthy`, 인스턴스를 중지하면 수 초 안에 `unhealthy`(`Target.Timeout`). 리스너에 연결되지 않은 대상 그룹의 대상은 `unused`(`Target.NotInUse`)다(AWS와 같음) | `compute-gaps` |
 | ASG: Min/Max/Desired·`SetDesiredCapacity`·**인스턴스 새로 고침(Successful)**은 동작한다. 조정 정책·예약·후크·각종 Describe·`SetInstanceHealth`는 501이다. `--target-group-arns`의 인스턴스는 대상 그룹에 등록되지 않고, 자가 치유는 없다 | `autoscaling`, `compute-gaps` |
 | ASG 축소 시 새 인스턴스부터 종료한다. 혼합 인스턴스 정책·시작 템플릿 태그·메타데이터 옵션은 반영되지 않는다. 배치 그룹 제한과 최대 절전 조건은 검사하지 않는다 | 모듈 저자 관찰 (m03 README) |
 
@@ -153,8 +163,8 @@
 
 | 사실 | 근거 |
 |---|---|
-| 버전 관리·삭제 마커·미리 서명 URL(curl)·멀티파트·객체 잠금·Glacier 복원·버킷 정책 Deny·BPA·SSE-S3/KMS/C 헤더·복제·S3→SQS 이벤트는 AWS와 같다 | `s3` |
-| 수명 주기 검증은 **2026-07-16 이후 AWS 규칙과 같다**. STANDARD_IA·ONEZONE_IA로 30일 전에 전환하는 규칙을 받아 준다(AWS가 30일 제한을 없앰. 30일 최소 보관 요금은 그대로). 한 규칙 안에서 최소 보관 기간보다 빠른 연쇄 전환(Glacier IR 4일 → Deep Archive 20일), 역방향 전환, 중복 규칙 ID, 0일 만료는 거부한다. 다만 전환 자체는 시간이 흘러도 일어나지 않는다 | `s3` |
+| 버전 관리·삭제 마커·미리 서명 URL(curl)·멀티파트·객체 잠금·Glacier 복원 흐름(복원 전 `InvalidObjectState`, 복원 후 읽기 — 단 Standard 복원이 1초 안에 끝남)·버킷 정책 Deny·BPA·SSE-S3/KMS/C 헤더·복제·S3→SQS 이벤트는 AWS와 같다 | `s3` |
+| 수명 주기 검증은 **현재 AWS 규칙과 같다**. STANDARD_IA 10일·ONEZONE_IA 1일 전환 규칙을 받아 준다. AWS는 2026-07-16에 "Standard에 30일 머문 뒤에야 Standard-IA·One Zone-IA로 전환" 제한을 없앴다([What's New, 2026-07-16](https://aws.amazon.com/about-aws/whats-new/2026/07/s3-removes-30-day-transitions-standard-ia-one-zone-ia/)). 없어진 것은 전환 전 대기뿐이고 **최소 보관 기간 요금은 남아 있다**: IA에 들어간 객체를 30일이 되기 전에 삭제·덮어쓰기·전환하면 30일을 채운 만큼 청구된다. 또 2024-09부터 수명 주기 전환은 기본적으로 **128 KB 미만 객체를 옮기지 않는다**(비용 계산에 영향. 에뮬레이터에서는 전환이 일어나지 않으므로 확인하지 않음). 한 규칙 안에서 최소 보관 기간보다 빠른 연쇄 전환(Glacier IR 4일 → Deep Archive 20일), 역방향 전환, 중복 규칙 ID, 0일 만료는 거부한다. 다만 전환 자체는 시간이 흘러도 일어나지 않는다 | `s3` |
 | MFA Delete는 아무 코드나 받고 집행하지 않는다. 객체 잠금 버킷의 버전 관리를 일시 중지할 수 있다 | `s3-gaps` |
 | 복제 구성은 버전 관리 없는 대상·없는 대상 버킷(그리고 없는 역할 — m04 README)도 받아 준다. 버전 관리 없는 원본만 거부한다 | `s3-gaps` |
 | 새 버킷의 SSE-C 차단은 표시만 되고 집행되지 않는다. 퍼블릭 정책 + BPA 해제여도 익명 GET은 403이다. SSE-KMS 키를 비활성화해도 객체가 읽힌다 | `s3-gaps`, `s3` |
@@ -187,12 +197,12 @@
 |---|---|
 | Lambda `Invoke`(동기·비동기·DryRun)는 코드를 실제로 실행한다. 런타임은 **RustPython**이고 boto3는 에뮬레이터의 대체 모듈이다(`client`·`resource`·`Session`만, 일부 서비스만, `sts`·`lambda` 클라이언트 없음 — 상세는 m07 README) | `lambda`, `lambda-runtime` |
 | 함수 안 호출에는 **실행 역할 정책이 집행된다**(권한 없으면 AccessDenied, 허용하면 성공) | `lambda-runtime` |
-| 비동기 실패 대상(OnFailure)·함수 DLQ는 전달되지 않고 `MaximumRetryAttempts=0`도 무시된다(3번 실행) | `lambda-runtime` |
+| 비동기 실패의 OnFailure 대상(SQS)과 함수 DLQ(`DeadLetterConfig` → SQS)는 35초 안에 전달되지 않는다. `MaximumRetryAttempts=0`도 무시된다(3번 실행). `DeadLetterConfig` 설정 자체는 저장·조회된다 | `lambda-runtime` |
 | 동기 호출 한 번마다 에뮬레이터 메모리가 약 7 MiB씩 늘고 줄지 않는다 → 반복 실습 시 리셋(환경 메모) | `lambda-runtime` |
 | REST API Lambda 프록시, SNS → Lambda, S3 → Lambda 알림은 Lambda 리소스 정책(`add-permission`)을 요구한다. 없으면 각각 500 / 조용히 미실행 / `InvalidArgument`이다. **HTTP API만** 권한 없이 호출된다 | `lambda-permissions`, `apigatewayv2` |
 | `/aws/lambda/<함수>` 로그 그룹은 실행 역할에 logs 권한이 있을 때만 생긴다 | `lambda`, `apigatewayv2` |
 | Cognito 가입·확인·로그인·JWT 발급과 HTTP API JWT 권한 부여자(토큰 없음 401, 유효 토큰 200)가 동작한다. 토큰의 `iss`는 에뮬레이터 주소(`https://127.0.0.1:<포트>/<풀 ID>`)이고 권한 부여자의 Issuer에도 그 값을 넣어야 한다 | `cognito`, `integration-better` |
-| ECS 태스크는 이미지를 실제로 내려받으려다 `STOPPED`(`CannotPullContainerError`)가 된다. 실제 레지스트리 주소를 주면 외부로 연결을 시도하므로 `.invalid` 주소를 쓴다 | `ecs`, 모듈 저자 관찰 (m07 README) |
+| ECS 태스크는 이미지를 실제로 내려받으려다 `STOPPED`(`CannotPullContainerError: failed to resolve ref registry.invalid/...`)가 된다. 실제 레지스트리 주소를 주면 외부로 연결을 시도하므로 `.invalid` 주소를 쓴다 | `ecs`, 모듈 저자 관찰 (m07 README) |
 
 ### M08 DNS와 엣지
 
@@ -239,7 +249,7 @@
 
 | 사실 | 근거 |
 |---|---|
-| Backup 볼트·계획·선택·온디맨드 백업 COMPLETED·복구 지점이 동작한다. `ListCopyJobs`는 501이다 | `backup` |
+| Backup 볼트·계획·선택·온디맨드 백업 COMPLETED·복구 지점이 동작한다. `ListCopyJobs`는 501이다. 복원 결과가 빈 테이블이라(아래 행) 백업→복원 흐름 전체는 재현되지 않는다(🟡) | `backup` |
 | Backup 신뢰 정책은 `CreateBackupSelection`에서만 검사하고 `StartBackupJob`은 없는 역할·리소스로도 COMPLETED다. 복원은 **빈 테이블**을 만든다. 볼트 잠금은 집행되고 `ListBackupPlans` 등 목록 계열은 501이다 | 모듈 저자 관찰 (m12 README, PR #8 재현) |
 | DMS 복제 인스턴스·엔드포인트·작업 생성은 된다. `TestConnection`·삭제·중지 계열은 501이고, 데이터 이동은 없으며, 잘못된 엔진·매핑도 받아 준다 | `dms`, 모듈 저자 관찰 (m12 README) |
 | 리전 분리가 없으므로 다중 리전은 포트가 다른 두 에뮬레이터(`scripts/dr-env.sh`, `emulator_site("DR_")`)로 흉내 낸다 | `client-config`, M00 |
@@ -250,12 +260,13 @@
 |---|---|
 | Budgets 구성은 저장되지만 실제 지출은 항상 0이다. Cost Explorer `GetCostAndUsage`·`GetCostForecast`는 501이다 | `budgets`, 모듈 저자 관찰 (m13 README) |
 | Tagging API `GetResources`는 SQS만 찾는다 → 태그 감사는 서비스별 API로 한다. Organizations 태그 정책 `CreatePolicy`는 501이다 | `tagging`, 모듈 저자 관찰 (m13 README) |
-| S3 수명 주기 규칙은 2026-07 AWS 규칙대로 검증되지만 전환은 일어나지 않는다 → 비용은 워크시트로 계산한다 | `s3` |
+| S3 수명 주기 규칙은 현재 AWS 규칙대로 검증되지만(IA 전환 전 30일 대기는 2026-07-16에 없어졌고 30일 최소 보관 요금은 남음, 128 KB 미만 객체는 기본적으로 전환 안 됨 — M04 표 참고) 전환은 일어나지 않는다 → 비용은 워크시트로 계산한다 | `s3` |
 
 ### 모든 저자가 알아야 할 공통 사항
 
 - **정책을 실제처럼 써야 한다.** 큐 정책, 버킷 정책, 역할 신뢰 정책·권한, Lambda 리소스 정책(`add-permission`)이 없으면 전달이 **조용히** 일어나지 않거나 거부된다(HTTP API만 예외).
-- **조건 키가 있는 IAM 정책은 실제 호출로 시험하지 않는다.** 시뮬레이터로 판정한다.
+- **조건 키가 있는 IAM 정책은 시뮬레이터로 판정한다.** 실제 호출로 맞게 동작하는 조합은 S3·SQS의 `aws:SecureTransport`·`aws:PrincipalAccount`뿐이다(`iam-conditions`).
+- **코드에 바깥 주소를 쓰지 않는다.** 이미지·URL·구독 엔드포인트·Issuer에는 `.invalid` 같은 예약 이름을 쓴다. `tools/probe/no_external_hosts.py`로 검사할 수 있다(환경 메모).
 - **상태와 시간을 단언하지 않는다.** waiter나 짧은 간격 폴링을 쓰되, CloudFormation은 2초 간격으로 폴링한다. "몇 초 뒤"라는 시간이나 "생성 직후 상태"는 단언하지 않는다.
 - **목록 결과를 `--query ... --output text`로 변수에 담지 않는다**(페이지마다 `None` 줄). `--output json`이나 `--no-paginate`를 쓴다.
 - **boto3 예제는 `emulator_guard`를 먼저 호출한다.** 두 사이트는 `emulator_site()`와 `emulator_site("DR_")`로 구분한다.
@@ -266,20 +277,36 @@
 
 | 모듈 | 관찰 | 출처 |
 |---|---|---|
-| M01 | `aws:username` 조건은 IAM API에서만 정확하고 EC2에서는 Deny가 항상 적용됨. `aws:PrincipalAccount` 조건도 Deny 항상 적용 | 모듈 저자 관찰 (m01 README), PR #4 리뷰 재현 |
+| M01 | `aws:username` 조건은 IAM API에서만 정확하고 EC2에서는 Deny가 항상 적용됨. (README의 "`aws:PrincipalAccount` Deny 항상 적용"은 서비스에 따라 다름 — `iam-conditions`: S3·SQS는 정확, DynamoDB·EC2·IAM은 항상 적용) | 모듈 저자 관찰 (m01 README), PR #4 리뷰 재현 |
 | M01 | `simulate-principal-policy`가 `${aws:username}` 정책 변수를 채우지 않음. `--policy-input-list file://`는 `InvalidInput` | 모듈 저자 관찰 (m01 README) |
 | M01 | `AssumeRoleWithWebIdentity`는 발급자 공개 키를 가져오려 함(임의 토큰 거부). Identity Center는 계정 인스턴스 | 모듈 저자 관찰 (m01 README) |
+| M01 | `GenerateCredentialReport`를 4시간 안에 다시 요청하면 `LimitExceeded`("1 report every 14400 seconds") | 모듈 저자 관찰 (m01 README L68) |
+| M01 | 정책 없는 사용자도 통과하는 요청: Lambda `ListFunctions`, SNS `ListTopics`, Logs `DescribeLogGroups`, SSM `DescribeParameters`, CloudWatch `ListMetrics`, RDS `DescribeDBInstances`, Organizations `ListRoots` (거부 쪽인 IAM·EC2·KMS·Secrets Manager는 `iam-enforcement` 행으로 확인) | 모듈 저자 관찰 (m01 README L70) |
 | M02 | 접두사 목록 CIDR `198.18.x.x` 하나, Direct Connect 위치 3개, Network Firewall은 차단 없음 | 모듈 저자 관찰 (m02 README) |
 | M03 | ASG 축소 시 새 인스턴스부터 종료, 혼합 인스턴스 정책·템플릿 태그 미반영, 배치 그룹·최대 절전 제한 미검사, EIP 재연결 허용, `CopyImage`·`ModifySnapshotTier` 501 | 모듈 저자 관찰 (m03 README), PR #11 리뷰 재현(축소 순서) |
+| M03 | `run-instances --block-device-mappings`(루트 볼륨 크기·암호화)가 무시되고 AMI 기본값(8 GiB, 비암호화)으로 생성 | 모듈 저자 관찰 (m03 README L70) |
+| M03 | 스팟 중단 없음. RI 가격표가 결제 방식별 할인을 반영하지 않음. 용량 예약을 지정해 띄워도 `AvailableInstanceCount`가 줄지 않음 | 모듈 저자 관찰 (m03 README L74) |
+| M03 | ALB 리디렉션 응답의 `Location` 호스트가 원래 호스트가 아니라 `elasticloadbalancingv2.amazonaws.com` | 모듈 저자 관찰 (m03 README L78) |
+| M03 | NLB `--subnet-mappings`로 준 EIP가 응답에 표시되지 않음 | 모듈 저자 관찰 (m03 README L79) |
+| M03 | Elastic Beanstalk 환경이 `Ready/Green`까지 가지만 실제 ASG·ELB는 없음. 카탈로그에 없는 솔루션 스택 이름도 허용 | 모듈 저자 관찰 (m03 README L88) |
 | M04 | 존재하지 않는 역할로도 복제 구성 허용. SSE-KMS 응답이 별칭을 그대로 돌려줌. FSx `ImportPath` 미저장. EFS 같은 AZ 다른 서브넷 마운트 타깃 허용 | 모듈 저자 관찰 (m04 README), PR #14 재확인(EFS) |
+| M04 | S3 정적 웹 사이트·Transfer Acceleration 설정은 저장되지만 해당 엔드포인트가 없음 | 모듈 저자 관찰 (m04 README L77) |
 | M05 | RDS Multi-AZ DB 클러스터 멤버 미생성, Aurora `MultiAZ` 표시 false, 글로벌 테이블 리전 분리 없음, `timestream-write` `AmbiguousService`, TTL 삭제 Stream 레코드에 `userIdentity` 없음 | 모듈 저자 관찰 (m05 README), PR #7 리뷰 재현 |
 | M06 | Scheduler cron 일정 미발화(20초 관찰), `QueueDeletedRecently` 비결정적 | 모듈 저자 관찰 (m06 README) |
-| M07 | 함수 안 RustPython 제약 목록(`socket.gethostname`·`os.listdir` 오류, 네트워크 허용 서비스 목록), ECS 이미지 풀이 실제 ECR 호스트로 연결 시도 | 모듈 저자 관찰 (m07 README), PR #9 리뷰(외부 접속 감사) |
+| M07 | 함수 안 RustPython 제약 목록(`socket.gethostname`·`os.listdir` 오류, 네트워크 허용 서비스 목록) | 모듈 저자 관찰 (m07 README), PR #9 리뷰(외부 접속 감사) |
+| M07 | Cognito 토큰의 `iss`가 `https://127.0.0.1:<포트>/<풀 ID>`이고, JWT 권한 부여자의 Issuer를 AWS 형식으로 넣으면 유효 토큰도 401 | 모듈 저자 관찰 (m07 README L66) (`iss` 값은 `integration-better` 행으로도 확인) |
+| M07 | ECS 태스크가 `PROVISIONING → PENDING → STOPPED`(`CannotPullContainerError`). 이미지를 실제로 내려받으려 하며 ECR 주소를 주면 실제 AWS 호스트(`000000000000.dkr.ecr.us-east-1.amazonaws.com:443`)로 연결을 시도 | 모듈 저자 관찰 (m07 README L67) |
 | M08 | 지리적 위치·지리 근접·IP 기반 응답 고정, CloudFront `DefaultRootObject` 무시, GA `ListEndpointGroups` 501, WAF IP 세트가 `X-Forwarded-For`를 기본 처리, 속도 기반 규칙 정확 | 모듈 저자 관찰 (m08 README), PR #12 리뷰 재현 |
 | M09 | Config 수정 설정이 연결된 규칙도 삭제됨(AWS: `ResourceInUseException`), GuardDuty 결과가 EventBridge로 안 감, KMS 온디맨드 교체 목록이 비동기 | 모듈 저자 관찰 (m09 README), PR #12 리뷰 |
+| M09 | Config가 지운 버킷의 평가 결과를 이름으로 기억함 → 평가 대상 버킷 이름에 실행마다 다른 접미사 | 모듈 저자 관찰 (m09 README L75) |
 | M10 | Insights `pct()` 실패, SSM `DescribePatchBaselines`·`ListCommandInvocations`·`ListDocuments`·`DescribeMaintenanceWindows` 501, `SendCommand` 대상 0개 | 모듈 저자 관찰 (m10 README), PR #10 리뷰 재현 |
 | M11 | Glue Spark 작업 `awsglue.context` 없음, Glue Python shell 작업 역할 정책 집행, 줄바꿈 없는 JSON → 모든 열 NULL 한 행, Athena 실행 시간 3초 고정 | 모듈 저자 관찰 (m11 README), PR #10 리뷰 재현 |
 | M12 | Backup `StartBackupJob` 신뢰 미검사·복원 빈 테이블·목록 계열 501·볼트 잠금 집행, DMS 삭제·중지 계열 501, `ReplaceRouteTableAssociation` 501(탐침 `vpc-gaps`로도 확인), ASG `DescribeLoadBalancerTargetGroups` 501 | 모듈 저자 관찰 (m12 README), PR #8 리뷰 재현 |
+| M12 | Backup `StartCopyJob`/`DescribeCopyJob`이 동작(같은 에뮬레이터의 다른 볼트로 COMPLETED) | 모듈 저자 관찰 (m12 README L69) |
+| M12 | 같은 이름으로 `CreateBackupPlan`을 다시 하면 `AlreadyExistsException` | 모듈 저자 관찰 (m12 README L71) |
+| M12 | 등록 해제한 ELB 대상이 `draining`으로 남음(실제 AWS도 등록 해제 지연 동안 draining) | 모듈 저자 관찰 (m12 README L77) |
+| M12 | Elastic Disaster Recovery·MGN: `InitializeService` 뒤 `DescribeSourceServers`가 빈 목록 | 모듈 저자 관찰 (m12 README L79) |
+| M12 | Application Discovery Service `DescribeAgents` 501 | 모듈 저자 관찰 (m12 README L80) |
 | M13 | Cost Explorer 비용 할당 태그·추천 API 501, 이상 탐지 모니터 생성은 동작, Compute Optimizer `OptInRequiredException`, Organizations `TAG_POLICY` 501, DynamoDB 태그 반영 지연 | 모듈 저자 관찰 (m13 README) |
 
 <!-- section: env -->
@@ -287,5 +314,7 @@
 - **메모리 상한 기본 2g.** `scripts/emulator-up.sh`의 기본 `EMULATOR_MEMORY`는 2g다(공식 가이드와 같음). 빈 에뮬레이터는 약 174 MiB를 쓴다. 동기 Lambda `Invoke`는 호출 한 번에 약 7 MiB씩 늘리고 그 메모리를 되돌려 주지 않는다(`lambda-runtime` 행). 1 GiB 상한에서는 약 120회 호출 뒤 `OOMKilled`(종료 코드 137)되었다. 학습자에게는 `Could not connect to the endpoint URL`만 보인다. `env.sh`와 `emulator-status.sh`가 OOM을 알려 주며, 대처는 `scripts/emulator-reset.sh`다.
 - **호스트 잠자기 뒤 시계 어긋남.** 노트북이 잠들었다 깨면 Colima VM(= 에뮬레이터 컨테이너)의 시계가 뒤처질 수 있다. 그러면 STS는 `SignatureDoesNotMatch`, S3·DynamoDB 등은 `RequestTimeTooSkewed`로 모든 요청을 거부한다. M03·M04·M05·M12 작업 중에 실제로 겪었다. `scripts/clock-check.sh`가 차이를 재고, `env.sh`는 서명 거부일 때만 이 진단을 보여 준다. 해결 명령(VM의 `systemd-timesyncd` 재시작 또는 `date -s`)은 실제로 잠자기 뒤 어긋난 상황에서는 아직 검증하지 못했다(M00 레슨 3).
 - **리소스 엔드포인트는 컨테이너 안에만 있다.** RDS·Aurora·ElastiCache 주소, ALB·NLB `DNSName`, CloudFront `DomainName`은 `127.0.0.1:<임의 포트>`이고 에뮬레이터 컨테이너 **안에서만** 열린다. 호스트에서는 접속할 수 없다. 확인하려면 `docker exec aws-emulator-$EMULATOR_PORT curl ...`을 쓴다. API Gateway 실행 URL(`https://127.0.0.1:<API 포트>/_aws/execute-api/...`)만 호스트에서 열린다.
-- **외부 접속 위험.** ECS 태스크는 이미지를 **실제로 내려받으려** 한다. ECR 주소를 주면 실제 AWS 호스트(`000000000000.dkr.ecr.us-east-1.amazonaws.com:443`)로 연결을 시도했다(m07 README). 실습과 탐침은 해석되지 않는 `.invalid` 레지스트리 주소를 써서 외부 연결을 만들지 않는다. 마찬가지로 Cognito JWT 권한 부여자에 AWS 형식의 Issuer를 넣으면 JWKS를 실제 AWS에서 가져오려 할 수 있다(m07 리뷰 경고, 미검증). Issuer에는 토큰의 `iss`(에뮬레이터 주소)를 쓴다.
+- **외부 접속 위험.** 에뮬레이터는 받은 주소를 실제로 따라간다. ECS 태스크는 이미지를 **실제로 내려받으려** 하고, ECR 주소를 주면 실제 AWS 호스트(`000000000000.dkr.ecr.us-east-1.amazonaws.com:443`)로 연결을 시도했다(m07 README). Cognito JWT 권한 부여자에 AWS 형식의 Issuer를 넣으면 JWKS를 실제 AWS에서 가져오려 할 수 있다(m07 리뷰 경고, 미검증).
+  - **이 탐침의 이전 실행도 외부에 연결을 시도했다.** 이 보고서 이전의 모든 탐침 실행(PR #2 이후)은 ECS 작업 정의에 `public.ecr.aws/nginx/nginx:latest`를 썼고, 에뮬레이터는 `RunTask` 때 public.ecr.aws에서 이미지를 익명으로 받으려 했다(태스크는 `CannotPullContainerError`로 STOPPED). 같은 실행들은 SNS https 구독 엔드포인트(`https://example.com/hook`), HTTP API `HTTP_PROXY` 통합(`https://example.com/orders`), JWT 권한 부여자 Issuer(`https://cognito-idp.us-east-1.amazonaws.com/...`)도 바깥 주소로 등록했다. 에뮬레이터가 이 셋에 실제로 연결했는지는 기록하지 않았다. 자격 증명이나 계정 정보는 보내지 않았다(익명 요청, 에뮬레이터 내부 키만 사용).
+  - 지금은 탐침의 이미지·URL·엔드포인트가 모두 `.invalid` 주소다(`registry.invalid/todayorder/nginx:latest`, `hook.todayorder.invalid` 등). `tools/probe/no_external_hosts.py`가 **탐침 시작 때**와 **M00 verify.sh**에서 tools·scripts·src·M00 코드를 정적으로 검사해, 이미지·URL·주소 키·메일 자리에 예약 이름(`.invalid`·`.test`·`.example`·`.localhost`)이나 루프백 이외의 호스트가 있으면 실패한다(Docker Hub로 가는 `nginx:latest` 같은 이름 포함). 의도된 예외(가드가 거부해야 하는 주소, 설치 안내 링크, 설치용 Dockerfile)는 그 줄에 `external-host-ok: <이유>`를 단다.
 - **보고서의 근거.** 표의 각 행은 이 탐침의 실제 호출 결과다. 탐침이 다시 확인하지 않은 항목은 아래 "탐침이 다시 확인하지 않은 모듈 저자 관찰"에 출처(`모듈 저자 관찰 (mNN README)`)와 함께 따로 적었다.
