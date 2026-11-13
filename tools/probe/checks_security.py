@@ -231,7 +231,10 @@ def run_acm(p: Probe) -> None:
                        f"{cc['Status']} {cc.get('FailureReason') or ''} — .example 등 예약 도메인은 수 초 만에 FAILED(ADDITIONAL_VERIFICATION_REQUIRED)")
     # Route 53 에 검증 CNAME 을 만들면 ISSUED 가 되는가
     r53 = p.client("route53")
-    zone_name = f"todayorder-{p.suffix}.com"  # .example 같은 예약 도메인은 즉시 FAILED 되므로 .com 사용
+    # 에뮬레이터 ACM 은 예약 TLD(.invalid·.test·.example)를 즉시 FAILED(ADDITIONAL_VERIFICATION_REQUIRED)로 만든다(직접 확인).
+    # 그래서 이 행만 .com 을 쓴다. 영역은 에뮬레이터의 Route 53 안에만 있고, 리뷰 DNS 기록에 이 이름의 질의는 없었다.
+    # external-host-ok: ACM 이 예약 TLD 를 거부해 .com 이 필요(DNS 질의 없음 확인)
+    zone_name = f"todayorder-{p.suffix}.com"
     hz = r53.create_hosted_zone(Name=zone_name, CallerReference=p.name("acmhz"))["HostedZone"]["Id"]
     r2 = p.call("RequestCertificate(Route 53 영역 도메인)", acm.request_certificate, DomainName=f"api.{zone_name}",
                 ValidationMethod="DNS")

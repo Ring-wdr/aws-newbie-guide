@@ -32,7 +32,7 @@
 | 지난 비용 분석·예측 그래프 | Cost Explorer |
 | 가장 상세한 리소스 단위 데이터 → Athena | CUR / Data Exports (CUR 2.0) |
 | 비정상 지출 급증 감지 | Cost Anomaly Detection |
-| 부서별 비용 배분 | 비용 할당 태그 (활성화 필요, 소급 안 됨) |
+| 부서별 비용 배분 | 비용 할당 태그 (활성화 필요. 기본은 활성화 이후 비용부터 — 관리 계정이 **최대 12개월 백필** 요청 가능, 단 그때 이미 붙어 있던 태그만) |
 | 과다 프로비저닝 찾기 | Compute Optimizer, Trusted Advisor |
 | 여러 계정 볼륨 할인·RI 공유 | Organizations 통합 결제 |
 | 아직 안 만든 아키텍처 견적 | AWS Pricing Calculator |

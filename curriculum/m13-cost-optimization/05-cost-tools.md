@@ -35,7 +35,7 @@ flowchart LR
 
 - **필수 키**를 정한다: TodayOrder는 `project`, `cost-center`, `env`. 값도 허용 목록으로 제한한다(`env`는 `prod|staging|dev`). `Project`와 `project`는 **다른 키**다(대소문자 구분).
 - 강제 수단: AWS Organizations **태그 정책**(키 대소문자·허용 값 표준화, 규정 미준수 보고, 지정한 리소스 유형의 미준수 태그 작업 차단), SCP의 `aws:RequestTag` 조건으로 "태그 없이는 생성 금지", AWS Config 규칙 `required-tags`, IaC 템플릿의 기본 태그.
-- 태그는 **붙인 시점 이후**의 비용에만 반영된다. 사용자 정의 태그는 붙인 뒤 활성화 목록에 나타나기까지, 활성화 후 반영까지 각각 최대 24시간이 걸릴 수 있다. 처음부터 붙이자.
+- 태그는 **붙인 시점 이후**의 비용에만 반영된다. 사용자 정의 태그는 붙인 뒤 활성화 목록에 나타나기까지, 활성화 후 반영까지 각각 최대 24시간이 걸릴 수 있다. 활성화가 늦었다면 관리 계정이 **백필**(2024-03부터)을 요청해 최대 12개월 전 비용까지 태그를 소급 적용할 수 있다 — 단 그 기간에 리소스에 태그가 이미 붙어 있었어야 하고, 요청은 24시간에 한 번이다([비용 할당 태그 백필](https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/cost-allocation-backfill.html)). 그래도 붙이지 않았던 기간은 되살릴 수 없으니 처음부터 붙이자.
 
 ## 직접 해 보기
 
@@ -126,7 +126,7 @@ LAB05 OK
 - **Budgets**: 데이터는 하루에 최대 3번 갱신된다(실시간이 아니다). 조치(action)가 없는 예산은 무료, 조치가 있는 예산은 일정 개수를 넘으면 유료. 예산마다 알림 여러 개, 알림마다 이메일 여러 명과 SNS 주제를 지정할 수 있다. 알림을 Slack 등으로 보내려면 SNS → Amazon Q Developer in chat applications(구 AWS Chatbot).
 - **Cost Explorer**: 콘솔 사용은 무료, **API 호출은 요청당 0.01 USD**. 예측은 최대 18개월. 처음 켜면 데이터가 준비되기까지 최대 24시간.
 - **CUR**: 레거시 CUR도 동작하지만 AWS는 **Data Exports의 CUR 2.0**으로 옮기기를 권장한다.
-- **비용 할당 태그**: Billing 콘솔 → Cost allocation tags에서 활성화. 관리 계정(Organizations)만 활성화할 수 있다.
+- **비용 할당 태그**: Billing 콘솔 → Cost allocation tags에서 활성화. 관리 계정(Organizations)만 활성화할 수 있다. 같은 화면의 **Backfill tags**로 최대 12개월 전까지 소급 적용을 요청할 수 있다.
 - **Compute Optimizer**는 옵트인이 필요하고 기본 14일 지표를 본다(에뮬레이터: `OptInRequiredException`).
 
 **실제 AWS에서 해 보려면**: 프리 티어 계정에서 이 lab의 예산(작은 금액, 예: 5 USD)과 알림을 그대로 만들어 보라. 조치 없는 예산은 무료이고, 실제로 이메일이 온다. **Zero spend budget**(1센트라도 쓰면 알림) 템플릿은 프리 티어 학습자에게 특히 유용하다. Cost Explorer는 콘솔에서 무료로 보되 CLI·API 호출은 요청당 과금되니 반복 호출하지 말 것. 정리: `aws budgets delete-budget --account-id <계정> --budget-name <이름>`, `aws sns delete-topic`.

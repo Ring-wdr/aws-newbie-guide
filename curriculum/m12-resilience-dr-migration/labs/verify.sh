@@ -11,7 +11,6 @@
 set -euo pipefail
 ROOT="$(git rev-parse --show-toplevel)"
 MOD_DIR="$ROOT/curriculum/m12-resilience-dr-migration"
-LOG_DIR="$(mktemp -d)"
 
 # 0) 포트 확인 — 아무것도 지우기 전에. 두 포트를 **기본값까지 정한 뒤** 비교한다.
 #    - 주 포트: EMULATOR_PORT. 없으면 대화형 터미널에서만 9297(emulator-reset.sh 와 같은 규칙), 비대화형이면 거부
@@ -33,7 +32,9 @@ if [ "$DR_EMULATOR_PORT" = "$EMULATOR_PORT" ]; then
   exit 1
 fi
 
-# 1) 깨끗한 에뮬레이터 두 개
+# 1) 깨끗한 에뮬레이터 두 개. 임시 폴더는 포트 확인을 통과한 뒤에 만든다(거부 경로에서 남지 않게).
+LOG_DIR="$(mktemp -d)"
+trap 'rm -rf "$LOG_DIR"' EXIT
 "$ROOT/scripts/emulator-reset.sh"
 trap 'rm -rf "$LOG_DIR"; "$ROOT/scripts/emulator-down.sh" "$DR_EMULATOR_PORT" >/dev/null 2>&1 || true' EXIT
 "$ROOT/scripts/emulator-reset.sh" "$DR_EMULATOR_PORT"

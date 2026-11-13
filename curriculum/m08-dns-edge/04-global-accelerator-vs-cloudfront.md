@@ -33,13 +33,13 @@ flowchart LR
 |---|---|---|
 | 프로토콜 | HTTP/HTTPS(+WebSocket) | **TCP·UDP** 모든 애플리케이션 |
 | 콘텐츠 **캐시** | ✅ 핵심 기능 | ❌ 없음 |
-| 진입점 | 도메인 이름(엣지 IP는 바뀜) | **고정 애니캐스트 IP 2개** |
+| 진입점 | 도메인 이름(기본 엣지 IP는 수시로 바뀜). 선택: **Anycast 고정 IP 목록**(2024-11~, 계정 전용 IP 21개 또는 apex용 3개, 지원 요청 후 발급, **HTTP(S) 전용**) | **고정 애니캐스트 IP 2개**(모든 TCP·UDP) |
 | 리전 장애 조치 | 오리진 그룹(오리진 단위) | 엔드포인트 그룹 상태 확인 + 트래픽 다이얼(DNS 캐시와 무관) |
 | 엣지에서 하는 일 | 캐시, TLS 종료, 함수 실행, WAF | 가장 가까운 엣지에서 백본으로 진입(TCP 종료 최적화) |
 | 대표 워크로드 | 정적 파일, 이미지, 동영상, 웹·API 가속(캐시·엣지 로직) | 게임(UDP), IoT(MQTT), VoIP, 고정 IP가 필요한 API, 다중 리전 액티브-액티브 빠른 장애 조치 |
 | 보안 연동 | WAF, Shield, OAC, 서명된 URL | Shield(Standard 자동, Advanced 가능). WAF는 뒤의 ALB에 |
 
-> 한 줄 구분: **"캐시할 수 있는 HTTP" → CloudFront, "고정 IP·TCP/UDP·빠른 리전 장애 조치" → Global Accelerator.**
+> 한 줄 구분: **"HTTP(S) 콘텐츠 전송·캐시(필요하면 Anycast 고정 IP 목록도)" → CloudFront, "비 HTTP를 포함한 TCP/UDP에 고정 애니캐스트 IP + 캐시 없이 빠른 리전 장애 조치" → Global Accelerator.** CloudFront도 2024년 11월부터 고정 IP를 받을 수 있으니("[CloudFront Anycast 고정 IP](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/request-static-ips.html)") "고정 IP"만으로 GA를 고르지 말고 **프로토콜(HTTP 밖이냐)·캐시 여부·리전 장애 조치**를 함께 본다.
 
 ### Route 53 지연 시간 라우팅과는 뭐가 다른가
 
@@ -112,21 +112,21 @@ LAB05 OK
 
 ## 시험 포인트
 
-- "**고정 IP**(허용 목록)가 필요하다", "**UDP**/게임/IoT/VoIP를 전 세계에서 빠르게" → **Global Accelerator**.
+- "**고정 IP**(허용 목록) + **TCP/UDP·비 HTTP**", "**UDP**/게임/IoT/VoIP를 전 세계에서 빠르게" → **Global Accelerator**. "HTTP(S) 배포인데 허용 목록용 고정 IP" → CloudFront **Anycast 고정 IP 목록**도 답이 될 수 있다.
 - "정적 콘텐츠·이미지·동영상을 **캐시**해 지연을 줄이고 오리진 부하를 덜어라" → **CloudFront**.
 - "다중 리전 액티브-액티브에서 **DNS 캐시 없이 빠르게** 장애 조치" → **Global Accelerator**(엔드포인트 그룹 상태 확인). Route 53 장애 조치는 TTL만큼 늦을 수 있다.
 - "블루/그린을 리전 단위로 서서히" → GA **트래픽 다이얼** 또는 Route 53 **가중치**. 단, 엔드포인트 장애 시의 GA 장애 조치는 다이얼을 무시한다(0%인 그룹으로도 넘어간다).
-- GA는 **캐시를 하지 않고**, CloudFront는 **고정 IP를 주지 않는다** — 보기에서 이 둘을 바꿔 놓은 오답이 자주 나온다.
+- GA는 **캐시를 하지 않고 HTTP 밖의 TCP/UDP도 받는다**. CloudFront는 **HTTP(S)만** 받고, 고정 IP는 기본이 아니라 **별도로 신청하는 Anycast 고정 IP 목록**이다(옛 자료의 "CloudFront는 고정 IP 불가"는 2024-11 이후 틀린 말).
 
 ## 스스로 확인
 
-1. CloudFront 배포에도 엣지 IP가 있는데 왜 "고정 IP 허용 목록" 요구에 쓰지 않나?
+1. CloudFront 배포에도 엣지 IP가 있는데, "고정 IP 허용 목록" 요구에 그 IP를 그대로 알려 주면 왜 안 되나? CloudFront로 이 요구를 맞추려면 무엇이 필요하고, 그래도 GA를 고르는 경우는?
 2. 서울 리전 장애 시 Route 53 장애 조치와 GA 엔드포인트 그룹 장애 조치 중 사용자가 더 빨리 복구되는 쪽은? 이유는?
 3. lab05에서 리스너를 먼저 지우려 했을 때 실패한 이유는?
 
 <details><summary>답</summary>
 
-1. CloudFront 엣지 IP는 많고 수시로 바뀐다. 고객이 고정 IP를 허용 목록에 넣어야 한다면 GA의 **고정 애니캐스트 IP 2개**가 맞다.
+1. 기본 배포의 엣지 IP는 많고 수시로 바뀐다. HTTP(S) 배포라면 **Anycast 고정 IP 목록**(계정 전용 21개, apex용 3개 — 지원 요청 후 발급, 가격 등급 "모든 엣지 로케이션" 필요)을 받아 연결하면 허용 목록에 넣을 수 있다. 하지만 HTTP가 아닌 TCP/UDP(소켓·게임·IoT)이거나, 캐시 없이 리전 엔드포인트 사이를 빠르게 장애 조치해야 한다면 GA의 **고정 애니캐스트 IP 2개**가 맞다.
 2. 대개 GA. GA는 IP가 그대로이고 AWS 안에서 경로를 바꾸므로 클라이언트·리졸버의 DNS 캐시(TTL)를 기다리지 않는다. Route 53은 새 응답이 캐시가 만료된 뒤에야 퍼진다.
 3. 엔드포인트 그룹이 아직 리스너에 붙어 있었다(`AssociatedEndpointGroupFoundException`). 안쪽(엔드포인트 그룹)부터 지워야 한다.
 

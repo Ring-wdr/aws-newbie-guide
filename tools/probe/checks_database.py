@@ -2,15 +2,12 @@
 
 from __future__ import annotations
 
-import os
-import socket
-import subprocess
 import time
 from typing import Any
 
 from botocore.exceptions import ClientError
 
-from lib import Probe, wait_until
+from lib import Probe, container_tcp, host_tcp, wait_until
 
 
 def _vpc_subnets(p: Probe, cidr2: str) -> list[str]:
@@ -28,24 +25,6 @@ def _vpc_subnets(p: Probe, cidr2: str) -> list[str]:
         return []
 
 
-def _tcp_from_container(host: str, port: int) -> str:
-    """에뮬레이터 컨테이너 안에서 TCP 연결을 시도한다 (bash /dev/tcp 사용)."""
-    ep = os.environ.get("EMULATOR_PORT", "9297")
-    try:
-        r = subprocess.run(["docker", "exec", f"aws-emulator-{ep}", "bash", "-c",
-                            f"timeout 3 bash -c 'exec 3<>/dev/tcp/{host}/{port}' && echo OPEN || echo CLOSED"],
-                           capture_output=True, text=True, timeout=15)
-        return (r.stdout.strip() or r.stderr.strip())[:60]
-    except Exception as e:  # noqa: BLE001
-        return f"{type(e).__name__}"
-
-
-def _tcp_from_host(host: str, port: int) -> bool:
-    try:
-        socket.create_connection((host, port), timeout=2).close()
-        return True
-    except Exception:  # noqa: BLE001
-        return False
 
 
 def run_rds(p: Probe) -> None:
@@ -90,19 +69,12 @@ def run_rds(p: Probe) -> None:
     p.behavior("Endpoint 주소·포트 반환", bool(ep.get("Address")) and bool(ep.get("Port")), f"{ep.get('Address')}:{ep.get('Port')}")
     p.behavior("MultiAZ·SecondaryAvailabilityZone 표시", d.get("MultiAZ") is True,
                f"MultiAZ={d.get('MultiAZ')} AZ={d.get('AvailabilityZone')} Secondary={d.get('SecondaryAvailabilityZone')}")
-    if ep.get("Address") and ep.get("Port"):
-        host_ok = _tcp_from_host(ep["Address"], int(ep["Port"]))
-        inside = _tcp_from_container(ep["Address"], int(ep["Port"]))
+    if ep.get("Address") and ep.get("Port") and p.target_ok("Endpoint 포트에 실제 DB가 떠 있음(컨테이너 안 TCP)", ep["Address"]):
+        host_ok = host_tcp(ep["Address"], int(ep["Port"])) == "OPEN"
+        inside = container_tcp(ep["Address"], int(ep["Port"]))
         p.behavior("Endpoint 포트에 실제 DB가 떠 있음(컨테이너 안 TCP)", inside == "OPEN", f"컨테이너 안: {inside}")
         if inside == "OPEN":
-            ep_ = os.environ.get("EMULATOR_PORT", "9297")
-            cmd = (f"exec 3<>/dev/tcp/{ep['Address']}/{ep['Port']}; printf '\\x00\\x00\\x00\\x08\\x04\\xd2\\x16\\x2f' >&3; "
-                   "timeout 2 head -c 1 <&3")
-            try:
-                out = subprocess.run(["docker", "exec", f"aws-emulator-{ep_}", "bash", "-c", cmd],
-                                     capture_output=True, text=True, timeout=15).stdout
-            except Exception as e:  # noqa: BLE001
-                out = type(e).__name__
+            out = container_tcp(ep["Address"], int(ep["Port"]), send="\\x00\\x00\\x00\\x08\\x04\\xd2\\x16\\x2f", read_bytes=1)
             p.behavior("Endpoint가 PostgreSQL 프로토콜로 응답(SSLRequest → 'S'/'N')", out in ("S", "N"), f"응답 {out!r}")
         p.behavior("호스트(macOS)에서 Endpoint 포트로 TCP 연결", host_ok, "연결됨" if host_ok else "연결 불가(포트가 컨테이너 밖에 게시되지 않음)")
     rr = p.call("CreateDBInstanceReadReplica", rds.create_db_instance_read_replica, DBInstanceIdentifier=p.name("db-rr"),
@@ -386,8 +358,10 @@ def run_elasticache(p: Probe) -> None:
         p.behavior("기본(쓰기)·리더 엔드포인트 반환", bool(pe.get("Address")),
                    f"Primary={pe.get('Address')}:{pe.get('Port')} Reader={(ng.get('ReaderEndpoint') or {}).get('Address')} "
                    f"members={len(ng.get('NodeGroupMembers', []))}")
-        if pe.get("Address") and pe.get("Port"):
-            inside = _tcp_from_container(pe["Address"], int(pe["Port"]))
+        # 에뮬레이터는 ElastiCache 주소를 실제 AWS 형식 이름(master.<id>.000001.us-east-1.cache.amazonaws.com)으로
+        # 돌려준다. 그 이름으로 접속하면 바깥 DNS 에 질의가 나가므로 관문(target_ok)이 이 행을 SKIP 으로 남긴다.
+        if pe.get("Address") and pe.get("Port") and p.target_ok("엔드포인트 포트에 실제 캐시 서버가 떠 있음(컨테이너 안 TCP)", pe["Address"]):
+            inside = container_tcp(pe["Address"], int(pe["Port"]))
             p.behavior("엔드포인트 포트에 실제 캐시 서버가 떠 있음(컨테이너 안 TCP)", inside == "OPEN", f"컨테이너 안: {inside}")
         p.call("TestFailover", ec.test_failover, ReplicationGroupId=rgid, NodeGroupId=ng.get("NodeGroupId", "0001"))
     cc = p.call("CreateCacheCluster(memcached 2노드)", ec.create_cache_cluster, CacheClusterId=f"to-mc-{p.suffix}",
@@ -403,8 +377,77 @@ def run_elasticache(p: Probe) -> None:
     p.cleanup("sl", lambda: ec.delete_serverless_cache(ServerlessCacheName=f"to-sl-{p.suffix}"))
 
 
+def run_db_gaps(p: Probe) -> None:
+    """M05 모듈 저자가 찾은 501·동작 차이를 재현한다. 501 오퍼레이션은 존재하지 않는 ID로도 501을 돌려준다."""
+    rds, ec, dax, ddb = p.client("rds"), p.client("elasticache"), p.client("dax"), p.client("dynamodb")
+    p.call("RestoreDBInstanceToPointInTime", rds.restore_db_instance_to_point_in_time,
+           SourceDBInstanceIdentifier=p.name("nodb"), TargetDBInstanceIdentifier=p.name("nodb-r"), UseLatestRestorableTime=True)
+    p.call("PromoteReadReplica", rds.promote_read_replica, DBInstanceIdentifier=p.name("nodb"))
+    p.call("CreateDBClusterEndpoint", rds.create_db_cluster_endpoint, DBClusterIdentifier=p.name("nocl"),
+           DBClusterEndpointIdentifier=p.name("ep"), EndpointType="READER")
+    p.call("DescribeDBInstanceAutomatedBackups", rds.describe_db_instance_automated_backups)
+    p.call("DeleteReplicationGroup", ec.delete_replication_group, ReplicationGroupId=p.name("norg"))
+
+    subs = _vpc_subnets(p, 45)
+    if subs:
+        try:
+            dax.create_subnet_group(SubnetGroupName=p.name("daxsng"), SubnetIds=subs)
+            p.behavior("DAX CreateSubnetGroup(유효한 서브넷) 이 성공", True, "성공")
+            p.cleanup("daxsng", lambda: dax.delete_subnet_group(SubnetGroupName=p.name("daxsng")))
+        except ClientError as e:
+            err = e.response["Error"]
+            p.behavior("DAX CreateSubnetGroup(유효한 서브넷) 이 성공", False,
+                       f"{err.get('Code')}: {err.get('Message', '')[:120]}")
+
+    # DynamoDB PITR
+    t = p.name("pitr")
+    ddb.create_table(TableName=t, BillingMode="PAY_PER_REQUEST",
+                     AttributeDefinitions=[{"AttributeName": "pk", "AttributeType": "S"}],
+                     KeySchema=[{"AttributeName": "pk", "KeyType": "HASH"}])
+    p.cleanup("pitr", lambda: ddb.delete_table(TableName=t))
+    ddb.get_waiter("table_exists").wait(TableName=t, WaiterConfig={"Delay": 1, "MaxAttempts": 30})
+    p.call("UpdateContinuousBackups(PITR on)", ddb.update_continuous_backups, TableName=t,
+           PointInTimeRecoverySpecification={"PointInTimeRecoveryEnabled": True})
+
+    def _latest() -> Any:
+        return ddb.describe_continuous_backups(TableName=t)["ContinuousBackupsDescription"][
+            "PointInTimeRecoveryDescription"].get("LatestRestorableDateTime")
+
+    l0 = _latest()
+    ddb.put_item(TableName=t, Item={"pk": {"S": "o1"}, "v": {"S": "v1"}})
+    time.sleep(2)
+    import datetime as _dt
+    between = _dt.datetime.now(_dt.timezone.utc)
+    time.sleep(2)
+    ddb.put_item(TableName=t, Item={"pk": {"S": "o1"}, "v": {"S": "v2"}})
+    time.sleep(2)
+    l1 = _latest()
+    p.behavior("PITR LatestRestorableDateTime 이 시간이 지나면 앞으로 감", l0 is not None and l1 is not None and l1 > l0,
+               f"PITR 켠 직후 {l0} → 6초 뒤 {l1}")
+
+    def _restore_value(label: str, **kw: Any) -> str:
+        tgt = p.name(f"pitr-{label}")
+        try:
+            ddb.restore_table_to_point_in_time(SourceTableName=t, TargetTableName=tgt, **kw)
+        except ClientError as e:
+            return f"오류 {e.response['Error']['Code']}: {e.response['Error'].get('Message', '')[:80]}"
+        p.cleanup(f"r-{label}", lambda: ddb.delete_table(TableName=tgt))
+        try:
+            ddb.get_waiter("table_exists").wait(TableName=tgt, WaiterConfig={"Delay": 1, "MaxAttempts": 30})
+            it = ddb.get_item(TableName=tgt, Key={"pk": {"S": "o1"}}, ConsistentRead=True).get("Item")
+            return it["v"]["S"] if it else "(항목 없음)"
+        except Exception as e:  # noqa: BLE001
+            return f"{type(e).__name__}"
+
+    v_latest = _restore_value("latest", UseLatestRestorableTime=True)
+    p.behavior("PITR UseLatestRestorableTime 복원 → 최신 데이터(v2)", v_latest == "v2", f"복원된 값 {v_latest}")
+    v_between = _restore_value("between", RestoreDateTime=between)
+    p.behavior("PITR RestoreDateTime(v1과 v2 사이) 복원 → 그 시점 데이터(v1)", v_between == "v1", f"복원 결과 {v_between}")
+
+
 CHECKS = {
     "rds": run_rds,
     "dynamodb": run_dynamodb,
     "elasticache": run_elasticache,
+    "db-gaps": run_db_gaps,
 }

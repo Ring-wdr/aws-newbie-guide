@@ -29,7 +29,7 @@ done
 
 if [ "$OS" = "Darwin" ]; then
   if ! have brew; then
-    die "Homebrew가 필요합니다. https://brew.sh 의 안내대로 설치한 뒤 다시 실행하세요."
+    die "Homebrew가 필요합니다. https://brew.sh 의 안내대로 설치한 뒤 다시 실행하세요."  # external-host-ok: 설치 안내 문구(호출하지 않음)
   fi
   want=()
   have aws || want+=(awscli)
@@ -45,9 +45,9 @@ if [ "$OS" = "Darwin" ]; then
   fi
 else
   # Linux / WSL: 배포판마다 설치 방법이 달라 안내만 한다.
-  have docker || missing+=("docker  → https://docs.docker.com/engine/install/ (설치 후 'sudo usermod -aG docker \$USER' 하고 다시 로그인)")
-  have aws || missing+=("aws CLI v2 → https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html")
-  have uv || missing+=("uv → curl -LsSf https://astral.sh/uv/install.sh | sh")
+  have docker || missing+=("docker  → https://docs.docker.com/engine/install/ (설치 후 'sudo usermod -aG docker \$USER' 하고 다시 로그인)")  # external-host-ok: 설치 안내 문구(호출하지 않음)
+  have aws || missing+=("aws CLI v2 → https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html")  # external-host-ok: 설치 안내 문구(호출하지 않음)
+  have uv || missing+=("uv → curl -LsSf https://astral.sh/uv/install.sh | sh")  # external-host-ok: 설치 안내 문구(호출하지 않음)
   if [ ${#missing[@]} -gt 0 ]; then
     c_red "다음 프로그램을 설치한 뒤 다시 실행하세요:"
     for m in "${missing[@]}"; do echo "  - $m"; done

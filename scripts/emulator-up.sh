@@ -8,6 +8,9 @@
 #   EMULATOR_MEMORY       컨테이너 메모리 상한 (기본 2g, 스왑 없음)
 #   EMULATOR_TELEMETRY    on 으로 두면 텔레메트리를 끄지 않는다 (기본: 끔)
 #   EMULATOR_IDLE_TIMEOUT 지정한 초 동안 API 호출이 없으면 에뮬레이터가 스스로 종료
+#   EMULATOR_DNS          컨테이너가 쓸 DNS 서버 IP (docker run --dns). 127.0.0.1 로 두면 컨테이너 안의
+#                         이름 해석이 모두 실패해 바깥으로 DNS 질의가 나가지 않는다(탐침 검증용, M00 레슨 3).
+#                         비우면 Docker 기본 리졸버를 쓴다(기본값).
 set -euo pipefail
 # shellcheck source=scripts/_common.sh
 . "$(dirname "$0")/_common.sh"
@@ -18,6 +21,10 @@ NAME="$(container_name "$PORT")"
 # 기본 2g(공식 가이드와 같음). 동기 Lambda Invoke 한 번마다 약 7 MiB가 회수되지 않고 쌓여서
 # 1g 에서는 약 120번 호출 후 OOM(137)으로 죽었다(측정과 대처: M00 레슨 3 문제 해결). 병렬 에이전트는 줄일 수 있다.
 MEMORY="${EMULATOR_MEMORY:-2g}"
+DNS="${EMULATOR_DNS:-}"
+if [ -n "$DNS" ] && ! [[ "$DNS" =~ ^[0-9]{1,3}(\.[0-9]{1,3}){3}$ ]]; then
+  die "EMULATOR_DNS 는 IPv4 주소여야 합니다 (예: 127.0.0.1): '$DNS'"
+fi
 
 require_docker
 require_image
@@ -56,7 +63,7 @@ if [ -z "$state" ]; then
   mkdir -p "$EMULATOR_HOME_DIR"
 
   run_args=(
-    run -d --name "$NAME"
+    run -d --name "$NAME" --pull never   # 로컬에서 빌드한 이미지만 쓴다(레지스트리에서 받지 않음)
     --label "$EMULATOR_LABEL=1" --label "$EMULATOR_LABEL.port=$PORT"
     --memory="$MEMORY" --memory-swap="$MEMORY"
     -p "127.0.0.1:$PORT:$PORT"
@@ -68,6 +75,9 @@ if [ -z "$state" ]; then
   if [ "$(uname -s)" = "Linux" ]; then
     run_args+=(--user "$(id -u):$(id -g)")
   fi
+  if [ -n "$DNS" ]; then
+    run_args+=(--dns "$DNS")
+  fi
   emu_args=(-p "$PORT")
   if [ "${EMULATOR_TELEMETRY:-off}" != "on" ]; then
     emu_args+=(--telemetry off)
@@ -76,7 +86,7 @@ if [ -z "$state" ]; then
     emu_args+=(--idle-timeout "$EMULATOR_IDLE_TIMEOUT")
   fi
 
-  echo "에뮬레이터를 시작합니다: $NAME (포트 $PORT, 메모리 상한 $MEMORY)"
+  echo "에뮬레이터를 시작합니다: $NAME (포트 $PORT, 메모리 상한 $MEMORY${DNS:+, DNS $DNS})"
   if ! docker "${run_args[@]}" "$EMULATOR_IMAGE" "${emu_args[@]}" >/dev/null; then
     die "컨테이너를 시작하지 못했습니다. 포트 $PORT 를 다른 프로그램이 쓰고 있지 않은지 확인하세요 (lsof -i :$PORT)."
   fi

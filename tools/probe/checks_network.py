@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import os
+import subprocess
+import tempfile
 from typing import Any
 
 from lib import Probe, wait_until
@@ -303,6 +306,143 @@ def run_vpc(p: Probe) -> None:
                    what="서브넷이 남은 VPC 삭제 → DependencyViolation")
 
 
+def _selfsigned_cert() -> tuple[bytes, bytes] | None:
+    """openssl 로 자체 서명 인증서(키, 인증서 PEM)를 만든다. 없으면 None."""
+    try:
+        with tempfile.TemporaryDirectory() as d:
+            key, crt = os.path.join(d, "k.pem"), os.path.join(d, "c.pem")
+            subprocess.run(["openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-keyout", key, "-out", crt,
+                            "-days", "2", "-subj", "/CN=vpn.todayorder.example"], check=True, capture_output=True, timeout=30)
+            return open(key, "rb").read(), open(crt, "rb").read()
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def run_vpc_gaps(p: Probe) -> None:
+    """M02 모듈 저자가 찾은 501·동작 차이를 재현한다 (삭제 API가 501인 것이 많아 일부 리소스는 남는다)."""
+    ec2 = p.client("ec2")
+
+    def vpc(cidr: str) -> str:
+        vid = ec2.create_vpc(CidrBlock=cidr)["Vpc"]["VpcId"]
+        p.cleanup(f"vpc-{cidr}", lambda: ec2.delete_vpc(VpcId=vid))
+        return vid
+
+    def subnet(vid: str, cidr: str, az: str = "us-east-1a") -> str:
+        sid = ec2.create_subnet(VpcId=vid, CidrBlock=cidr, AvailabilityZone=az)["Subnet"]["SubnetId"]
+        p.cleanup(f"sn-{cidr}", lambda: ec2.delete_subnet(SubnetId=sid))
+        return sid
+
+    v1, v2 = vpc("10.61.0.0/16"), vpc("10.62.0.0/16")
+    s1 = subnet(v1, "10.61.1.0/24")
+
+    # 피어링 삭제·거절
+    pc = p.call("CreateVpcPeeringConnection", ec2.create_vpc_peering_connection, VpcId=v1, PeerVpcId=v2)
+    if pc:
+        pcx = pc["VpcPeeringConnection"]["VpcPeeringConnectionId"]
+        p.call("RejectVpcPeeringConnection", ec2.reject_vpc_peering_connection, VpcPeeringConnectionId=pcx)
+        p.call("DeleteVpcPeeringConnection", ec2.delete_vpc_peering_connection, VpcPeeringConnectionId=pcx)
+
+    # 라우팅: ReplaceRoute, ReplaceRouteTableAssociation, NAT 삭제 후 블랙홀
+    igw = ec2.create_internet_gateway()["InternetGateway"]["InternetGatewayId"]
+    ec2.attach_internet_gateway(InternetGatewayId=igw, VpcId=v1)
+
+    def _rm_igw() -> None:
+        ec2.detach_internet_gateway(InternetGatewayId=igw, VpcId=v1)
+        ec2.delete_internet_gateway(InternetGatewayId=igw)
+
+    p.cleanup("igw", _rm_igw)
+    rt = ec2.create_route_table(VpcId=v1)["RouteTable"]["RouteTableId"]
+    p.cleanup("rt", lambda: ec2.delete_route_table(RouteTableId=rt))
+    ec2.create_route(RouteTableId=rt, DestinationCidrBlock="0.0.0.0/0", GatewayId=igw)
+    p.call("ReplaceRoute", ec2.replace_route, RouteTableId=rt, DestinationCidrBlock="0.0.0.0/0", GatewayId=igw)
+    assoc = ec2.associate_route_table(RouteTableId=rt, SubnetId=s1)["AssociationId"]
+    rt2 = ec2.create_route_table(VpcId=v1)["RouteTable"]["RouteTableId"]
+    p.cleanup("rt2", lambda: ec2.delete_route_table(RouteTableId=rt2))
+    r = p.call("ReplaceRouteTableAssociation", ec2.replace_route_table_association, AssociationId=assoc, RouteTableId=rt2)
+    if r:
+        assoc = r.get("NewAssociationId", assoc)
+    p.cleanup("assoc", lambda: ec2.disassociate_route_table(AssociationId=assoc))
+
+    alloc = ec2.allocate_address(Domain="vpc")["AllocationId"]
+    p.cleanup("eip", lambda: ec2.release_address(AllocationId=alloc))
+    nat = p.call("CreateNatGateway(zonal)", ec2.create_nat_gateway, SubnetId=s1, AllocationId=alloc)
+    if nat:
+        nid = nat["NatGateway"]["NatGatewayId"]
+        wait_until(lambda: ec2.describe_nat_gateways(NatGatewayIds=[nid])["NatGateways"][0]["State"] == "available", 30)
+        prt = ec2.create_route_table(VpcId=v1)["RouteTable"]["RouteTableId"]
+        p.cleanup("prt", lambda: ec2.delete_route_table(RouteTableId=prt))
+        ec2.create_route(RouteTableId=prt, DestinationCidrBlock="0.0.0.0/0", NatGatewayId=nid)
+        ec2.delete_nat_gateway(NatGatewayId=nid)
+        wait_until(lambda: ec2.describe_nat_gateways(NatGatewayIds=[nid])["NatGateways"][0]["State"] == "deleted", 30)
+        routes = ec2.describe_route_tables(RouteTableIds=[prt])["RouteTables"][0]["Routes"]
+        st = [x.get("State") for x in routes if x.get("NatGatewayId") == nid]
+        p.behavior("NAT 게이트웨이를 지우면 그 경로가 blackhole 로 바뀜", st == ["blackhole"], f"경로 State={st}")
+    p.call("CreateNatGateway(AvailabilityMode=regional)", ec2.create_nat_gateway, VpcId=v1, AvailabilityMode="regional")
+
+    # Egress-only IGW
+    p.call("CreateEgressOnlyInternetGateway", ec2.create_egress_only_internet_gateway, VpcId=v1)
+    p.call("DescribeEgressOnlyInternetGateways", ec2.describe_egress_only_internet_gateways)
+
+    # TGW: 기본 연결·전파, 정적 경로, 경로 검색, 연결 삭제
+    tgw = p.call("CreateTransitGateway(기본 연결·전파 enable)", ec2.create_transit_gateway, Options={
+        "DefaultRouteTableAssociation": "enable", "DefaultRouteTablePropagation": "enable"})
+    if tgw:
+        tid = tgw["TransitGateway"]["TransitGatewayId"]
+        wait_until(lambda: ec2.describe_transit_gateways(TransitGatewayIds=[tid])["TransitGateways"][0]["State"] == "available", 30)
+        opts = ec2.describe_transit_gateways(TransitGatewayIds=[tid])["TransitGateways"][0]["Options"]
+        default_rt = opts.get("AssociationDefaultRouteTableId")
+        att = p.call("CreateTransitGatewayVpcAttachment", ec2.create_transit_gateway_vpc_attachment,
+                     TransitGatewayId=tid, VpcId=v1, SubnetIds=[s1])
+        if att:
+            aid = att["TransitGatewayVpcAttachment"]["TransitGatewayAttachmentId"]
+            wait_until(lambda: ec2.describe_transit_gateway_vpc_attachments(TransitGatewayAttachmentIds=[aid])[
+                "TransitGatewayVpcAttachments"][0]["State"] == "available", 30)
+            if default_rt:
+                a = ec2.get_transit_gateway_route_table_associations(TransitGatewayRouteTableId=default_rt)["Associations"]
+                pr = ec2.get_transit_gateway_route_table_propagations(TransitGatewayRouteTableId=default_rt)[
+                    "TransitGatewayRouteTablePropagations"]
+                p.behavior("DefaultRouteTableAssociation=enable 이면 새 연결이 기본 TGW 라우팅 테이블에 자동 연결",
+                           any(x.get("TransitGatewayAttachmentId") == aid for x in a), f"연결 {len(a)}개")
+                p.behavior("DefaultRouteTablePropagation=enable 이면 새 연결이 기본 TGW 라우팅 테이블로 자동 전파",
+                           any(x.get("TransitGatewayAttachmentId") == aid for x in pr), f"전파 {len(pr)}개")
+                p.call("CreateTransitGatewayRoute", ec2.create_transit_gateway_route, DestinationCidrBlock="10.99.0.0/16",
+                       TransitGatewayRouteTableId=default_rt, TransitGatewayAttachmentId=aid)
+                p.call("SearchTransitGatewayRoutes", ec2.search_transit_gateway_routes, TransitGatewayRouteTableId=default_rt,
+                       Filters=[{"Name": "type", "Values": ["static", "propagated"]}])
+            else:
+                p.skip("TGW 기본 라우팅 테이블", "AssociationDefaultRouteTableId 없음")
+            p.call("DeleteTransitGatewayVpcAttachment", ec2.delete_transit_gateway_vpc_attachment,
+                   TransitGatewayAttachmentId=aid)
+
+    # Client VPN
+    kc = _selfsigned_cert()
+    if kc:
+        acm = p.client("acm")
+        cert = p.call("ACM ImportCertificate(Client VPN 서버 인증서)", acm.import_certificate, Certificate=kc[1], PrivateKey=kc[0])
+        if cert:
+            arn = cert["CertificateArn"]
+            p.cleanup("cert", lambda: acm.delete_certificate(CertificateArn=arn))
+            p.call("CreateClientVpnEndpoint", ec2.create_client_vpn_endpoint, ClientCidrBlock="10.200.0.0/22",
+                   ServerCertificateArn=arn, ConnectionLogOptions={"Enabled": False},
+                   AuthenticationOptions=[{"Type": "certificate-authentication",
+                                           "MutualAuthentication": {"ClientRootCertificateChainArn": arn}}])
+    else:
+        p.skip("CreateClientVpnEndpoint", "openssl 없음")
+
+    # 기본 VPC
+    dv = ec2.describe_vpcs(Filters=[{"Name": "isDefault", "Values": ["true"]}])["Vpcs"]
+    if dv:
+        dvid = dv[0]["VpcId"]
+        igws = ec2.describe_internet_gateways(Filters=[{"Name": "attachment.vpc-id", "Values": [dvid]}])["InternetGateways"]
+        rts = ec2.describe_route_tables(Filters=[{"Name": "vpc-id", "Values": [dvid]}])["RouteTables"]
+        has_default = any(r.get("DestinationCidrBlock") == "0.0.0.0/0" for t in rts for r in t["Routes"])
+        p.behavior("기본 VPC 에 IGW 와 0.0.0.0/0 경로가 있음", bool(igws) and has_default,
+                   f"{dv[0]['CidrBlock']} IGW {len(igws)}개, 0.0.0.0/0 경로 {'있음' if has_default else '없음'}")
+    else:
+        p.behavior("기본 VPC 가 있음", False, "없음")
+
+
 CHECKS = {
     "ec2-vpc": run_vpc,
+    "vpc-gaps": run_vpc_gaps,
 }

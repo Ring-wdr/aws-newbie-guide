@@ -3,13 +3,11 @@
 from __future__ import annotations
 
 import json
-import os
-import subprocess
 import time
 
 import boto3
 
-from lib import Probe, wait_until
+from lib import ExternalTarget, Probe, container_curl, wait_until
 
 from lib import _CFG  # noqa: E402  (같은 재시도·타임아웃 설정 재사용)
 
@@ -92,6 +90,7 @@ def run_route53(p: Probe) -> None:
 
     # Alias → S3 웹 사이트 엔드포인트 (us-east-1 S3 웹사이트 호스팅 영역 ID: Z3AQBSTGFYJSTF)
     alias = {"Action": "UPSERT", "ResourceRecordSet": {"Name": f"static.{domain}", "Type": "A", "AliasTarget": {
+        # external-host-ok: Route 53 별칭 값(에뮬레이터가 질의하지 않음, 리뷰 DNS 기록 확인). AWS 가 요구하는 고정 이름
         "HostedZoneId": "Z3AQBSTGFYJSTF", "DNSName": "s3-website-us-east-1.amazonaws.com", "EvaluateTargetHealth": False}}}
     p.call("ChangeResourceRecordSets(Alias → S3 웹 사이트)", r53.change_resource_record_sets, HostedZoneId=zid,
            ChangeBatch={"Changes": [alias]})
@@ -136,6 +135,11 @@ def run_cloudfront(p: Probe) -> None:
     if cp:
         p.cleanup("cp", lambda: cf.delete_cache_policy(Id=cp_id, IfMatch=cf.get_cache_policy(Id=cp_id)["ETag"]))
 
+    # 원본 이름은 S3 형식(<버킷>.s3.<리전>.amazonaws.com)이어야 한다. 에뮬레이터는 이 이름을 보고 같은 에뮬레이터의
+    # S3 버킷에 연결하고 OAC 를 집행한다(직접 확인: <버킷>.s3.todayorder.invalid 로 주면 버킷 정책 없이도 200 — OAC 미집행,
+    # origin.todayorder.invalid 로 주면 404 NoSuchBucket). PR #15 리뷰의 DNS 기록과 --no-dns 비교 실행에서
+    # 이 이름의 DNS 질의는 관찰되지 않았다(이름 해석 없이 내부에서 매핑).
+    # external-host-ok: 에뮬레이터가 내부 S3 로 매핑하는 원본 이름(DNS 질의 없음 확인)
     origin = {"Id": "s3origin", "DomainName": f"{bucket}.s3.us-east-1.amazonaws.com",
               "S3OriginConfig": {"OriginAccessIdentity": ""}}
     if oac_id:
@@ -158,16 +162,14 @@ def run_cloudfront(p: Probe) -> None:
         # 데이터 플레인: 배포 주소는 컨테이너 내부 포트라 호스트에서는 닿지 않는다. docker exec 로 확인.
         s3.put_object(Bucket=bucket, Key="index.html", Body=b"hello-cloudfront")
         p.cleanup("obj", lambda: s3.delete_object(Bucket=bucket, Key="index.html"))
-        port = os.environ.get("EMULATOR_PORT", "9297")
-
         def _get() -> tuple[str, str]:
-            r = subprocess.run(["docker", "exec", f"aws-emulator-{port}", "curl", "-s", "-m", "5",
-                                "-w", "\\n%{http_code}", f"http://{dom}/index.html"],
-                               capture_output=True, text=True, timeout=20).stdout
+            r = container_curl(f"http://{dom}/index.html", "-w", "\\n%{http_code}").stdout
             body, _, code = r.rpartition("\n")
             return code.strip(), body
 
         try:
+            if not p.target_ok("CloudFront 데이터 플레인(컨테이너 안 curl)", dom):
+                raise ExternalTarget(dom)
             code0, _ = _get()
             p.behavior("버킷 정책 없이 배포로 GET → 403 (OAC가 허용되지 않음)", code0 == "403", f"HTTP {code0}")
             s3.put_bucket_policy(Bucket=bucket, Policy=json.dumps({"Version": "2012-10-17", "Statement": [{
@@ -177,6 +179,8 @@ def run_cloudfront(p: Probe) -> None:
             code1, body = _get()
             p.behavior("OAC용 버킷 정책 추가 후 배포 주소로 GET → 객체 반환 (컨테이너 안에서 curl)",
                        code1 == "200" and "hello-cloudfront" in body, f"HTTP {code1} {body[:40]!r}")
+        except ExternalTarget:
+            pass  # target_ok 가 이미 SKIP 을 남겼다
         except Exception as e:  # noqa: BLE001
             p.skip("CloudFront 데이터 플레인", f"docker exec 불가: {type(e).__name__}")
         inv = p.call("CreateInvalidation", cf.create_invalidation, DistributionId=did, InvalidationBatch={

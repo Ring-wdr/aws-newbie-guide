@@ -93,7 +93,13 @@ guard_selftest() {
   uv run --quiet python -m emulator_guard.selftest --live
 }
 
+# 탐침·스크립트·가드·M00 코드가 바깥 호스트(이미지 레지스트리·URL·구독 엔드포인트)를 가리키지 않는지 정적으로 검사
+no_external_hosts() {
+  uv run --quiet python tools/probe/no_external_hosts.py
+}
+
 cd "$ROOT"
+run "외부 호스트 정적 검사 (tools·scripts·src·M00에 .invalid 이외 주소 없음)" no_external_hosts
 run "안전 장치 자체 시험 (URL 파싱 우회 차단·두 번째 사이트 API·opt-out)" guard_selftest
 [ -n "${DR_EMULATOR_PORT:-}" ] || echo "SKIP  두 번째 사이트 실시간 시험 (DR_EMULATOR_PORT 미설정 — 설정하고 그 포트에 에뮬레이터를 띄우면 시험)"
 run "env.sh: 서명 거부 + 시계 20분 어긋남 → 시계 어긋남 안내" envsh_sig_skew20
