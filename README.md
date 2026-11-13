@@ -24,7 +24,7 @@ macOS + [Homebrew](https://brew.sh) 기준 (Linux·WSL은 [M00 레슨 3](./curri
 git clone https://github.com/Ring-wdr/aws-newbie-guide.git && cd aws-newbie-guide
 scripts/install.sh            # Colima·docker·AWS CLI·uv 확인/설치, 에뮬레이터 이미지 빌드, boto3 설치
 scripts/emulator-up.sh        # 에뮬레이터 시작 (https://127.0.0.1:9297, 컨테이너의 외부 이름 해석은 기본으로 차단)
-source scripts/env.sh         # 이 셸을 에뮬레이터에 연결 (실제 AWS로 나가면 멈추는 안전 장치 포함)
+source scripts/env.sh         # 이 셸을 에뮬레이터에 연결 (에뮬레이터가 아니면 연결을 거부하고 이 셸을 AWS에서 분리하는 안전 장치 포함)
 aws sts get-caller-identity   # "Account": "000000000000" 이면 준비 완료
 ```
 
