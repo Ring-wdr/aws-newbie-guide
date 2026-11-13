@@ -93,7 +93,7 @@ def select_files(pages: str) -> list[str]:
 
 # ---------------------------------------------------------------- 내용 동등성
 def gate_parity(dist: Path, files: list[str]) -> Gate:
-    g = Gate("내용 동등성(제목·코드 블록 바이트·표 행/열·메타 줄)")
+    g = Gate("내용 동등성(제목·H2~H6 순서·코드 블록 바이트·표 행/열·메타 줄)")
     for rel in files:
         html_path = html_for_route(dist, route_for(rel))
         if not html_path.exists():
@@ -127,6 +127,12 @@ def gate_parity(dist: Path, files: list[str]) -> Gate:
             diff = next((i for i, (x, y) in enumerate(zip(st, bt)) if x != y), min(len(st), len(bt)))
             line = src.tables[diff][0] if diff < len(src.tables) else "?"
             g.fail(f"{rel}: 표 다름 — 원고 {len(st)}개 / 페이지 {len(bt)}개, {diff + 1}번째 표(원고 {line}줄) 원고 행·열 {st[diff:diff + 1]} / 페이지 {bt[diff:diff + 1]}")
+        bh = htmlbuilt.headings(content)
+        sh = [(lv, t) for _, lv, t in src.headings]
+        if bh != sh:
+            k = next((i for i, (x, y) in enumerate(zip(sh, bh)) if x != y), min(len(sh), len(bh)))
+            line = src.headings[k][0] if k < len(src.headings) else "?"
+            g.fail(f"{rel}: 제목(H2~H6) 다름 — 원고 {len(sh)}개 / 페이지 {len(bh)}개, {k + 1}번째(원고 {line}줄) 원고 {sh[k:k + 1]} / 페이지 {bh[k:k + 1]}")
         if src.meta is not None:
             mt = htmlbuilt.meta_text(content)
             if mt != src.meta:
@@ -313,6 +319,90 @@ def gate_links(dist: Path, routes: list[str] | None) -> Gate:
     return g
 
 
+# ---------------------------------------------------------------- 소스 보기의 실행 명령
+def strip_shell_comment(line: str) -> str:
+    q = None
+    for i, c in enumerate(line):
+        if q:
+            if c == q:
+                q = None
+            continue
+        if c in "'\"":
+            q = c
+        elif c == "#" and i > 0 and line[i - 1].isspace():
+            return line[:i].rstrip()
+    return line.rstrip()
+
+
+def invokes(line: str, rel: str) -> bool:
+    return re.match(
+        r"^\s*(?:[A-Z_][A-Z0-9_]*=\S*\s+)*(?:bash\s+|sh\s+|source\s+|\.\s+|uv\s+run\s+(?:--\S+\s+)*python3?\s+|python3?\s+)?(?:\./)?"
+        + re.escape(rel) + r"(?=\s|$|;|&&|\|)", line) is not None
+
+
+_bash_lines: list[str] | None = None
+
+
+def manuscript_bash_lines() -> list[str]:
+    global _bash_lines
+    if _bash_lines is None:
+        _bash_lines = []
+        for rel in all_content_files():
+            for cb in mdsource.parse((REPO / rel).read_text(encoding="utf-8")).codes:
+                if cb.lang.lower() != "bash":
+                    continue
+                raw = cb.text.split("\n")
+                i = 0
+                while i < len(raw):
+                    ln = raw[i]
+                    while re.search(r"\\\s*$", ln) and i + 1 < len(raw):
+                        i += 1
+                        ln = re.sub(r"\\\s*$", "", ln) + " " + raw[i].strip()
+                    _bash_lines.append(strip_shell_comment(ln).strip())
+                    i += 1
+    return _bash_lines
+
+
+def entry_command(rel: str) -> str | None:
+    """실행 진입점이면 그 형태의 명령, 아니면 None."""
+    p = REPO / rel
+    base = p.name
+    if rel.endswith(".sh"):
+        if base.startswith("_"):
+            return None
+        if os.access(p, os.X_OK) or re.search(r"(^|/)labs/(lab\d\d-[^/]+|verify)\.sh$", rel):
+            return f"bash {rel}" if rel.startswith("curriculum/") else rel
+        return None
+    if rel.endswith(".py"):
+        if re.search(r"^if __name__ == [\"']__main__[\"']\s*:", p.read_text(encoding="utf-8"), re.M):
+            return f"uv run python {rel}"
+    return None
+
+
+def gate_run_commands(dist: Path) -> Gate:
+    g = Gate("소스 보기 실행 명령의 근거(원고 또는 실행 진입점)")
+    root = dist / "files"
+    if not root.exists():
+        return g
+    for page in sorted(root.rglob("index.html")):
+        rel = str(page.parent.relative_to(root))
+        doc = htmlbuilt.parse(page.read_text(encoding="utf-8"))
+        runs = doc.find_all(lambda n: "source-run" in n.cls())
+        for box in runs:
+            g.checked += 1
+            pres = box.find_all(lambda n: n.tag == "pre")
+            cmd = pres[0].text().strip() if pres else ""
+            if not (REPO / rel).is_file():
+                g.fail(f"/files/{rel}/: 저장소에 없는 파일에 실행 명령 {cmd!r}")
+                continue
+            grounded = cmd in manuscript_bash_lines() and invokes(cmd, rel)
+            entry = entry_command(rel)
+            if not grounded and cmd != entry:
+                why = "실행 진입점이 아님(실행 비트·labs 이름 규칙·__main__ 없음)" if entry is None else f"진입점 형태는 {entry!r}"
+                g.fail(f"/files/{rel}/: 근거 없는 실행 명령 {cmd!r} — 원고에 이 명령이 없고 {why}")
+    return g
+
+
 # ---------------------------------------------------------------- 외부 리소스 정적 검사
 URL_RE = re.compile(r"(?:https?|wss?|ftp):\/\/[^\s\"'<>)\\]+", re.I)
 NAMESPACE_OK = re.compile(r"^https?://www\.w3\.org/(1999/xhtml|2000/svg|1999/xlink|1998/Math/MathML|XML/1998/namespace|2000/xmlns/?)")
@@ -327,7 +417,19 @@ JS_LOAD = re.compile(
 )
 
 
-def gate_static(dist: Path) -> Gate:
+# 네트워크로 나갈 수 있는 브라우저 API. 오프라인 브라우저 관문(site/tests/lib/harness.mjs)이 기록하는 통로와 같은 목록이다.
+NET_APIS = re.compile(
+    r"\b(?:new\s+WebSocket|WebSocket\s*\(|new\s+EventSource|sendBeacon\s*\(|serviceWorker\s*\.\s*register|RTCPeerConnection"
+    r"|importScripts\s*\(|new\s+(?:Shared)?Worker\s*\(|navigator\s*\.\s*connection)"
+)
+LINK_HINT = re.compile(r"\b(?:preconnect|dns-prefetch|prefetch|prerender|modulepreload)\b")
+INLINE_SCRIPT = re.compile(r"<script\b([^>]*)>([\s\S]*?)</script>", re.I)
+# 산출물에서 알려진 동일 출처 사용(주소를 정적으로 판정할 수 없어 브라우저 관문이 실제 요청을 본다):
+#  Pagefind 검색이 같은 폴더의 pagefind-worker.js 를 Worker 로 연다.
+DIST_API_ALLOW = {("pagefind/pagefind.js", "new Worker(")}
+
+
+def gate_static(dist: Path, verbose: bool = True) -> Gate:
     g = Gate("외부 리소스 정적 검사(site/src·빌드 산출물)")
     # 1) site/src: 주소 자체가 없어야 한다(SVG 이름공간 제외, 줄에 'sitecheck-allow:' 표시가 있으면 예외)
     for p in sorted((SITE / "src").rglob("*")):
@@ -335,10 +437,17 @@ def gate_static(dist: Path) -> Gate:
             continue
         g.checked += 1
         for i, line in enumerate(p.read_text(encoding="utf-8", errors="replace").splitlines(), 1):
+            if "sitecheck-allow:" in line:
+                continue
+            where = f"site/src/{p.relative_to(SITE / 'src')}:{i}"
             for u in URL_RE.findall(line):
-                if NAMESPACE_OK.match(u) or "sitecheck-allow:" in line:
-                    continue
-                g.fail(f"site/src/{p.relative_to(SITE / 'src')}:{i}: 외부 주소 {u}")
+                if not NAMESPACE_OK.match(u):
+                    g.fail(f"{where}: 외부 주소 {u}")
+            # 네트워크 API·연결 예고는 사이트 공용부에서 쓰지 않는다(쓰려면 줄에 sitecheck-allow: 이유)
+            for m in NET_APIS.finditer(line):
+                g.fail(f"{where}: 네트워크 API {m.group(0)!r}")
+            if re.search(r"<link\b", line) and LINK_HINT.search(line):
+                g.fail(f"{where}: 연결 예고 <link rel={LINK_HINT.search(line).group(0)}>")
     # 2) 산출물: 리소스를 불러오는 자리(HTML 속성, CSS url/@import, JS 로딩 호출)에 루프백 밖 주소가 없어야 한다
     nav_links = 0
     for p in sorted(dist.rglob("*")):
@@ -362,17 +471,35 @@ def gate_static(dist: Path) -> Gate:
         if p.suffix in {".js", ".mjs", ".html"}:
             for m in JS_LOAD.finditer(text):
                 g.fail(f"{rel}: 스크립트가 외부 주소를 불러옴 {m.group(0)[:100]}")
-    print(f"  (참고) 원고의 외부 하이퍼링크 <a href=\"http…\"> {nav_links}개 — 누를 때만 이동하는 탐색 링크이며 페이지가 불러오는 리소스가 아니다")
+            # 스크립트 코드(파일 또는 문서 안 <script>)에 네트워크 API가 있으면 실패. 본문 글자는 보지 않는다.
+            if p.suffix == ".html":
+                code = "\n".join(body for attrs, body in INLINE_SCRIPT.findall(text) if "application/json" not in attrs)
+            else:
+                code = text
+            for m in NET_APIS.finditer(code):
+                if (str(rel), re.sub(r"\s+", " ", m.group(0))) in DIST_API_ALLOW:
+                    continue
+                g.fail(f"{rel}: 스크립트의 네트워크 API {m.group(0)!r}")
+    if verbose:
+        print(f"  (참고) 원고의 외부 하이퍼링크 <a href=\"http…\"> {nav_links}개 — 누를 때만 이동하는 탐색 링크이며 페이지가 불러오는 리소스가 아니다")
     return g
 
 
 # ---------------------------------------------------------------- 브라우저 검사(Node)
 def gate_browser(port: int, which: str) -> Gate:
     g = Gate(f"브라우저 검사({which})")
-    script = {"offline": "tests/offline.mjs", "a11y": "tests/a11y.mjs", "keyboard": "tests/keyboard.mjs"}[which]
+    script = {"offline": "tests/offline.mjs", "a11y": "tests/a11y.mjs", "keyboard": "tests/keyboard.mjs", "diagrams": "tests/diagrams.mjs"}[which]
+    if which == "offline":
+        # 관문이 잡는다고 주장하는 통로마다 결함을 심어 실제로 잡는지 먼저 확인한다.
+        st = subprocess.run(["node", "tests/offline-selftest.mjs", "--port", str(port)], capture_output=True, text=True, cwd=SITE)
+        sys.stdout.write(st.stdout.splitlines()[-1] + "\n" if st.stdout else st.stderr[-2000:])
+        if st.returncode != 0:
+            sys.stdout.write(st.stdout)
+            g.fail("offline-selftest: 심은 결함을 잡지 못한 통로가 있다")
     with tempfile.TemporaryDirectory(prefix="sitecheck-browser-") as d:
         env = {**os.environ, "GUIDE_DIST": str(DIST_IN_USE)}
-        p = subprocess.run(["node", script, "--port", str(port), "--out", d], capture_output=True, text=True, cwd=SITE, env=env)
+        args = ["--fail"] if which == "diagrams" else ["--out", d]
+        p = subprocess.run(["node", script, "--port", str(port), *args], capture_output=True, text=True, cwd=SITE, env=env)
         sys.stdout.write(p.stdout)
         if p.returncode != 0:
             sys.stdout.write(p.stderr[-3000:])
@@ -392,7 +519,7 @@ def gate_browser(port: int, which: str) -> Gate:
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="가이드 사이트 검사기 (GUIDE-SITE 5장)")
-    ap.add_argument("check", choices=["all", "parity", "quiz", "exam", "links", "static", "offline", "a11y", "keyboard", "browser"])
+    ap.add_argument("check", choices=["all", "parity", "quiz", "exam", "links", "run-commands", "static", "selftest", "offline", "a11y", "keyboard", "diagrams", "browser"])
     ap.add_argument("--pages", default="pilot", help="pilot(기본) | all | 쉼표로 구분한 경로(/curriculum/.../)")
     ap.add_argument("--dist", default=None, help="빌드 산출물 폴더(기본: site/dist)")
     ap.add_argument("--site", default=None, help="site/ 폴더(기본: 저장소의 site/) — 검사기 자체를 시험할 때 사본을 가리킨다")
@@ -419,9 +546,21 @@ def main(argv: list[str] | None = None) -> int:
         gates.append(gate_exam())
     if c in ("all", "links"):
         gates.append(gate_links(dist, routes))
+    if c in ("all", "selftest"):
+        g = Gate("검사기 자체 시험(정적·실행 명령 관문에 심은 결함)")
+        st = subprocess.run([sys.executable, str(HERE / "selftest.py")], capture_output=True, text=True)
+        g.checked = 1
+        print(st.stdout.splitlines()[-1] if st.stdout else st.stderr[-2000:])
+        if st.returncode != 0:
+            print(st.stdout)
+            g.fail("selftest.py 실패")
+        gates.append(g)
+    if c in ("all", "run-commands"):
+        gates.append(gate_run_commands(dist))
     if c in ("all", "static"):
         gates.append(gate_static(dist))
-    browser = {"all": ["offline", "a11y", "keyboard"], "browser": ["offline", "a11y", "keyboard"]}.get(c, [c] if c in ("offline", "a11y", "keyboard") else [])
+    browser = {"all": ["offline", "a11y", "keyboard", "diagrams"], "browser": ["offline", "a11y", "keyboard", "diagrams"]}.get(
+        c, [c] if c in ("offline", "a11y", "keyboard", "diagrams") else [])
     if browser and not args.port:
         print("브라우저 검사에는 --port 가 필요하다(에이전트 전용 포트, 127.0.0.1 에만 연다)", file=sys.stderr)
         return 2

@@ -25,6 +25,7 @@ class Source:
     codes: list[CodeBlock] = field(default_factory=list)
     tables: list[tuple[int, int, int]] = field(default_factory=list)  # (줄, 본문 행 수, 열 수)
     meta: str | None = None
+    headings: list[tuple[int, int, str]] = field(default_factory=list)  # (줄, 단계, 글자) — H2~H6
 
 
 def strip_inline(md: str) -> str:
@@ -87,6 +88,9 @@ def parse(text: str, is_lesson: bool = False) -> Source:
             src.codes.append(CodeBlock(lang=lang, text="\n".join(body), line=i + 1))
             i = j + 1
             continue
+        h = re.match(r"^ {0,3}(#{2,6})\s+(.+?)\s*#*\s*$", ln)
+        if h:
+            src.headings.append((i + 1, len(h.group(1)), strip_inline(h.group(2))))
         # GFM 표: 머리글 줄 + 구분 줄 (인용문 안의 표도 센다)
         unq = lambda s: re.sub(r"^\s*(?:>\s?)+", "", s)  # noqa: E731
         if "|" in ln and i + 1 < n and TABLE_DELIM.match(unq(lines[i + 1])) and "-" in lines[i + 1]:

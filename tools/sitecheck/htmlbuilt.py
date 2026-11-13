@@ -129,3 +129,11 @@ def meta_text(content: Node) -> str | None:
 
         parts.append(f"{dt}: {text_wo_labels(dd)}")
     return re.sub(r"\s+", " ", " · ".join(parts)).strip()
+
+
+def headings(content: Node) -> list[tuple[int, str]]:
+    out = []
+    for n in content.find_all(lambda n: n.tag in ("h2", "h3", "h4", "h5", "h6")):
+        if outside_widgets(n):
+            out.append((int(n.tag[1]), re.sub(r"\s+", " ", n.text()).strip()))
+    return out
