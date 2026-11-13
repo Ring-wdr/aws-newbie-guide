@@ -62,13 +62,21 @@ container_dns() {
 # 그룹 전체에 TERM, 0.5초 뒤에도 남아 있으면 KILL 을 보낸 뒤 wait 로 거둔다(TERM 을 무시하는 자식도 끝난다).
 # 출력은 파이프가 아니라 파일로 받는다 — 그룹을 떠난 손자(ssh 제어 연결 등)가 파이프를 쥐고 있어도 기다리지 않는다.
 # 하위 셸의 stderr 를 버려 작업 제어 메시지("Terminated" 등)가 보이지 않는다. bash 3.2(macOS 기본)에서 시험함.
+# Ctrl-C·TERM·HUP: 명령은 자기 그룹에 있어 터미널의 Ctrl-C 를 받지 못한다. 그래서 set -m 은 띄우는 순간에만 켜고
+# 바로 끈다(대기용 sleep 이 호출한 셸과 같은 포그라운드 그룹에 남아 Ctrl-C 가 이 하위 셸에 닿는다). 하위 셸의 trap 이
+# 명령의 그룹을 KILL 하고 거둔 뒤 130 으로 끝난다. trap 은 하위 셸 안에만 있어 호출한 셸의 trap 을 바꾸지 않는다.
+# 반환 130 = 중단됨 — 호출한 쪽은 자신도 130 으로 끝내야 한다(bash 는 자식이 신호를 처리하고 끝나면 계속 진행한다).
 run_limited() {  # <초> <출력 파일> <명령...>
   local limit="$1" out="$2"
   shift 2
   (
+    set +e   # 호출한 스크립트의 set -e 를 끈다 — 거둔 명령의 0 이 아닌 상태(137 등)로 하위 셸이 먼저 끝나지 않게
+    pid=""
+    trap '[ -n "$pid" ] && { kill -KILL -- "-$pid"; wait "$pid"; } 2>/dev/null; exit 130' INT TERM HUP
     set -m
     "$@" >"$out" 2>/dev/null </dev/null &
     pid=$!
+    set +m
     i=0
     while kill -0 "$pid" 2>/dev/null; do
       if [ "$i" -ge $((limit * 10)) ]; then
@@ -92,6 +100,7 @@ warn_if_clock_unstable() {
   local out rc=0
   out="$(bash "$(dirname "${BASH_SOURCE[0]}")/clock-check.sh" --stability 2>&1)" || rc=$?
   if [ "$rc" -eq 4 ]; then printf '%s\n' "$out" >&2; fi
+  [ "$rc" -ne 130 ] || exit 130   # Ctrl-C 로 중단됐으면 호출한 스크립트도 멈춘다
   return 0
 }
 

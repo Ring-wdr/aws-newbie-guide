@@ -20,7 +20,7 @@
 # 리소스를 잠깐 "아직 준비 안 됨"으로 본다(Kinesis 스트림 ACTIVE → CREATING, DynamoDB 테이블 ACTIVE 직후
 # PutItem·BatchWriteItem 의 ResourceNotFoundException). 원인: Colima(Lima 2.x)의 게스트 에이전트는 10초마다 VM 시계를
 # 맥 시각으로 맞추고(차이가 0.1초를 넘을 때), VM 안의 systemd-timesyncd 는 인터넷 NTP 시각으로 맞춘다. 맥 시계가
-# NTP 와 0.1초 넘게 다르면 둘이 10초마다 서로 되돌린다. 0.1~0.14초짜리 작은 보정은 흔하고(관찰: 하루에 약 730번)
+# NTP 와 0.1초 넘게 다르면 둘이 10초마다 서로 되돌린다. 0.1~0.14초짜리 작은 보정은 흔하고(관찰: 약 31시간치 저널에 743번, 그중 724번이 어느 새벽 5시간 남짓에 몰림)
 # 영향이 없었다. 문제는 한 번에 0.5초 이상일 때다(시험: DynamoDB 는 1초 이상에서, Kinesis 는 2초에서 준비 상태가
 # 되돌아감. 관찰: 맥 시계가 2초 틀어진 45분 동안 270번). 서명은 15분까지 허용되므로 위의 기본 모드로는 보이지 않는다. 이 모드는 VM 저널에서 게스트 에이전트의 보정 기록("SyncTime: ... drift was X")을 센다.
 #   --last <초>  최근 몇 초를 볼지 (기본 180)
@@ -78,9 +78,16 @@ stability() {
     local tmo="${EMULATOR_CLOCK_SSH_TIMEOUT:-3}" jf rc=0
     case "$tmo" in '' | *[!0-9]* | 0) tmo=3 ;; esac
     jf="$(mktemp "${TMPDIR:-/tmp}/clock-check.XXXXXX")" || cannot_s "임시 파일을 만들지 못했습니다"
+    # Ctrl-C·TERM·HUP 로 끝나도 임시 파일을 남기지 않는다. 신호마다 exit 를 걸어 두어야 EXIT trap 이 언제나 돈다
+    # (bash 는 trap 없는 TERM·HUP 로 죽을 때 EXIT trap 을 건너뛸 수 있다).
+    trap 'rm -f "$jf"' EXIT
+    trap 'exit 130' INT
+    trap 'exit 143' TERM
+    trap 'exit 129' HUP
     run_limited "$tmo" "$jf" colima ssh -p "$profile" -- sh -c "sudo -n journalctl -t lima-guestagent --since @$since -o short-unix -q --no-pager 2>/dev/null || journalctl -t lima-guestagent --since @$since -o short-unix -q --no-pager" || rc=$?
     journal="$(cat "$jf" 2>/dev/null)"
     rm -f "$jf"
+    [ "$rc" -ne 130 ] || exit 130   # Ctrl-C·TERM·HUP 로 중단됨 (--summary 도 중단은 그대로 알린다)
     if [ "$rc" -eq 124 ]; then
       cannot_s "colima ssh 가 ${tmo}초 안에 응답하지 않았습니다 (colima status 로 VM 상태 확인. 계속되면 colima ssh -- true 로 접속을 확인)"
     elif [ "$rc" -ne 0 ]; then
