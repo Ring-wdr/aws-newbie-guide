@@ -100,7 +100,7 @@ def seed(ssm, sm) -> None:  # type: ignore[no-untyped-def]
     ssm.put_parameter(Name=f"{PREFIX}/payment/api-key", Type="SecureString", Value="pk_demo_123")
     sm.create_secret(
         Name=SECRET_ID,
-        SecretString=json.dumps({"username": "orders_app", "password": "first-pass", "host": "orders-db.internal"}),
+        SecretString=json.dumps({"username": "orders_app", "password": "first-pass", "host": "orders-db.todayorder.invalid"}),
     )
 
 
@@ -149,7 +149,7 @@ def main() -> None:
     # 비밀이 교체됐다고 하자 (실제로는 교체 Lambda 가 한다 — labs/lab04 참고)
     sm.put_secret_value(
         SecretId=SECRET_ID,
-        SecretString=json.dumps({"username": "orders_app", "password": "rotated-pass", "host": "orders-db.internal"}),
+        SecretString=json.dumps({"username": "orders_app", "password": "rotated-pass", "host": "orders-db.todayorder.invalid"}),
     )
     now[0] += 299.0  # TTL(300초) 직전
     stale = loader.get().db_password

@@ -62,12 +62,12 @@ ARN 끝의 '-xxxxxx' 6자는 AWS가 붙이는 무작위 접미사다 (같은 이
 == 2. 새 값 저장 → AWSCURRENT 는 새 버전으로, AWSPREVIOUS 는 옛 버전으로
   버전 77881740… → AWSPREVIOUS
   버전 02ed568a… → AWSCURRENT
-AWSCURRENT : {"username":"orders_app","password":"v2-Changed!","host":"orders-db.internal","port":5432}
-AWSPREVIOUS: {"username":"orders_app","password":"v1-Initial!","host":"orders-db.internal","port":5432}
+AWSCURRENT : {"username":"orders_app","password":"v2-Changed!","host":"orders-db.todayorder.invalid","port":5432}
+AWSPREVIOUS: {"username":"orders_app","password":"v1-Initial!","host":"orders-db.todayorder.invalid","port":5432}
 == 3. 잘못 바꿨다! AWSCURRENT 를 옛 버전으로 되돌리기(롤백)
   버전 02ed568a… → AWSPREVIOUS
   버전 77881740… → AWSCURRENT
-롤백 후 AWSCURRENT: {"username":"orders_app","password":"v1-Initial!","host":"orders-db.internal","port":5432}
+롤백 후 AWSCURRENT: {"username":"orders_app","password":"v1-Initial!","host":"orders-db.todayorder.invalid","port":5432}
 ```
 
 방금 본 것: 값을 새로 넣으면 스테이지 레이블이 **자동으로 이동**한다. 롤백은 값을 다시 쓰는 것이 아니라 `update-secret-version-stage`로 `AWSCURRENT` 레이블을 옛 버전에 옮기는 것이다. IAM 정책에서는 ARN 접미사 때문에 `…:secret:todayorder/m09/orders-db-??????`처럼 와일드카드를 쓴다.
@@ -87,7 +87,7 @@ aws: [ERROR]: An error occurred (AccessDeniedException) when calling the RotateS
 }
   버전 77881740… → AWSPREVIOUS
   버전 775b6070… → AWSCURRENT, AWSPENDING
-교체 후 AWSCURRENT: {"username": "orders_app", "password": "lIr1geEmAb4L9WKzhyzGwphV", "host": "orders-db.internal", "port": 5432}
+교체 후 AWSCURRENT: {"username": "orders_app", "password": "lIr1geEmAb4L9WKzhyzGwphV", "host": "orders-db.todayorder.invalid", "port": 5432}
 ```
 
 방금 본 것:
@@ -161,7 +161,7 @@ LAB05 OK
 
 ```
 설정 로드: timeout=3000ms origins=['https://todayorder.example', 'https://admin.todayorder.example']
-           payment_api_key=<11자 숨김> db=orders_app@orders-db.internal password=<10자 숨김>
+           payment_api_key=<11자 숨김> db=orders_app@orders-db.todayorder.invalid password=<10자 숨김>
 요청 100번 뒤 AWS 호출 수: 2 (첫 로드 2)
 교체 직후(TTL 안, 캐시): <10자 숨김> · TTL 지난 뒤: <12자 숨김> · 같은 값? False
 정리 완료
