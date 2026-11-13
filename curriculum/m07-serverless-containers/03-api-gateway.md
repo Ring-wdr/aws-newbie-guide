@@ -133,7 +133,7 @@ LAB03 OK
 
 ## 실제 AWS에서는
 
-- **권한 검사가 API 유형마다 다르다(에뮬레이터 한정).** 저자 확인 결과, 에뮬레이터의 **REST API**는 Lambda 리소스 정책을 검사해 없으면 500을 냈지만, **HTTP API**는 `add-permission` 없이도 함수를 호출했다(FIDELITY의 "AddPermission 없이도 통과"는 HTTP API에 해당). 실제 AWS에서는 **둘 다** 권한이 필요하므로, 실습 스크립트는 HTTP API에도 `add-permission`을 넣는다. 에뮬레이터에서 통과했다고 실제 AWS에서 통과한다는 뜻이 아니다.
+- **권한 검사가 API 유형마다 다르다(에뮬레이터 한정).** 저자 확인 결과, 에뮬레이터의 **REST API**는 Lambda 리소스 정책을 검사해 없으면 500을 냈지만, **HTTP API**는 `add-permission` 없이도 함수를 호출했다(FIDELITY.md의 `lambda-permissions`·`apigatewayv2` 행과 같다: HTTP API만 검사하지 않음). 실제 AWS에서는 **둘 다** 권한이 필요하므로, 실습 스크립트는 HTTP API에도 `add-permission`을 넣는다. 에뮬레이터에서 통과했다고 실제 AWS에서 통과한다는 뜻이 아니다.
 - 스로틀링 설정은 저장되지만, 에뮬레이터에서 실제로 429가 나는지는 확인하지 않았다. 캐싱·WAF·사용량 계획도 구성까지만 관찰 대상이다.
 - 실제 AWS의 `ApiEndpoint`는 `https://<apiId>.execute-api.us-east-1.amazonaws.com`이고 AWS가 관리하는 공인 인증서를 쓴다. `--cacert`가 필요 없다.
 - 실제 AWS에서 해 보려면: API Gateway는 Lambda·SQS처럼 "상시 무료(Always Free)" 항목이 아니다. 2025년 7월 15일 이후 만든 계정은 가입 크레딧으로, 그 전 계정은 (남아 있다면) 12개월 무료 혜택으로 충당된다. 실습 수준의 호출 수백 건은 몇 원 수준이지만, **REST 캐시는 켜 두는 시간만큼 과금**되므로 켜지 않는다. 정리: `aws apigateway delete-rest-api --rest-api-id <id>`, `aws apigatewayv2 delete-api --api-id <id>`, `aws lambda delete-function --function-name todayorder-api-echo`.
