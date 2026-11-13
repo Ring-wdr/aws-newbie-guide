@@ -5,6 +5,10 @@
 #
 # 이 파일이 아는 "3-티어 VPC 설계"는 README.md 의 CIDR 계획표와 같다. 바꾸면 둘 다 바꾼다.
 
+# CLI waiter(`aws ec2 wait vpc-available` 등, 15초 간격) 대신 같은 조건을 1초 간격으로 확인하는 함수
+# (wait_ec2_vpc_available, wait_ec2_nat_available). 이유는 scripts/lab-wait.sh 머리말.
+source "$(git rev-parse --show-toplevel)/scripts/lab-wait.sh"
+
 # ---- 설계값 (README "CIDR 계획"과 동일) ---------------------------------------------
 M02_VPC_NAME="todayorder-vpc"
 M02_VPC_CIDR="10.0.0.0/16"
@@ -194,7 +198,7 @@ build_three_tier() {
   local vpc igw line name cidr az tier sn
   echo "== VPC $M02_VPC_NAME ($M02_VPC_CIDR)"
   vpc="$(aws ec2 create-vpc --cidr-block "$M02_VPC_CIDR" --tag-specifications "$(tags vpc "$M02_VPC_NAME")" --query Vpc.VpcId --output text)"
-  aws ec2 wait vpc-available --vpc-ids "$vpc"
+  wait_ec2_vpc_available "$vpc"
   aws ec2 modify-vpc-attribute --vpc-id "$vpc" --enable-dns-hostnames
   echo "   $vpc"
 
@@ -229,7 +233,7 @@ build_three_tier() {
     nats+=("$nat")
     echo "   todayorder-nat-$s $nat (EIP $eip)"
   done
-  aws ec2 wait nat-gateway-available --nat-gateway-ids "${nats[@]}"
+  wait_ec2_nat_available "${nats[@]}"
 
   echo "== 앱 라우팅 테이블 (AZ별: 0.0.0.0/0 → 같은 AZ의 NAT)"
   local i=0 app_rt

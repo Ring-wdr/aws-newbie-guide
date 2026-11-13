@@ -11,7 +11,7 @@ teardown_vpc "$NAME"
 
 echo "== 1. 연습용 VPC 10.99.0.0/16 (2^16 = 65,536개 주소)"
 VPC="$(aws ec2 create-vpc --cidr-block 10.99.0.0/16 --tag-specifications "$(tags vpc "$NAME")" --query Vpc.VpcId --output text)"
-aws ec2 wait vpc-available --vpc-ids "$VPC"
+wait_ec2_vpc_available "$VPC"
 echo "   $VPC"
 
 echo "== 2. 크기가 다른 서브넷 4개: 손계산 vs AvailableIpAddressCount"

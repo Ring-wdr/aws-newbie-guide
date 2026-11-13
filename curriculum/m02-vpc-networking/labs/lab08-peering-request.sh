@@ -15,7 +15,7 @@ ensure_vpc() { # ensure_vpc <이름> <cidr> → VPC ID
   id="$(vpc_id "$1")"
   if [ -z "$id" ]; then
     id="$(aws ec2 create-vpc --cidr-block "$2" --tag-specifications "$(tags vpc "$1")" --query Vpc.VpcId --output text)"
-    aws ec2 wait vpc-available --vpc-ids "$id"
+    wait_ec2_vpc_available "$id"
   fi
   echo "$id"
 }
