@@ -232,7 +232,7 @@ aws: [ERROR]: An error occurred (NotImplemented) when calling the RegisterImage 
 aws: [ERROR]: An error occurred (NotImplemented) when calling the CopyImage operation: operation CopyImage is scaffolded but not implemented in this emulator
 ```
 
-방금 본 것: AMI = **루트 스냅샷 + 디바이스 매핑 + 속성**. `ImdsSupport: v2.0`이면 이 AMI로 띄운 인스턴스는 IMDSv2가 기본이다. `LaunchPermissions: Group=all`은 **공개 AMI**라는 뜻이다. 내 AMI는 기본이 비공개이고, 특정 계정에만 공유할 수 있다. `ImdsSupport`·`BootMode` 같은 필드를 읽는 습관은 실제 운영에서도 쓸모가 있다.
+방금 본 것: AMI = **루트 스냅샷 + 디바이스 매핑 + 속성**. `ImdsSupport: v2.0`이면 이 AMI로 띄운 인스턴스는 IMDSv2가 기본이다. `Owner`의 12자리 번호는 우리 계정(`000000000000`)이 아니라 `--owners amazon`이 가리키는 **AWS 공식 AMI 소유 계정**이다(에뮬레이터가 실제 AMI 목록을 그대로 흉내 낸다). `LaunchPermissions: Group=all`은 **공개 AMI**라는 뜻이다. 내 AMI는 기본이 비공개이고, 특정 계정에만 공유할 수 있다. `ImdsSupport`·`BootMode` 같은 필드를 읽는 습관은 실제 운영에서도 쓸모가 있다.
 
 ## 실제 AWS에서는
 

@@ -91,7 +91,7 @@ flowchart LR
       NAT["NAT GW<br/>(하나뿐)"]
       API["EC2 api-1<br/>+ 정산 cron"]
       DB[("RDS PostgreSQL<br/>단일 AZ")]
-      REDIS[("ElastiCache Redis<br/>노드 1개, 세션 저장")]
+      REDIS[("ElastiCache(Valkey/Redis OSS)<br/>노드 1개, 세션 저장")]
     end
     subgraph AZb["AZ-b"]
       WRK["EC2 worker-1<br/>(SQS 소비자)"]

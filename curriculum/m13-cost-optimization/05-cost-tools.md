@@ -14,7 +14,7 @@
 | **Cost Explorer** | 지난 비용을 서비스·계정·태그·사용 유형별로 **시각화·분석**, 향후 비용 **예측** | "어디에 돈을 썼나 분석", "추세", "예측" |
 | **AWS Budgets** | 비용·사용량·약정 사용률/적용률에 **임계값 알림**(실제·예측), 예산 조치(Budget Actions: IAM·SCP 정책 적용, 인스턴스 중지) | "한도를 넘기 **전에** 알림", "초과 시 자동 조치" |
 | **Cost Anomaly Detection** | 머신 러닝으로 평소와 다른 지출을 찾아 알림 | "예상치 못한 비용 급증 감지" |
-| **CUR / Data Exports(CUR 2.0)** | 시간·리소스 단위의 **가장 상세한** 사용·비용 데이터를 S3로 내보냄 → Athena·QuickSight 분석 | "가장 상세한", "리소스 단위", "자체 분석" |
+| **CUR / Data Exports(CUR 2.0)** | 시간·리소스 단위의 **가장 상세한** 사용·비용 데이터를 S3로 내보냄 → Athena·Amazon Quick(구 QuickSight) 분석 | "가장 상세한", "리소스 단위", "자체 분석" |
 | **비용 할당 태그** | 태그별로 비용을 나눠 보기. 사용자 정의 태그는 Billing 콘솔에서 **활성화**해야 비용 데이터에 나타남 | "부서·프로젝트별 비용 배분(chargeback)" |
 | **Compute Optimizer** | 사용률 지표로 EC2·ASG·EBS·Lambda·Fargate·RDS 등의 **적정 크기 권장** | "과다 프로비저닝 찾기", "rightsizing" |
 | **Trusted Advisor** | 비용·보안·성능·내결함성·서비스 한도 점검(유휴 리소스 등). 전체 점검은 Business 이상 지원 플랜 | "모범 사례 점검", "유휴 로드 밸런서" |
@@ -64,7 +64,7 @@ FORECASTED	100.0	OK
 EMAIL	ops@todayorder.example
 SNS	arn:aws:sns:us-east-1:000000000000:todayorder-budget-alerts
 == 4. Cost Explorer: 이번 달 비용 조회와 예측
-조회 기간 2026-11-01 ~ 2026-11-14 · 예측 기간 2026-11-14 ~ 2026-12-01
+조회 기간 2026-11-01 ~ 2026-11-13 · 예측 기간 2026-11-13 ~ 2026-12-01
 
 aws: [ERROR]: An error occurred (NotImplemented) when calling the GetCostAndUsage operation: operation GetCostAndUsage is scaffolded but not implemented in this emulator
 
@@ -78,7 +78,7 @@ LAB04 OK
 
 - 예산과 알림 두 개, 구독자(이메일·SNS)가 **저장**됐다. 태그 필터 `user:project$todayorder`의 `user:`는 "사용자 정의 태그"라는 뜻이다(AWS가 만든 태그는 `aws:` 접두사).
 - `ActualSpend`는 `0`이다. 에뮬레이터는 과금을 하지 않으니 지출이 늘지 않고, 알림 상태도 계속 `OK`다. **알림이 울리는 장면은 볼 수 없다**(🟡).
-- Cost Explorer의 비용 조회·예측은 `501 NotImplemented`(🔴). 조회 기간은 lab이 실행한 날짜로 계산한다(이번 달 1일 ~ 내일, `End`는 포함되지 않음). Cost Anomaly Detection 모니터는 만들어지지만 탐지할 지출이 없다.
+- Cost Explorer의 비용 조회·예측은 `501 NotImplemented`(🔴). 조회 기간은 lab을 실행한 날짜로 계산한다(이번 달 1일 ~ 내일, `End`는 포함되지 않음). 날짜는 Cost Explorer처럼 **UTC** 기준이라 한국 시각 오전 9시 전에는 하루 전 날짜가 보인다. 달의 마지막 날에는 "내일 ~ 다음 달 1일"이 빈 기간(`Start == End`, 실제 AWS는 `ValidationException`)이 되므로 예측 끝을 그다음 달 1일로 미룬다. Cost Anomaly Detection 모니터는 만들어지지만 탐지할 지출이 없다.
 
 ### 실습 2: 태그 정책 감사 — [labs/lab05-tag-audit.sh](./labs/lab05-tag-audit.sh)
 

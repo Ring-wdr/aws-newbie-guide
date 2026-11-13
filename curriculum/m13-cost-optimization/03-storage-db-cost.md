@@ -38,7 +38,7 @@ flowchart LR
   DA -- "1800일 (약 5년)" --> X((삭제))
 ```
 
-규칙은 **Transition**(며칠 뒤 어느 클래스로)과 **Expiration**(며칠 뒤 삭제)으로 이뤄진다. 접두사·태그·객체 크기로 대상을 좁힐 수 있다. 버전 관리 버킷이면 이전 버전용 규칙(`NoncurrentVersionTransition`/`Expiration`)도 따로 둔다. Standard-IA·One Zone-IA로는 생성 후 **30일이 지난 객체**만 옮길 수 있다.
+규칙은 **Transition**(며칠 뒤 어느 클래스로)과 **Expiration**(며칠 뒤 삭제)으로 이뤄진다. 접두사·태그·객체 크기로 대상을 좁힐 수 있다. 버전 관리 버킷이면 이전 버전용 규칙(`NoncurrentVersionTransition`/`Expiration`)도 따로 둔다. Standard-IA·One Zone-IA로의 전환은 예전에는 생성 후 **30일이 지난 객체**만 가능했지만, [2026-07-16 발표](https://aws.amazon.com/about-aws/whats-new/2026/07/s3-removes-30-day-transitions-standard-ia-one-zone-ia/)로 이 제한이 없어져 **0일 전환도 가능**하다. 하지만 IA의 **최소 보관 기간 30일(요금)** 은 그대로다(M04 레슨 2). 시험·옛 자료는 여전히 "30일 이후부터"를 기대할 수 있으니 두 가지를 모두 알아 둔다.
 
 ### EBS·DB 비용 손잡이
 
@@ -148,7 +148,7 @@ LAB02 OK
 
 - `put-bucket-lifecycle-configuration`의 응답에 `TransitionDefaultMinimumObjectSize: all_storage_classes_128K`가 있다. 128 KB 미만 객체는 규칙이 있어도 전환하지 않는다는 기본값이다(실제 S3와 같은 필드).
 - [`sdk/lifecycle_cost.py`](./sdk/lifecycle_cost.py)는 `get_bucket_lifecycle_configuration`으로 **버킷에 저장된 규칙**을 읽어 구간을 계산했다. 같은 계산기에 규칙만 바꿔 넣으면 안을 비교할 수 있다.
-- 마지막 단계: 에뮬레이터에서는 시간이 지나도 객체가 `STANDARD`에 머문다(FIDELITY: 수명 주기 전환은 일어나지 않음). 그래서 "규칙 구성은 🟢, 비용은 계산"이다. 에뮬레이터는 잘못된 규칙(예: 10일 뒤 Standard-IA)도 거부하지 않으니(M04), 최소 일수는 스스로 지켜야 한다.
+- 마지막 단계: 에뮬레이터에서는 시간이 지나도 객체가 `STANDARD`에 머문다(FIDELITY: 수명 주기 전환은 일어나지 않음). 그래서 "규칙 구성은 🟢, 비용은 계산"이다. 에뮬레이터는 10일 뒤 Standard-IA 같은 규칙을 받아 준다. 2026-07부터는 실제 AWS도 받아 주지만, IA에 30일을 채우지 못하고 지우거나 옮기면 남은 기간만큼 요금이 붙으니 최소 보관 기간은 스스로 따져야 한다(M04 레슨 2, `lifecycle_lint.py`).
 
 ## 실제 AWS에서는
 
