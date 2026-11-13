@@ -11,6 +11,12 @@
 # 마지막에 안전 장치를 실행해, 요청이 에뮬레이터(계정 000000000000)로 가는 것이
 # 확인되지 않으면 0이 아닌 값으로 반환한다. 실습 스크립트는 set -e 상태에서 이 파일을
 # source 하므로, 안전 장치가 실패하면 실습은 실제 AWS에 요청을 보내기 전에 멈춘다.
+#
+# 거부(실패)하면 어떤 이유든 이 셸을 AWS에서 끊는다: 실제 자격 증명·프로필·엔드포인트 변수를 지우고,
+# AWS_CONFIG_FILE·AWS_SHARED_CREDENTIALS_FILE 을 ~/.aws/emulator/ 아래의 없는 파일로, AWS_ENDPOINT_URL 을
+# 닫힌 루프백 포트로 돌려 둔다. 그래서 거부 뒤에 친 aws 명령은 ~/.aws 의 실제 설정을 쓰지 않고 이 컴퓨터
+# 안에서 실패한다. ~/.aws 의 실제 파일은 읽지도 고치지도 않는다. 실제 AWS를 쓰려면 새 셸을 연다.
+# (boto3 예제의 TODAYORDER_ALLOW_REAL_AWS=1 같은 해제 스위치는 env.sh 에 없다 — env.sh 는 에뮬레이터 전용이다.)
 
 # 이 파일이 있는 scripts/ 디렉터리 (bash·zsh 공통. zsh 문법은 bash 가 파싱하지 않도록 eval 로 감싼다)
 if [ -n "${ZSH_VERSION:-}" ]; then
@@ -23,6 +29,35 @@ _emu_env_fail() {
   printf '\033[31m[env.sh] %s\033[0m\n' "$1" >&2
   [ -n "${2:-}" ] && printf '         %s\n' "$2" >&2
   return 1
+}
+
+# 실제 AWS 자격 증명·프로필·엔드포인트를 줄 수 있는 변수를 모두 지운다.
+# (환경 변수 자격 증명은 파일보다 우선하므로, 남겨 두면 실제 키로 서명된다)
+_emu_env_scrub() {
+  unset AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN AWS_SECURITY_TOKEN \
+    AWS_PROFILE AWS_DEFAULT_PROFILE AWS_ROLE_ARN AWS_ROLE_SESSION_NAME AWS_WEB_IDENTITY_TOKEN_FILE \
+    AWS_CONTAINER_CREDENTIALS_RELATIVE_URI AWS_CONTAINER_CREDENTIALS_FULL_URI \
+    AWS_CONTAINER_AUTHORIZATION_TOKEN AWS_IGNORE_CONFIGURED_ENDPOINT_URLS \
+    AWS_USE_FIPS_ENDPOINT AWS_USE_DUALSTACK_ENDPOINT AWS_ENDPOINT_URL
+  # 서비스별 엔드포인트 덮어쓰기(AWS_ENDPOINT_URL_S3 등)도 지운다.
+  local v
+  for v in $(env | sed -n 's/^\(AWS_ENDPOINT_URL_[A-Za-z0-9_]*\)=.*/\1/p'); do
+    unset "$v"
+  done
+}
+
+# 거부했을 때: 이 셸에서 친 aws·boto3 가 실제 AWS에 닿지 못하게 해 둔다.
+_emu_env_disconnect() {
+  _emu_env_scrub
+  local off="$HOME/.aws/emulator/.disconnected"   # 만들지 않는 경로: 설정·자격 증명이 "없음"이 된다
+  export AWS_CONFIG_FILE="$off/config"
+  export AWS_SHARED_CREDENTIALS_FILE="$off/credentials"
+  export AWS_ENDPOINT_URL="https://127.0.0.1:9"   # discard 포트(닫혀 있음): 서명 없는 요청도 밖으로 나가지 않는다
+  export AWS_EC2_METADATA_DISABLED=true           # 인스턴스 메타데이터에서도 자격 증명을 찾지 않는다
+  export AWS_REGION=us-east-1 AWS_DEFAULT_REGION=us-east-1   # 리전도 정해 둬서 실패 이유가 항상 "자격 증명 없음"이 되게 한다
+  export AWS_PAGER=""
+  unset AWS_CA_BUNDLE
+  printf '\033[31m[env.sh] 이 셸은 AWS에서 끊겼습니다: 실제 자격 증명·프로필 변수를 지웠고, aws 명령은 이 컴퓨터 안에서 실패합니다. 에뮬레이터는 원인을 고친 뒤 다시 source scripts/env.sh, 실제 AWS는 새 셸을 여세요.\033[0m\n' >&2
 }
 
 _emu_env_main() {
@@ -38,17 +73,7 @@ _emu_env_main() {
   local dir="$HOME/.aws/emulator/$port"
 
   # 1) 실제 AWS 자격 증명을 줄 수 있는 변수를 모두 지운다.
-  #    (환경 변수 자격 증명은 파일보다 우선하므로, 남겨 두면 실제 키로 서명된다)
-  unset AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN AWS_SECURITY_TOKEN \
-    AWS_PROFILE AWS_DEFAULT_PROFILE AWS_ROLE_ARN AWS_ROLE_SESSION_NAME AWS_WEB_IDENTITY_TOKEN_FILE \
-    AWS_CONTAINER_CREDENTIALS_RELATIVE_URI AWS_CONTAINER_CREDENTIALS_FULL_URI \
-    AWS_CONTAINER_AUTHORIZATION_TOKEN AWS_IGNORE_CONFIGURED_ENDPOINT_URLS \
-    AWS_USE_FIPS_ENDPOINT AWS_USE_DUALSTACK_ENDPOINT
-  #    서비스별 엔드포인트 덮어쓰기(AWS_ENDPOINT_URL_S3 등)도 지운다.
-  local v
-  for v in $(env | sed -n 's/^\(AWS_ENDPOINT_URL_[A-Za-z0-9_]*\)=.*/\1/p'); do
-    unset "$v"
-  done
+  _emu_env_scrub
 
   # 2) 에뮬레이터 연결 설정
   export EMULATOR_PORT="$port"
@@ -106,7 +131,7 @@ _emu_env_main() {
     # 차이를 확인하면 시계 어긋남으로 결론 내리고, 그보다 작으면 측정값만 참고로 보여 준다.
     case "$errtext" in
       *SignatureDoesNotMatch* | *RequestTimeTooSkewed* | *InvalidSignatureException*)
-        if ! bash "$_emu_env_dir/clock-check.sh" "$port"; then
+        if bash "$_emu_env_dir/clock-check.sh" "$port"; [ $? -eq 3 ]; then   # 3 = 시계 어긋남 (2 = 측정 못 함은 시계 탓으로 보지 않는다)
           _emu_env_fail "안전 장치: 시계 어긋남 때문에 에뮬레이터가 서명을 거부했습니다 (위 [clock-check] 안내대로 VM 시계를 맞춘 뒤 다시 source 하세요)."
           return 1
         fi
@@ -127,7 +152,9 @@ _emu_env_main() {
 # 실패 안내 뒤 호출한 셸 전체를 끝내 버린다(M00 verify.sh 가 FAIL 줄 없이 멈춘 원인).
 _emu_env_rc=0
 _emu_env_main || _emu_env_rc=$?
-unset -f _emu_env_main _emu_env_fail
+# 어떤 이유로 거부했든(포트 오류·파일 없음·서명 거부·응답 없음…) 이 셸을 AWS에서 끊는다.
+[ "$_emu_env_rc" -eq 0 ] || _emu_env_disconnect
+unset -f _emu_env_main _emu_env_fail _emu_env_scrub _emu_env_disconnect
 unset _emu_env_dir
 if [ "$_emu_env_rc" -ne 0 ]; then
   unset _emu_env_rc

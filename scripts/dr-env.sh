@@ -92,7 +92,7 @@ _dr_env_main() {
     case "$errtext" in
       *SignatureDoesNotMatch* | *RequestTimeTooSkewed* | *InvalidSignatureException*)
         # 서명 거부일 때만 시계를 의심한다. clock-check 가 15분 창에 가까운 차이를 확인하면 시계 어긋남으로 결론.
-        if ! bash "$_dr_env_dir/clock-check.sh" "$port"; then
+        if bash "$_dr_env_dir/clock-check.sh" "$port"; [ $? -eq 3 ]; then   # 3 = 시계 어긋남 (2 = 측정 못 함은 시계 탓으로 보지 않는다)
           _dr_env_fail "안전 장치: 시계 어긋남 때문에 두 번째 에뮬레이터가 서명을 거부했습니다 (위 [clock-check] 안내 참고)."
           return 1
         fi
@@ -112,6 +112,12 @@ _dr_env_main() {
 # 실패 안내 뒤 호출한 셸 전체를 끝내 버린다(M00 verify.sh 가 FAIL 줄 없이 멈춘 원인).
 _dr_env_rc=0
 _dr_env_main || _dr_env_rc=$?
+# 어떤 이유로 거부했든 두 번째 사이트 연결 정보를 남기지 않는다 → dr_aws 와 emulator_site("DR_") 는 이 셸에서 거부된다.
+# (주 사이트 변수는 env.sh 가 관리한다. 여기서는 건드리지 않는다)
+if [ "$_dr_env_rc" -ne 0 ]; then
+  _dr_env_clear
+  printf '\033[31m[dr-env.sh] 두 번째 사이트 연결(DR_AWS_*)을 지웠습니다: dr_aws 와 emulator_site("DR_") 는 이 셸에서 거부됩니다. 원인을 고친 뒤 다시 source scripts/dr-env.sh 하세요.\033[0m\n' >&2
+fi
 unset -f _dr_env_main _dr_env_fail _dr_env_clear
 unset _dr_env_dir
 if [ "$_dr_env_rc" -ne 0 ]; then
