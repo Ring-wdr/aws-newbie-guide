@@ -9,8 +9,17 @@ set -euo pipefail
 
 require_docker
 
+colima_unresponsive=0
 if command -v colima >/dev/null 2>&1 && [ "$(uname -s)" = "Darwin" ]; then
-  colima list 2>/dev/null | sed 's/^/  /' || true
+  # colima 가 응답하지 않아도 상태 표시가 멈추지 않게 3초로 제한한다 (넘기면 VM 목록만 건너뛴다)
+  cl="$(mktemp "${TMPDIR:-/tmp}/emulator-status.XXXXXX")"
+  if run_limited 3 "$cl" colima list; then
+    sed 's/^/  /' "$cl"
+  else
+    echo "  (colima list 가 3초 안에 응답하지 않았거나 실패해 VM 목록을 건너뜁니다)"
+    colima_unresponsive=1
+  fi
+  rm -f "$cl"
   echo
 fi
 
@@ -43,4 +52,5 @@ done
 for p in $oom_hint; do
   c_red "포트 $p: 메모리 상한을 넘어 강제 종료됨(종료 코드 137). 리소스는 사라졌습니다 → scripts/emulator-reset.sh $p (반복되면 EMULATOR_MEMORY=3g)"
 done
-warn_if_clock_unstable   # VM 시계가 몇 초씩 반복해서 옮겨지는 중이면 경고 (M00 레슨 3 문제 해결)
+# colima 가 방금 응답하지 않았다면 시계 확인(colima ssh)도 건너뛴다 — 제한 시간을 두 번 기다리지 않게
+[ "$colima_unresponsive" -eq 1 ] || warn_if_clock_unstable   # VM 시계가 몇 초씩 반복해서 옮겨지는 중이면 경고 (M00 레슨 3 문제 해결)
