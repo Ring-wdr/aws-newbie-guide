@@ -130,21 +130,31 @@ emulator_dns_validation() {
   return "$rc"
 }
 
-# env.sh 가 어떤 이유로든 거부하면, 학습자가 미리 넣어 둔 실제 자격 증명·프로필 변수가 남아 다음 aws 명령이
-# 실제 AWS로 가는 일이 없어야 한다. 가짜 AWS_PROFILE·키·서비스별 엔드포인트를 넣은 셸(bash, 있으면 zsh)에서
-# 거부시킨 뒤, 서명 요청은 "자격 증명 없음"으로, 서명 없는 요청은 닫힌 루프백 포트(127.0.0.1:9)로 이 컴퓨터 안에서
-# 실패하는지 본다. 바깥으로 나가는 요청이 있으면 닫힌 프록시로 보내 즉시 실패하게 한다(실제 AWS에 닿지 않음).
+# env.sh 가 거부·중단된 뒤(또는 연결된 뒤) SDK 요청이 실제 AWS에 전달되지 않는지 본다. 도우미(_envsh_refusal_check.sh)는
+# **임시 HOME**(가짜 ~/.boto·AWS_CREDENTIAL_FILE·프로필·키 포함)에서 bash(있으면 /bin/bash 3.2 도)·zsh 로 돌고,
+# 모든 HTTP(S) 요청을 루프백의 TLS 종단 프록시로 보내 "HTTP 요청이 하나도 전달되지 않는다"를 단언한다(NO_PROXY 비움).
+# 시나리오: 거부 4가지(포트 없음·포트 오류·파일 없음·서명 거부), 계정 확인 도중 SIGINT, 연결 상태(이 포트의 에뮬레이터).
+# 확인 대상에는 SDK 가 엔드포인트를 무시하고 AWS 호스트명을 직접 만드는 S3 MRAP ARN·Kinesis --stream-id 가 들어 있다.
+# macOS 에서는 sandbox-exec 로 루프백 밖 연결을 막은 채 실행한다 — 시험이 실패해도 실제로 새어 나갈 수 없다.
 envsh_refusal_disconnects() {
-  local sh sc out rc=0 shells="bash"
+  local sh sc out rc=0 shells="bash" wrap="" sb=""
   [ -x /bin/bash ] && [ "$(command -v bash)" != /bin/bash ] && shells="$shells /bin/bash"
   command -v zsh >/dev/null 2>&1 && shells="$shells zsh"
+  if command -v sandbox-exec >/dev/null 2>&1; then
+    sb="$(mktemp)"
+    printf '(version 1)\n(allow default)\n(deny network-outbound)\n(allow network-outbound (remote ip "localhost:*"))\n' >"$sb"
+    wrap="sandbox-exec -f $sb"
+  else
+    echo "참고: sandbox-exec 없음 — 루프백 프록시 안전망만으로 실행"
+  fi
   for sh in $shells; do
-    for sc in noport badport nofiles sigfail; do
-      out="$("$sh" "$MOD_DIR/labs/_envsh_refusal_check.sh" "$ROOT" "$sc" "$EMULATOR_PORT" 2>/dev/null | grep '^RESULT')"
+    for sc in noport badport nofiles sigfail interrupt connected; do
+      out="$($wrap "$sh" "$MOD_DIR/labs/_envsh_refusal_check.sh" "$ROOT" "$sc" "$EMULATOR_PORT" 2>/dev/null | grep '^RESULT')"
       echo "$sh $sc: $out"
       [[ "$out" == "RESULT OK"* ]] || rc=1
     done
   done
+  [ -n "$sb" ] && rm -f "$sb"
   return "$rc"
 }
 
@@ -206,7 +216,7 @@ run "dr-env.sh: 비대화형 + DR_EMULATOR_PORT 없음 → 거부, 이전 DR_AWS
 run "dr-env.sh: 잘못된 포트 → 거부, 이전 DR_AWS_* 지움" drenv_bad_port_clears
 [ -n "${DR_EMULATOR_PORT:-}" ] || run "verify.sh: DR_EMULATOR_PORT 에 에뮬레이터 없음 → 리셋 전에 원인·해결 방법 안내" verify_refuses_missing_dr
 run "emulator-up.sh: 잘못된 EMULATOR_DNS(999.999.999.999·127.0.0.01 등) → docker 호출 전 거부" emulator_dns_validation
-run "env.sh: 어떤 이유로 거부하든 기존 실제 자격 증명·프로필을 지우고 aws 가 이 컴퓨터 안에서 실패 (bash·zsh)" envsh_refusal_disconnects
+run "env.sh: 거부·Ctrl-C·연결 상태에서 HTTP 요청이 실제 AWS에 전달되지 않음 — ~/.boto 무시, MRAP 로컬 거부, Kinesis stream-id 는 TLS 에서 끊김, dr-env 거부 (임시 HOME, bash·zsh)" envsh_refusal_disconnects
 run "env.sh·dr-env.sh: if 조건 안에서 source 해 거부돼도 호출한 셸이 끝나지 않음 (macOS bash 3.2)" sourced_refusal_is_contained
 run "clock-check.sh: 에뮬레이터 없음 → '측정하지 못했습니다' + 종료 코드 2" clock_check_cannot_measure
 for py in "$MOD_DIR"/sdk/*.py; do
