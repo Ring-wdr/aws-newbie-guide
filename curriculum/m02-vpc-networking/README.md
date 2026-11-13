@@ -55,8 +55,6 @@ curriculum/m02-vpc-networking/labs/verify.sh
 
 ## CIDR 계획
 
-<a id="cidr-계획-m10에서-cloudformation으로-재현할-기준"></a><!-- 예전 제목의 앵커: 다른 모듈(M14)의 기존 링크가 깨지지 않게 남겨 둔다 -->
-
 이 모듈이 만드는 VPC의 기준이다. 이름·CIDR·연결 관계는 아래 표가 기준이며 [labs/_lib.sh](./labs/_lib.sh)의 `M02_SUBNETS`·`build_three_tier`와 같다. 모든 리소스에 `Name`과 `Project=todayorder` 태그를 붙인다. 리전 `us-east-1`.
 
 > **M10과의 관계**: M10(레슨 3, lab04)은 이 VPC를 그대로 재현하지 않는다. 같은 요구(10.0.0.0/16, 2 AZ × 3 티어, IGW, NAT, SG 체인)를 만족하는 **자기 2-AZ 3-티어 VPC**를 CloudFormation 템플릿 [vpc-3tier.yaml](../m10-monitoring-iac/labs/templates/vpc-3tier.yaml)로 따로 만든다. 다른 점:
@@ -137,23 +135,23 @@ flowchart TB
 
 ## 에뮬레이터 제약
 
-에뮬레이터 1.0.322, 포트 9302에서 직접 확인했다. [FIDELITY.md](../../docs/FIDELITY.md)의 M02 항목에 없던 것은 **(신규)** 로 표시했다.
+에뮬레이터 1.0.322, 포트 9302에서 직접 확인했다. 재생성된 [FIDELITY.md](../../docs/FIDELITY.md)의 "M02 VPC 네트워킹" 사실 표에도 같은 내용이 있다(`EnableVgwRoutePropagation`처럼 표에 없는 세부 오퍼레이션은 이 모듈의 관찰).
 
 | 오퍼레이션 / 동작 | 증상 | 이 모듈의 대응 |
 |---|---|---|
 | 데이터 플레인 전체 | 패킷이 흐르지 않는다. SG·NACL·라우팅은 저장·조회만 되고 실제로 무언가를 막거나 보내지 않는다 | 경로·규칙을 읽어 판정하는 워크시트(lab03·04·05·06·07) |
 | `AcceptVpcPeeringConnection` | 501 → 피어링이 `pending-acceptance`에 머문다 | lab08 🟡, 수락 후는 다이어그램 |
-| `RejectVpcPeeringConnection`, `DeleteVpcPeeringConnection` **(신규)** | 501 → 한 번 만든 피어링 요청을 지울 수 없다. VPC는 지워지고 피어링 기록만 남는다 | lab08은 "있으면 재사용" 방식으로 멱등 |
-| `CreateEgressOnlyInternetGateway`, `DescribeEgressOnlyInternetGateways` **(신규: Describe)** | 501 | lab10에서 501 확인, 레슨 3 개념 |
-| `CreateNatGateway --availability-mode regional` **(신규)** | 501 (zonal NAT는 정상) | lab10, 레슨 3 개념 |
-| `CreateVpnConnection`, `EnableVgwRoutePropagation` **(신규: 전파)**, `CreateClientVpnEndpoint` **(신규)** | 501. 고객 게이트웨이·가상 프라이빗 게이트웨이 생성·연결은 된다 | lab10, 레슨 6 개념 |
+| `RejectVpcPeeringConnection`, `DeleteVpcPeeringConnection` | 501 → 한 번 만든 피어링 요청을 지울 수 없다. VPC는 지워지고 피어링 기록만 남는다 | lab08은 "있으면 재사용" 방식으로 멱등 |
+| `CreateEgressOnlyInternetGateway`, `DescribeEgressOnlyInternetGateways` | 501 | lab10에서 501 확인, 레슨 3 개념 |
+| `CreateNatGateway --availability-mode regional` | 501 (zonal NAT는 정상) | lab10, 레슨 3 개념 |
+| `CreateVpnConnection`, `EnableVgwRoutePropagation`, `CreateClientVpnEndpoint` | 501. 고객 게이트웨이·가상 프라이빗 게이트웨이 생성·연결은 된다 | lab10, 레슨 6 개념 |
 | `ssm StartSession` | 501 | lab10, 레슨 7 개념 |
-| `ReplaceRoute` **(신규)** | 501. 경로를 바꾸려면 `delete-route` 후 `create-route` | lab07의 `ensure_route`가 그렇게 한다 |
-| `CreateTransitGatewayRoute`, `SearchTransitGatewayRoutes`, `GetTransitGatewayAttachmentPropagations` **(신규)** | 501. 정적 경로·TGW 경로 조회 불가. 연결(association)·전파(propagation)와 그 조회(`get-transit-gateway-route-table-associations/-propagations`)는 동작 | lab07은 전파만 사용 |
-| `DeleteTransitGatewayVpcAttachment`, `DisassociateTransitGatewayRouteTable` **(신규)** | 501 → 한 번 VPC를 연결한 TGW는 지울 수 없다(`IncorrectState`). 연결된 서브넷·VPC 삭제는 막지 않는다 | lab07은 "있으면 재사용" 방식으로 멱등. `teardown_vpc`는 501을 건너뛴다. **부작용**: lab02(또는 lab07의 정산 VPC 재생성)가 VPC를 다시 만들 때마다 옛 VPC의 TGW 연결이 `available`로 남아 `todayorder-tgw-rt`에 연결·전파된 채 쌓이고, 지워진 옛 주문 VPC의 연결도 `10.0.0.0/16`을 계속 전파한다(실제 AWS라면 같은 CIDR이 두 연결에서 전파되는 충돌 상태). lab07은 현재 VPC ID의 연결만 확인하므로 결과에는 영향이 없다. 깨끗하게 하려면 `scripts/emulator-reset.sh` |
-| TGW 기본 연결·전파 **(신규)** | `DefaultRouteTableAssociation/Propagation=enable`이어도 새 연결이 기본 라우팅 테이블에 자동으로 연결·전파되지 않는다 | 기본값을 끄고 명시적으로 연결·전파(실제 AWS에서도 같은 결과) |
-| 블랙홀 경로 **(신규)** | NAT 게이트웨이를 지워도 그 경로의 `State`가 `blackhole`이 아니라 `active`로 남는다 | 레슨 3 "실제 AWS에서는" |
-| 기본 VPC **(신규)** | 기본 VPC(`172.31.0.0/16`)와 기본 서브넷 3개는 있지만 **IGW와 `0.0.0.0/0` 경로가 없다**(실제 기본 VPC에는 있다) | 레슨 2 "실제 AWS에서는" |
+| `ReplaceRoute` | 501. 경로를 바꾸려면 `delete-route` 후 `create-route` | lab07의 `ensure_route`가 그렇게 한다 |
+| `CreateTransitGatewayRoute`, `SearchTransitGatewayRoutes`, `GetTransitGatewayAttachmentPropagations` | 501. 정적 경로·TGW 경로 조회 불가. 연결(association)·전파(propagation)와 그 조회(`get-transit-gateway-route-table-associations/-propagations`)는 동작 | lab07은 전파만 사용 |
+| `DeleteTransitGatewayVpcAttachment`, `DisassociateTransitGatewayRouteTable` | 501 → 한 번 VPC를 연결한 TGW는 지울 수 없다(`IncorrectState`). 연결된 서브넷·VPC 삭제는 막지 않는다 | lab07은 "있으면 재사용" 방식으로 멱등. `teardown_vpc`는 501을 건너뛴다. **부작용**: lab02(또는 lab07의 정산 VPC 재생성)가 VPC를 다시 만들 때마다 옛 VPC의 TGW 연결이 `available`로 남아 `todayorder-tgw-rt`에 연결·전파된 채 쌓이고, 지워진 옛 주문 VPC의 연결도 `10.0.0.0/16`을 계속 전파한다(실제 AWS라면 같은 CIDR이 두 연결에서 전파되는 충돌 상태). lab07은 현재 VPC ID의 연결만 확인하므로 결과에는 영향이 없다. 깨끗하게 하려면 `scripts/emulator-reset.sh` |
+| TGW 기본 연결·전파 | `DefaultRouteTableAssociation/Propagation=enable`이어도 새 연결이 기본 라우팅 테이블에 자동으로 연결·전파되지 않는다 | 기본값을 끄고 명시적으로 연결·전파(실제 AWS에서도 같은 결과) |
+| 블랙홀 경로 | NAT 게이트웨이를 지워도 그 경로의 `State`가 `blackhole`이 아니라 `active`로 남는다 | 레슨 3 "실제 AWS에서는" |
+| 기본 VPC | 기본 VPC(`172.31.0.0/16`)와 기본 서브넷 3개는 있지만 **IGW와 `0.0.0.0/0` 경로가 없다**(실제 기본 VPC에는 있다) | 레슨 2 "실제 AWS에서는" |
 | 접두사 목록(prefix list) CIDR | S3·DynamoDB 접두사 목록이 `198.18.x.x`(테스트용 대역) 하나씩이다. 실제는 수십 개의 공인 대역 | lab06은 목록에서 CIDR을 읽어 쓴다 |
 | Flow Logs | 생성·`ACTIVE`·`DeliverLogsStatus=SUCCESS`까지. 트래픽이 없어 로그 스트림이 생기지 않는다. S3 대상은 없는 버킷도 받아 준다 | lab09 🟡, 레코드 읽기는 레슨 7 워크시트(문서 형식 예시) |
 | Network Firewall | 규칙 그룹·정책·방화벽이 `READY`, 엔드포인트 ID 발급. 차단 동작은 없음 | lab09 🟡 |
