@@ -8,6 +8,7 @@
 set -euo pipefail
 ROOT="$(git rev-parse --show-toplevel)"
 source "$ROOT/scripts/env.sh"
+source "$ROOT/scripts/lab-wait.sh"   # CLI waiter(EC2 15초, DynamoDB table-not-exists 20초 간격) 대신 1초 간격 대기
 AUDIT="$ROOT/curriculum/m13-cost-optimization/sdk/tag_audit.py"
 P="todayorder-m13-audit"
 cd "$ROOT"
@@ -19,12 +20,12 @@ if [ -n "$ids" ]; then
   # shellcheck disable=SC2086
   aws ec2 terminate-instances --instance-ids $ids >/dev/null
   # shellcheck disable=SC2086
-  aws ec2 wait instance-terminated --instance-ids $ids
+  wait_ec2_instance_terminated $ids
 fi
 for v in $(aws ec2 describe-volumes --filters "Name=tag:Name,Values=$P-*" --query 'Volumes[].VolumeId' --output text); do aws ec2 delete-volume --volume-id "$v"; done
 for b in images logs; do aws s3 rb "s3://$P-$b" --force >/dev/null 2>&1 || true; done
 for t in orders sessions; do aws dynamodb delete-table --table-name "$P-$t" >/dev/null 2>&1 || true; done
-for t in orders sessions; do aws dynamodb wait table-not-exists --table-name "$P-$t"; done
+for t in orders sessions; do wait_dynamodb_table_gone "$P-$t"; done
 for q in events dlq; do
   url="$(aws sqs get-queue-url --queue-name "$P-$q" --query QueueUrl --output text 2>/dev/null || true)"
   [ -n "$url" ] && aws sqs delete-queue --queue-url "$url"

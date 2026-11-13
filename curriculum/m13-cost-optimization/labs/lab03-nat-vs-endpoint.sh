@@ -7,6 +7,7 @@
 # ⚠️ 단가는 예시 숫자다. 실제 가격은 AWS Pricing Calculator 로.
 set -euo pipefail
 source "$(git rev-parse --show-toplevel)/scripts/env.sh"
+source "$(git rev-parse --show-toplevel)/scripts/lab-wait.sh"   # CLI waiter(15초 간격) 대신 1초 간격 대기
 P="todayorder-m13-net"
 
 teardown() {
@@ -51,7 +52,7 @@ for az in us-east-1a us-east-1b; do
   priv="$(aws ec2 create-subnet --vpc-id "$VPC" --cidr-block "10.32.$((i + 10)).0/24" --availability-zone "$az" --query Subnet.SubnetId --output text)"
   eip="$(aws ec2 allocate-address --domain vpc --tag-specifications "ResourceType=elastic-ip,Tags=[{Key=Name,Value=$P-nat}]" --query AllocationId --output text)"
   nat="$(aws ec2 create-nat-gateway --subnet-id "$pub" --allocation-id "$eip" --query NatGateway.NatGatewayId --output text)"
-  aws ec2 wait nat-gateway-available --nat-gateway-ids "$nat"
+  wait_ec2_nat_available "$nat"
   rt="$(aws ec2 create-route-table --vpc-id "$VPC" --query RouteTable.RouteTableId --output text)"
   aws ec2 create-route --route-table-id "$rt" --destination-cidr-block 0.0.0.0/0 --nat-gateway-id "$nat" >/dev/null
   aws ec2 associate-route-table --route-table-id "$rt" --subnet-id "$priv" >/dev/null

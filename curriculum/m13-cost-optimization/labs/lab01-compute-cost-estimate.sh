@@ -8,6 +8,7 @@
 set -euo pipefail
 ROOT="$(git rev-parse --show-toplevel)"
 source "$ROOT/scripts/env.sh"
+source "$ROOT/scripts/lab-wait.sh"   # CLI waiter(15초 간격) 대신 같은 조건을 1초 간격으로 확인 (wait_ec2_*)
 EST="$ROOT/curriculum/m13-cost-optimization/sdk/cost_estimator.py"
 LAB="m13"
 cd "$ROOT"
@@ -20,7 +21,7 @@ teardown() {
     # shellcheck disable=SC2086
     aws ec2 terminate-instances --instance-ids $ids >/dev/null
     # shellcheck disable=SC2086
-    aws ec2 wait instance-terminated --instance-ids $ids
+    wait_ec2_instance_terminated $ids
   fi
   for id in $(aws ec2 describe-volumes --filters "Name=tag:cost-lab,Values=$LAB" --query 'Volumes[].VolumeId' --output text); do
     aws ec2 delete-volume --volume-id "$id"
@@ -66,7 +67,7 @@ aws ec2 create-nat-gateway --subnet-id "$SUBNET" --allocation-id "$EIP_NAT" \
 aws ec2 allocate-address --domain vpc --tag-specifications "ResourceType=elastic-ip,Tags=[{$T}]" --query PublicIp --output text
 ids="$(aws ec2 describe-instances --filters "Name=tag:cost-lab,Values=$LAB" "Name=instance-state-name,Values=pending,running" --query 'Reservations[].Instances[].InstanceId' --output text)"
 # shellcheck disable=SC2086
-aws ec2 wait instance-running --instance-ids $ids
+wait_ec2_instance_running $ids
 nat_ok() { [ -n "$(aws ec2 describe-nat-gateways --filter "Name=tag:cost-lab,Values=$LAB" "Name=state,Values=available" --query 'NatGateways[].NatGatewayId' --output text)" ]; }
 for _ in $(seq 120); do nat_ok && break; sleep 1; done
 nat_ok || { echo "FAIL: NAT 게이트웨이가 available 이 되지 않음"; exit 1; }
