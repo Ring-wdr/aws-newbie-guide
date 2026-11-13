@@ -28,7 +28,7 @@ fi
 echo "== 1. DynamoDB 주문 표 (파티션 키 orderId, 온디맨드)"
 aws dynamodb create-table --table-name "$TABLE" --attribute-definitions AttributeName=orderId,AttributeType=S \
   --key-schema AttributeName=orderId,KeyType=HASH --billing-mode PAY_PER_REQUEST --query TableDescription.TableStatus --output text
-aws dynamodb wait table-exists --table-name "$TABLE"
+wait_dynamodb_table_active "$TABLE"   # = aws dynamodb wait table-exists + 준비 직후 재확인 (scripts/lab-wait.sh)
 
 echo "== 2. 실행 역할: 우선 로그 권한만 (DynamoDB 권한을 일부러 빠뜨린다)"
 ensure_role "$ROLE" lambda.amazonaws.com
