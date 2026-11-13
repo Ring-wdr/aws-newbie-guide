@@ -16,8 +16,14 @@
 #   - waiter 가 failure 로 정한 상태(failed, deleting, incompatible-* …)를 보면 상한을 기다리지 않고 바로 실패한다.
 #   - waiter 가 retry 로 정한 오류 코드만 다시 조회한다. 그 밖의 오류(연결 실패 포함)는 waiter 처럼 바로 실패한다.
 #   - "사라짐"은 지정한 NotFound 오류 코드일 때만 성공이다. 다른 오류는 사라진 것으로 치지 않는다.
-#   - 상한(기본 600초, LAB_WAIT_TIMEOUT)을 넘기면 마지막으로 관찰한 값을 보여 주고 실패한다.
-#   실패하면 1을 돌려준다(set -e 인 lab 은 그 자리에서 멈춘다).
+#   - 상한(기본 600초, LAB_WAIT_TIMEOUT — 1 이상의 정수 초. 아니면 기다리기 전에 거부)을 넘기면
+#     마지막으로 관찰한 값을 보여 주고 실패한다.
+#   - 조회가 실패했는데 에뮬레이터에 아예 닿지 않으면(꺼짐·재시작 중) 오류 코드 대신 그렇다고 알린다.
+#   실패하면 1을 돌려준다(set -e 인 lab 은 그 자리에서 멈춘다). 인자·환경 변수가 잘못되면 2.
+#   DynamoDB 테이블·Kinesis 스트림은 ACTIVE 를 본 뒤 잠깐 더 기다려 "아직 준비됨"인지 한 번 더 확인한다
+#   (아래 "준비 직후 다시 확인" — VM 시계가 뒤로 옮겨질 때의 증상을 좁히고, 보이면 크게 실패한다).
+#
+# bash 전용이다(read -a, local -a, $SECONDS). zsh 셸에서 source 하지 말고 bash lab 스크립트에서 쓴다.
 
 # ---- 내부 도구
 
@@ -43,6 +49,30 @@ _lw_report() { # <설명> <사유> <마지막 관찰>
     echo "  마지막 관찰: (출력 없음 — 조회 결과가 비어 있다)" >&2
   fi
   return 1
+}
+
+# 상한(LAB_WAIT_TIMEOUT)을 검사해 출력한다. 숫자가 아니면 매초 산술 오류를 내며 끝없이 도는 대신 바로 거부한다.
+_lw_limit() {
+  local v="${LAB_WAIT_TIMEOUT:-600}"
+  case "$v" in
+    '' | *[!0-9]* | 0 | 0*) echo "lab-wait: LAB_WAIT_TIMEOUT 은 1 이상의 정수(초)여야 한다: '$v'" >&2; return 2 ;;
+  esac
+  [ "${#v}" -le 9 ] || v=999999999   # bash 정수 범위를 넘는 자릿수는 줄인다
+  echo "$v"
+}
+
+# 조회 실패 사유. 에뮬레이터에 아예 닿지 않으면(내려가면서 env.sh 가 가리키던 자격 증명·인증서 파일이 지워져
+# NoCredentials 가 나거나, 연결이 거부됨) 오류 코드 대신 그렇다고 말한다. 닿으면 원래 오류 코드를 그대로 쓴다.
+_lw_error_reason() { # <오류 코드> <출력>
+  case "$1|$2" in
+    NoCredentials\|* | *'Could not connect to the endpoint URL'* | *EndpointConnectionError* | *'Connection refused'*)
+      if ! curl -s -o /dev/null --max-time 3 --cacert "${AWS_CA_BUNDLE:-/nonexistent}" \
+        "${AWS_ENDPOINT_URL:-https://127.0.0.1:9}/__admin/health" 2>/dev/null; then
+        echo "에뮬레이터(${AWS_ENDPOINT_URL:-?})에 연결하지 못했다 — 꺼졌거나 다시 시작되는 중이다${1:+ (aws 가 낸 오류: $1)}. scripts/emulator-status.sh 로 확인"
+        return 0
+      fi ;;
+  esac
+  echo "조회가 예상하지 못한 오류로 실패했다${1:+ ($1)}"
 }
 
 # 공통 인자 해석. 결과는 호출한 함수의 지역 변수(_want _fails _retry)에 넣는다.
@@ -72,7 +102,8 @@ wait_state() {
   _lw_opts "$@" || return 2
   shift "$_lw_argc"
   [ -n "$_want" ] || { echo "lab-wait: wait_state 에 --want 가 없다" >&2; return 2; }
-  local limit="${LAB_WAIT_TIMEOUT:-600}" start=$SECONDS out code tok bad n all
+  local limit start=$SECONDS out code tok bad n all
+  limit="$(_lw_limit)" || return 2
   local -a toks
   while :; do
     if out="$("$@" 2>&1)"; then
@@ -90,7 +121,7 @@ wait_state() {
       out="$(printf '%s\n' "$out" | _lw_clean)"
       code="$(_lw_error_code "$out")"
       if [ -z "$code" ] || ! _lw_in "$code" "$_retry"; then
-        _lw_report "$desc" "조회가 예상하지 못한 오류로 실패했다${code:+ ($code)}" "$out"
+        _lw_report "$desc" "$(_lw_error_reason "$code" "$out")" "$out"
         return 1
       fi
     fi
@@ -105,12 +136,17 @@ wait_state() {
 # wait_gone <설명> <NotFound 오류 코드> [--fail "<실패 상태…>"] -- <조회 명령…>
 #   조회 명령이 정확히 <NotFound 오류 코드>로 실패하면 성공. 다른 오류는 바로 실패.
 #   아직 조회되면 출력 값을 보고, 실패 상태(예: 삭제를 기다리는데 creating)면 바로 실패한다.
+#   일부러 NotFound 만 성공으로 친다: CLI 의 *-deleted waiter 는 "목록이 비었음"(RDS·DocumentDB 의
+#   length(...) == 0)과 "모두 deleted"(ElastiCache cache-cluster-deleted)도 성공으로 치지만, 여기서는 뺐다.
+#   식별자 하나로 조회하므로 빈 목록 대신 NotFound 가 오고, 'deleted' 가 보여도 NotFound 가 될 때까지 기다리는 쪽이
+#   "정말 사라졌다"에 더 가깝다(같은 이름으로 곧바로 다시 만드는 lab 이 있다). CLI 보다 엄격한 쪽이다(AUTHORING 규칙 10).
 wait_gone() {
   local desc="$1" notfound="$2" _want="" _fails="" _retry="" _lw_argc
   shift 2
   _lw_opts "$@" || return 2
   shift "$_lw_argc"
-  local limit="${LAB_WAIT_TIMEOUT:-600}" start=$SECONDS out code tok
+  local limit start=$SECONDS out code tok
+  limit="$(_lw_limit)" || return 2
   local -a toks
   while :; do
     if out="$("$@" 2>&1)"; then
@@ -126,7 +162,10 @@ wait_gone() {
       out="$(printf '%s\n' "$out" | _lw_clean)"
       code="$(_lw_error_code "$out")"
       [ "$code" = "$notfound" ] && return 0
-      _lw_report "$desc" "기대한 $notfound 가 아닌 오류${code:+ ($code)}" "$out"
+      local why
+      why="$(_lw_error_reason "$code" "$out")"
+      case "$why" in 에뮬레이터*) ;; *) why="기대한 $notfound 가 아닌 오류${code:+ ($code)}" ;; esac
+      _lw_report "$desc" "$why" "$out"
       return 1
     fi
     if [ $((SECONDS - start)) -ge "$limit" ]; then
@@ -250,18 +289,105 @@ wait_cloudfront_invalidation_completed() {
   wait_state "무효화 $2 Completed" --want Completed \
     -- aws cloudfront get-invalidation --distribution-id "$1" --id "$2" --query 'Invalidation.Status' --output text
 }
-# aws kinesis wait stream-exists — 성공: StreamStatus 가 ACTIVE
+# ---- 준비 직후 다시 확인 (DynamoDB 테이블·Kinesis 스트림)
+#
+# 에뮬레이터는 DynamoDB 테이블·Kinesis 스트림이 준비됐는지를 VM 벽시계로 판단한다(만든 시각 + 몇 초). 맥 시계가
+# 인터넷 시각과 0.5초 넘게 다르면 Colima 게스트 에이전트와 VM 의 timesyncd 가 10초마다 VM 시계를 번갈아 옮겨,
+# VM 시계가 약 2초(관찰 1.98~2.26초) 뒤로 갔다가 0.2~0.3초 만에 돌아온다. ACTIVE 가 된 바로 그 무렵에 이 일이
+# 생기면 리소스가 잠깐 "준비 안 됨"으로 돌아간다: DynamoDB 는 DescribeTable 이 ACTIVE 인데 PutItem·Scan 이
+# ResourceNotFoundException, Kinesis 는 ACTIVE → CREATING. (M00 레슨 3 문제 해결 표, clock-check.sh --stability)
+#
+# 그래서 ACTIVE 를 처음 본 뒤 LAB_WAIT_SETTLE 초(기본 3, 0 이면 끔) 기다렸다가 한 번 더 확인하고, 그때 준비가
+# 안 돼 있으면 다시 기다리지 않고(ResourceNotFoundException 도 재시도하지 않는다) 증상과 확인 명령을 알리며 실패한다.
+#
+# 무엇을 보장하고 무엇을 보장하지 않나
+#   - VM 시계가 두 시각(맥 시각·NTP 시각) 사이를 오가고 그 간격이 d 라 하자. ACTIVE 를 본 순간 VM 시계가 위쪽
+#     시각이었더라도, 그 뒤 실제로 d 초가 지나면 아래쪽 시각으로도 준비 경계를 넘어 있다. 그러니 기다림이 d 보다
+#     길면 10초마다 되풀이되는 옮김이 몇 번이든(방향이 앞이든 뒤든) 그 뒤로는 되돌아가지 않는다 — 한 번의 옮김만이
+#     아니라 되풀이에도 통한다. 단, 간격 d 가 그대로이고(옮김이 쌓이지 않고 돌아오고) 기다림보다 작을 때만이다.
+#     기본 3초는 관찰된 d(최대 2.26초)보다 약 0.7초 길다(시험: ACTIVE 직후 2초 되돌림 → PutItem 3/3 실패,
+#     3초 기다린 뒤 0/3 실패, 4초 기다린 뒤 2초 되돌림도 성공).
+#   - d 는 맥 시계가 틀린 정도라 정해진 값이 아니다. d 가 기다림보다 크면(예: 맥 시계가 5초 틀림) 이 기다림은
+#     실패 구간을 줄일 뿐 없애지 못한다. 마지막 확인은 한 번 조회일 뿐이라, 그 순간이 0.2~0.3초짜리 되돌림과
+#     겹칠 때만 잡는다(10초에 한 번이면 대략 3%). 이 확인을 통과한 뒤 lab 의 다음 호출이 같은 이유로 실패할 수 있고,
+#     그때는 모듈 verify.sh 의 실패 요약이 clock-check.sh --stability --summary 로 VM 시계 불안정을 알린다.
+#   - 기다리는 동안 상태가 잠깐 되돌아가는 것은 이 기다림이 견디려는 바로 그 일이므로 보지 않는다(보고 실패하면
+#     기다림이 막아 줄 수 있는 경우까지 실패로 만든다).
+#   - 테이블을 다시 만드는 다른 경로(CloudFormation 스택, boto3 예제, update-table 의 GSI·용량 변경)는 덮지 않는다.
+#   실제 AWS 에서는 이런 되돌아감이 없으니 레슨은 CLI waiter 를 그대로 가르친다.
+
+# LAB_WAIT_SETTLE 을 검사해 출력한다 (0 이상의 정수 초).
+_lw_settle_secs() {
+  local v="${LAB_WAIT_SETTLE:-3}"
+  case "$v" in
+    '' | *[!0-9]*) echo "lab-wait: LAB_WAIT_SETTLE 은 0 이상의 정수(초)여야 한다: '$v'" >&2; return 2 ;;
+  esac
+  [ "${#v}" -le 4 ] || { echo "lab-wait: LAB_WAIT_SETTLE 이 너무 크다: '$v'" >&2; return 2; }
+  echo "$((10#$v))"
+}
+
+# ACTIVE 를 본 뒤 settle 초 뒤의 재확인이 실패했을 때 (재시도하지 않는다)
+_lw_flip_report() { # <설명> <기다린 초> <무엇을 봤나> <마지막 관찰>
+  _lw_report "$1" "ACTIVE 를 확인하고 ${2}초 뒤 다시 보니 준비되지 않았다 — $3" "$4"
+  cat >&2 <<EOF
+  준비됨(ACTIVE) 직후 다시 "준비 안 됨"이 되는 것은 Colima VM 시계가 뒤로 옮겨질 때의 증상이다
+  (DynamoDB: ACTIVE 인데 ResourceNotFoundException / Kinesis: ACTIVE → CREATING). 다시 기다려 감추지 않고 여기서 멈춘다.
+  확인:  bash scripts/clock-check.sh --stability     (해결 방법은 M00 레슨 3 문제 해결 표)
+EOF
+  return 1
+}
+
+# aws kinesis wait stream-exists — 성공: StreamStatus 가 ACTIVE. 그 뒤 LAB_WAIT_SETTLE 초 뒤에도 ACTIVE 인지 확인한다.
 wait_kinesis_stream_active() {
+  local settle out code
+  settle="$(_lw_settle_secs)" || return 2
   wait_state "스트림 $1 ACTIVE" --want ACTIVE \
-    -- aws kinesis describe-stream --stream-name "$1" --query 'StreamDescription.StreamStatus' --output text
+    -- aws kinesis describe-stream --stream-name "$1" --query 'StreamDescription.StreamStatus' --output text || return $?
+  [ "$settle" -gt 0 ] || return 0
+  sleep "$settle"
+  if out="$(aws kinesis describe-stream --stream-name "$1" --query 'StreamDescription.StreamStatus' --output text 2>&1)"; then
+    out="$(printf '%s\n' "$out" | _lw_clean)"
+    [ "$out" = ACTIVE ] && return 0
+    _lw_flip_report "스트림 $1 ACTIVE" "$settle" "상태가 '$out' 다" "$out"
+    return 1
+  fi
+  out="$(printf '%s\n' "$out" | _lw_clean)"
+  code="$(_lw_error_code "$out")"
+  if [ "$code" = ResourceNotFoundException ]; then
+    _lw_flip_report "스트림 $1 ACTIVE" "$settle" "DescribeStream 이 ResourceNotFoundException" "$out"
+  else
+    _lw_report "스트림 $1 ACTIVE (재확인)" "$(_lw_error_reason "$code" "$out")" "$out"
+  fi
+  return 1
 }
 # aws kinesis wait stream-not-exists — 성공: ResourceNotFoundException
 wait_kinesis_stream_gone() {
   wait_gone "스트림 $1 삭제" ResourceNotFoundException \
     -- aws kinesis describe-stream --stream-name "$1" --query 'StreamDescription.StreamStatus' --output text
 }
-# (aws dynamodb wait table-exists 는 대신하지 않는다: 에뮬레이터의 DescribeTable 은 테이블이 ACTIVE 가 될 때까지
-#  약 3초 동안 응답을 늦추므로, waiter 의 첫 조회가 곧바로 ACTIVE 를 본다 — 1초 간격 폴링으로 줄어드는 시간이 없다.)
+# aws dynamodb wait table-exists — 성공: Table.TableStatus 가 ACTIVE / 재시도: ResourceNotFoundException
+#   (acceptor 는 CLI waiter 와 같다. 처음 ACTIVE 를 기다리는 동안의 ResourceNotFoundException 재시도는 waiter 의 것이다.)
+#   이 래퍼는 빨라지려고 있는 것이 아니다 — 에뮬레이터의 DescribeTable 은 테이블이 ACTIVE 가 될 때까지 약 3초 응답을
+#   늦추므로 waiter 의 첫 조회가 곧바로 ACTIVE 를 본다. 바로 그래서 waiter 가 끝난 순간이 준비 경계와 거의 같고,
+#   위 "준비 직후 다시 확인"이 필요하다. 재확인은 DescribeTable 이 아니라 Scan(Select=COUNT, Limit=1, 데이터 변경 없음)
+#   으로 한다 — 되돌아간 동안에도 DescribeTable 은 ACTIVE 를 돌려주고 데이터 호출만 ResourceNotFoundException 이다.
+wait_dynamodb_table_active() {
+  local settle out code
+  settle="$(_lw_settle_secs)" || return 2
+  wait_state "테이블 $1 ACTIVE" --want ACTIVE --retry-on ResourceNotFoundException \
+    -- aws dynamodb describe-table --table-name "$1" --query 'Table.TableStatus' --output text || return $?
+  [ "$settle" -gt 0 ] || return 0
+  sleep "$settle"
+  out="$(aws dynamodb scan --table-name "$1" --select COUNT --limit 1 --output text 2>&1)" && return 0
+  out="$(printf '%s\n' "$out" | _lw_clean)"
+  code="$(_lw_error_code "$out")"
+  if [ "$code" = ResourceNotFoundException ]; then
+    _lw_flip_report "테이블 $1 ACTIVE" "$settle" "DescribeTable 은 ACTIVE 였는데 Scan 이 ResourceNotFoundException" "$out"
+  else
+    _lw_report "테이블 $1 ACTIVE (재확인 Scan)" "$(_lw_error_reason "$code" "$out")" "$out"
+  fi
+  return 1
+}
 # aws dynamodb wait table-not-exists — 성공: ResourceNotFoundException
 wait_dynamodb_table_gone() {
   wait_gone "테이블 $1 삭제" ResourceNotFoundException \
