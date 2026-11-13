@@ -28,7 +28,7 @@ async function tabUntil(pred, arg, { back = false, max = 300 } = {}) {
     if (await page.evaluate(pred, arg)) return;
     await press(back ? 'Shift+Tab' : 'Tab');
   }
-  throw new Error(`초점을 옮기지 못했다: ${pred.toString().slice(0, 120)}`);
+  throw new Error(`초점을 옮기지 못했다: ${arg ?? pred.toString().slice(0, 120)}`);
 }
 const focusIs = (sel) => document.activeElement?.matches?.(sel) ?? false;
 

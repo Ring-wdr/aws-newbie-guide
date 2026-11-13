@@ -134,6 +134,11 @@ export function mountStoragePanels(): void {
     const row = document.createElement('div');
     row.className = 'storage-actions';
     row.append(exp, imp);
-    slot.append(row, note);
+    // 백업 단추는 접어 둔다(퀴즈 요약 상자를 작게 유지). 저장 불가 안내는 접지 않고 보인다.
+    const box = document.createElement('details');
+    const sum = document.createElement('summary');
+    sum.textContent = ko.storage.panelTitle;
+    box.append(sum, row);
+    slot.append(box, note);
   }
 }

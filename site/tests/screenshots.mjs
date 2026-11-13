@@ -18,7 +18,23 @@ const SHOTS = [
   { name: 'cheatsheet', path: '/curriculum/m06-integration-messaging/cheatsheet/' },
   { name: 'm00-lesson3', path: '/curriculum/m00-orientation/03-environment-setup/' },
   { name: 'm03-auto-scaling', path: '/curriculum/m03-compute-scaling/06-auto-scaling/' },
+  { name: 'home', path: '/' },
+  { name: 'module-m06', path: '/curriculum/m06-integration-messaging/' },
+  { name: 'exam-result', path: '/curriculum/m14-capstone-exam/mock-exam/questions/', prepare: examResult },
+  { name: 'source-view', path: '/files/curriculum/m06-integration-messaging/labs/lab01-sqs-basics.sh/' },
 ];
+
+async function examResult(page) {
+  await page.click('[data-act=start]');
+  for (const [n, v] of [[1, 'C'], [2, 'B'], [3, 'B']]) {
+    await page.check(`section.exam-q[data-q="${n}"] input[value="${v}"]`);
+    await page.click('[data-act=next]');
+  }
+  await page.click('[data-act=submit]');
+  await page.click('.guide-dialog .exam-primary');
+  await page.waitForSelector('.exam-result:not([hidden])');
+  await page.locator('.exam-result').scrollIntoViewIfNeeded();
+}
 
 async function quizMid(page) {
   // 1번은 맞히고 2번은 틀린 채 채점, 3번은 고르기만 한 상태
@@ -40,7 +56,7 @@ async function examMid(page) {
   await page.click('[data-act=next]'); // 6번: 복수 응답
   await page.check('section.exam-q[data-q="6"] input[value="B"]');
   await page.click('[data-act=flag]');
-  await page.locator('.exam-bar').scrollIntoViewIfNeeded();
+  await page.locator('.exam-app').evaluate((e) => e.scrollIntoView({ block: 'start' }));
 }
 
 const server = await serve(port);

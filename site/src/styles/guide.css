@@ -69,8 +69,20 @@ h1#_top {
   text-wrap: balance;
   line-height: 1.35;
 }
+@media (max-width: 50rem) {
+  h1#_top {
+    font-size: 1.75rem;
+  }
+}
 
 /* ---------- 코드 블록(Shiki 라이트·다크 이중 테마) ---------- */
+/* <pre>는 브라우저 기본 monospace 를 받으므로 글꼴을 직접 준다(한글이 고딕으로 나오게) */
+pre,
+pre code,
+.sl-markdown-content code,
+kbd {
+  font-family: var(--sl-font-mono);
+}
 .sl-markdown-content pre.astro-code {
   border: 1px solid var(--guide-border);
   border-radius: var(--guide-radius);
@@ -279,7 +291,6 @@ h1#_top {
 .table-scroll {
   overflow-x: auto;
   margin-top: 1.25rem;
-  border-radius: var(--guide-radius);
 }
 .sl-markdown-content .table-scroll > table {
   display: table;
@@ -335,9 +346,6 @@ details.reveal[open] {
 /* ---------- 퀴즈 ---------- */
 .quiz-summary,
 .checklist-summary {
-  position: sticky;
-  top: calc(var(--sl-nav-height) + 0.5rem);
-  z-index: 2;
   margin: 1.5rem 0;
   padding: 0.75rem 1rem;
   border: 1px solid var(--guide-border);
@@ -364,6 +372,24 @@ details.reveal[open] {
 .quiz-summary[data-state='fail'] .quiz-score::before { content: '△ '; color: var(--guide-bad); }
 .storage-panel {
   margin-top: 0.35rem !important;
+  font-size: 0.875rem;
+}
+.storage-panel summary {
+  cursor: pointer;
+  color: var(--guide-muted);
+  width: fit-content;
+}
+.storage-panel .storage-actions {
+  margin-top: 0.4rem;
+}
+/* 넓은 화면에서만 진행 요약을 화면 위에 붙여 둔다(좁은 화면에서는 본문을 가린다) */
+@media (min-width: 72em) {
+  .quiz-summary,
+  .checklist-summary {
+    position: sticky;
+    top: calc(var(--sl-nav-height) + 0.5rem);
+    z-index: 2;
+  }
 }
 .storage-actions {
   display: flex;
@@ -627,6 +653,11 @@ hr + .quiz-summary + hr {
 }
 .exam-nav {
   margin-top: 1rem;
+}
+.exam-nav-box > summary {
+  cursor: pointer;
+  font-weight: 700;
+  width: fit-content;
 }
 .exam-nav-legend {
   font-size: 0.8125rem;

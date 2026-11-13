@@ -88,7 +88,7 @@ export async function offlineBrowser({ colorScheme = 'light', viewport = { width
       /* 해석 못 하는 주소도 막는다 */
     }
     if (LOOPBACK.has(host)) return route.continue();
-    blocked.push(url);
+    if (!blocked.includes(url)) blocked.push(url);
     return route.abort('blockedbyclient');
   });
   // route 를 거치지 않는 요청(웹소켓 등)도 기록한다.

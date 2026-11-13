@@ -73,6 +73,12 @@ export const ko = {
   exam: {
     heading: '시험 모드',
     intro: '실제 시험처럼 130분 타이머로 65문항을 푼다. 답과 "표시해 두기"는 이 브라우저에 저장되며, 채점은 grade.py와 같은 규칙(복수 응답은 전부 맞혀야 정답, 무응답은 오답)을 따른다.',
+    timeLabel: '시험 시간',
+    minutes: (m) => `${m}분`,
+    passLabel: '통과 기준',
+    passValue: (p) => `정답률 ${p}% 이상`,
+    countLabel: '문항',
+    countValue: (n) => `${n}문항`,
     start: '시험 시작',
     resume: '이어서 풀기',
     restart: '새로 시작(답 모두 지우기)',

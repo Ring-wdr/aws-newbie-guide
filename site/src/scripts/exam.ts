@@ -92,6 +92,9 @@ function init(app: HTMLElement) {
   for (const s of document.querySelectorAll<HTMLElement>('section.exam-q')) sections.set(Number(s.dataset.q), s);
 
   app.querySelector('.exam-noscript')?.remove();
+  // 좁은 화면에서는 문항 이동판(65칸)을 접어 둔다.
+  const navBox = app.querySelector<HTMLDetailsElement>('.exam-nav-box');
+  if (navBox) navBox.open = window.matchMedia('(min-width: 50em)').matches;
   document.documentElement.classList.add('exam-js');
   const live = document.createElement('p');
   live.className = 'sr-only';

@@ -46,8 +46,9 @@ const data = {
   <div class="exam-start" hidden>
     <p>{ko.exam.intro}</p>
     <dl class="exam-facts">
-      <div><dt>{ko.exam.timeLeft}</dt><dd>{minutes}분</dd></div>
-      <div><dt>{ko.exam.resultTitle}</dt><dd>{`정답률 ${consts.passPct}% 이상 통과`}</dd></div>
+      <div><dt>{ko.exam.timeLabel}</dt><dd>{ko.exam.minutes(minutes)}</dd></div>
+      <div><dt>{ko.exam.passLabel}</dt><dd>{ko.exam.passValue(consts.passPct)}</dd></div>
+      <div><dt>{ko.exam.countLabel}</dt><dd>{ko.exam.countValue(consts.total)}</dd></div>
     </dl>
     <div class="exam-actions">
       <button type="button" class="exam-primary" data-act="start">{ko.exam.start}</button>
@@ -71,8 +72,11 @@ const data = {
   </div>
 
   <nav class="exam-nav" aria-label={ko.exam.navTitle} hidden>
-    <p class="exam-nav-legend">{ko.exam.navLegend}</p>
-    <ol class="exam-nav-grid"></ol>
+    <details class="exam-nav-box" open>
+      <summary>{ko.exam.navTitle}</summary>
+      <p class="exam-nav-legend">{ko.exam.navLegend}</p>
+      <ol class="exam-nav-grid"></ol>
+    </details>
   </nav>
 
   <section class="exam-result" aria-labelledby="exam-result-title" hidden tabindex="-1">
