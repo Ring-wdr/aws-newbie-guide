@@ -81,7 +81,7 @@ HostedZoneId: /hostedzone/ZD2ZTYT6DNYSR01
 대기 후 상태: INSYNC
 ```
 
-방금 본 것: `change-resource-record-sets`는 **변경 묶음(change batch)** 을 받아 변경 ID를 돌려준다. 상태가 `PENDING`에서 모든 Route 53 이름 서버에 퍼지면 `INSYNC`가 된다. 스크립트는 `aws route53 wait resource-record-sets-changed`로 기다렸다. 한 묶음 안의 변경은 **전부 적용되거나 전부 거부된다**(트랜잭션).
+방금 본 것: `change-resource-record-sets`는 **변경 묶음(change batch)** 을 받아 변경 ID를 돌려준다. 상태가 `PENDING`에서 모든 Route 53 이름 서버에 퍼지면 `INSYNC`가 된다. 손으로 칠 때(그리고 실제 AWS에서)는 `aws route53 wait resource-record-sets-changed --id <변경 ID>`로 `INSYNC`를 기다린다. lab 스크립트는 같은 조건을 1초 간격으로 확인하는 `wait_route53_change_insync`([`scripts/lab-wait.sh`](../../scripts/lab-wait.sh))를 쓴다 — 이 waiter는 30초 간격으로 조회해서, 첫 조회가 `PENDING`을 보면 에뮬레이터가 곧바로 `INSYNC`가 되어도 30초를 통째로 기다리기 때문이다. 한 묶음 안의 변경은 **전부 적용되거나 전부 거부된다**(트랜잭션).
 
 `Action`은 `CREATE`(없을 때만), `UPSERT`(있으면 바꾸고 없으면 만듦), `DELETE`(현재 값과 정확히 같아야 함) 세 가지다.
 

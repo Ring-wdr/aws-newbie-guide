@@ -58,7 +58,7 @@ cat >"$WORK/records.json" <<EOF
    "SetIdentifier": "web-3", "MultiValueAnswer": true, "ResourceRecords": [{"Value": "192.0.2.33"}]}}
 ]}
 EOF
-aws route53 wait resource-record-sets-changed --id "$(change "$WORK/records.json")"
+wait_route53_change_insync "$(change "$WORK/records.json")"
 
 echo "== 2. IP 기반 라우팅: CIDR 컬렉션 → 위치 → 레코드"
 CID="$(aws route53 create-cidr-collection --name "todayorder-isp-$(date +%s)-$RANDOM" --caller-reference "m08-lab02-$RANDOM" \
@@ -79,7 +79,7 @@ cat >"$WORK/ip.json" <<EOF
    "ResourceRecords": [{"Value": "192.0.2.49"}]}}
 ]}
 EOF
-aws route53 wait resource-record-sets-changed --id "$(change "$WORK/ip.json")"
+wait_route53_change_insync "$(change "$WORK/ip.json")"
 
 echo "== 3. 저장된 레코드: 이름별 라우팅 속성"
 aws route53 list-resource-record-sets --hosted-zone-id "$ZID" --no-paginate \
@@ -93,7 +93,7 @@ echo "== 5. 가중치(weighted) — blue 75 : green 25, 40번 물어보기"
 for _ in $(seq 40); do ask weighted; done | sort | uniq -c | tee "$WORK/weighted.txt"
 echo "-- green 의 가중치를 0으로 (롤백): 이제 blue 만"
 sed 's/"Weight": 25/"Weight": 0/' "$WORK/records.json" >"$WORK/rollback.json"
-aws route53 wait resource-record-sets-changed --id "$(change "$WORK/rollback.json")"
+wait_route53_change_insync "$(change "$WORK/rollback.json")"
 for _ in $(seq 10); do ask weighted; done | sort | uniq -c | tee "$WORK/rollback.txt"
 
 echo "== 6. 다중값 응답(multivalue) — 건강한 레코드 여러 개를 함께"
@@ -116,7 +116,7 @@ cat >"$WORK/geo-nodefault.json" <<EOF
    "SetIdentifier": "korea", "GeoLocation": {"CountryCode": "KR"}, "ResourceRecords": [{"Value": "203.0.113.1"}]}}
 ]}
 EOF
-aws route53 wait resource-record-sets-changed --id "$(change "$WORK/geo-nodefault.json")"
+wait_route53_change_insync "$(change "$WORK/geo-nodefault.json")"
 nodefault="$(ask geo-kr-only --resolver-ip 211.234.10.1)"
 echo "geo-kr-only → '$nodefault'"
 

@@ -44,7 +44,7 @@ EOF
 CHANGE="$(aws route53 change-resource-record-sets --hosted-zone-id "$ZID" \
   --change-batch "file://$WORK/create.json" --query ChangeInfo.Id --output text)"
 echo "변경 ID: $CHANGE  처음 상태: $(aws route53 get-change --id "$CHANGE" --query ChangeInfo.Status --output text)"
-aws route53 wait resource-record-sets-changed --id "$CHANGE"
+wait_route53_change_insync "$CHANGE"
 change_status="$(aws route53 get-change --id "$CHANGE" --query ChangeInfo.Status --output text)"
 echo "대기 후 상태: $change_status"
 

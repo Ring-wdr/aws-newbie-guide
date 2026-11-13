@@ -3,6 +3,10 @@
 
 ROOT="$(git rev-parse --show-toplevel)"
 
+# CLI waiter(Route 53 30초, CloudFront 60초·20초 간격) 대신 같은 조건을 1초 간격으로 확인하는 함수
+# (wait_route53_change_insync 등). 이유는 scripts/lab-wait.sh 머리말. 레슨에서 손으로 칠 때는 waiter 가 맞다.
+source "$(git rev-parse --show-toplevel)/scripts/lab-wait.sh"
+
 fail() { printf 'FAIL: %s\n' "$*" >&2; exit 1; }
 
 # assert_eq <실제> <기대> <설명>

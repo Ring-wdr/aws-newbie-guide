@@ -35,7 +35,7 @@ cat >"$WORK/failover.json" <<EOF
    "ResourceRecords": [{"Value": "192.0.2.200"}]}}
 ]}
 EOF
-aws route53 wait resource-record-sets-changed --id "$(aws route53 change-resource-record-sets --hosted-zone-id "$ZID" \
+wait_route53_change_insync "$(aws route53 change-resource-record-sets --hosted-zone-id "$ZID" \
   --change-batch "file://$WORK/failover.json" --query ChangeInfo.Id --output text)"
 aws route53 list-resource-record-sets --hosted-zone-id "$ZID" --no-paginate \
   --query 'ResourceRecordSets[?Failover].[SetIdentifier, Failover, HealthCheckId || `-`, ResourceRecords[0].Value]' --output text
@@ -76,7 +76,7 @@ cat >"$WORK/delete-primary.json" <<EOF
    "ResourceRecords": [{"Value": "192.0.2.100"}]}}
 ]}
 EOF
-aws route53 wait resource-record-sets-changed --id "$(aws route53 change-resource-record-sets --hosted-zone-id "$ZID" \
+wait_route53_change_insync "$(aws route53 change-resource-record-sets --hosted-zone-id "$ZID" \
   --change-batch "file://$WORK/delete-primary.json" --query ChangeInfo.Id --output text)"
 answer_failed_over="$(answer)"
 echo "PRIMARY 가 없을 때 api.$ZONE → $answer_failed_over  (실제 AWS에서 상태 확인이 실패했을 때의 답과 같다)"
