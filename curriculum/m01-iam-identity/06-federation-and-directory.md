@@ -63,8 +63,11 @@ TodayOrder 예: 개발자가 콘솔에 들어가는 것 → Identity Center. 고
 
 ### 1) OIDC 공급자 등록
 
+실습의 발급자(Issuer)는 예약 이름 `token.todayorder.invalid`다. 실제 GitHub Actions의 발급자는 `https://token.actions.githubusercontent.com`인데([실제 AWS에서는](#실제-aws에서는)), 에뮬레이터는 등록된 발급자 주소를 따라가 공개 키를 가져오려 할 수 있으므로 실제 주소를 등록하지 않는다.
+
 ```bash
-aws iam create-open-id-connect-provider --url https://token.actions.githubusercontent.com \
+ISSUER=token.todayorder.invalid
+aws iam create-open-id-connect-provider --url "https://$ISSUER" \
   --client-id-list sts.amazonaws.com \
   --thumbprint-list 6938fd4d98bab03faadb97b34396831e3780aea1
 aws iam list-open-id-connect-providers --query 'OpenIDConnectProviderList[].Arn'
@@ -72,10 +75,10 @@ aws iam list-open-id-connect-providers --query 'OpenIDConnectProviderList[].Arn'
 
 ```
 {
-    "OpenIDConnectProviderArn": "arn:aws:iam::000000000000:oidc-provider/token.actions.githubusercontent.com"
+    "OpenIDConnectProviderArn": "arn:aws:iam::000000000000:oidc-provider/token.todayorder.invalid"
 }
 [
-    "arn:aws:iam::000000000000:oidc-provider/token.actions.githubusercontent.com"
+    "arn:aws:iam::000000000000:oidc-provider/token.todayorder.invalid"
 ]
 ```
 
@@ -88,21 +91,21 @@ arn:aws:iam::000000000000:role/todayorder-gha-deploy
 {
     "Effect": "Allow",
     "Principal": {
-        "Federated": "arn:aws:iam::000000000000:oidc-provider/token.actions.githubusercontent.com"
+        "Federated": "arn:aws:iam::000000000000:oidc-provider/token.todayorder.invalid"
     },
     "Action": "sts:AssumeRoleWithWebIdentity",
     "Condition": {
         "StringEquals": {
-            "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
+            "token.todayorder.invalid:aud": "sts.amazonaws.com"
         },
         "StringLike": {
-            "token.actions.githubusercontent.com:sub": "repo:todayorder/api:ref:refs/heads/main"
+            "token.todayorder.invalid:sub": "repo:todayorder/api:ref:refs/heads/main"
         }
     }
 }
 ```
 
-방금 본 것: 조건 키 이름이 `<발급자>:aud`, `<발급자>:sub`다. **`sub` 조건이 핵심 보안 장치**다. 이것을 빼거나 `repo:*`처럼 넓히면 GitHub의 **아무 저장소**의 워크플로나 이 역할을 맡을 수 있다.
+방금 본 것: 조건 키 이름이 `<발급자>:aud`, `<발급자>:sub`다(여기서는 `token.todayorder.invalid:sub`, 실제 GitHub이면 `token.actions.githubusercontent.com:sub`). **`sub` 조건이 핵심 보안 장치**다. 이것을 빼거나 `repo:*`처럼 넓히면 GitHub의 **아무 저장소**의 워크플로나 이 역할을 맡을 수 있다.
 
 ### 3) 일반 AssumeRole로는 못 맡는다
 
@@ -120,6 +123,7 @@ SAML 공급자도 만들지 않았다: `create-saml-provider`는 1,000자 이상
 
 ## 실제 AWS에서는
 
+- 실제 GitHub Actions 연동에서는 발급자 URL이 `https://token.actions.githubusercontent.com`이고, 신뢰 정책 조건 키도 `token.actions.githubusercontent.com:aud`(값 `sts.amazonaws.com`)·`token.actions.githubusercontent.com:sub`(예: `repo:todayorder/api:ref:refs/heads/main`)가 된다. 실습의 `token.todayorder.invalid` 자리를 이 값으로 바꾸면 된다.
 - GitHub Actions에서는 워크플로에 `permissions: id-token: write`를 주고 `aws-actions/configure-aws-credentials` 액션에 `role-to-assume`을 넘기면 위 흐름이 자동으로 일어난다. 저장소 비밀 값에 액세스 키를 넣을 필요가 없다.
 - GitHub처럼 널리 쓰이는 OIDC 공급자는 AWS가 자체 신뢰 루트로 검증하므로 지문(thumbprint) 값이 실제 검증에 쓰이지 않는다(그래도 API는 값을 받는다).
 - **실제 AWS에서 해 보려면**: OIDC 공급자·역할은 무료다. 개인 저장소에 워크플로를 만들고 `aws sts get-caller-identity`만 실행해 보는 것이 가장 안전한 연습이다. 끝나면 `aws iam delete-role-policy`, `delete-role`, `delete-open-id-connect-provider`. Directory Service(Managed Microsoft AD, Simple AD, AD Connector)는 **시간당 요금**이 붙으니 연습용으로 만들지 않는다.
