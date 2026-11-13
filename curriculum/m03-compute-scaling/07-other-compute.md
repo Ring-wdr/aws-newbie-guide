@@ -21,7 +21,7 @@ flowchart TD
 
 | 서비스 | 한 줄 정의 | 이럴 때 | 헷갈리는 상대 |
 |---|---|---|---|
-| **Elastic Beanstalk** | 코드를 올리면 EC2·ASG·ELB·CloudWatch 경보를 대신 만들고 배포·상태 모니터링을 해 주는 PaaS. 서비스 자체는 무료(만들어진 리소스 비용만) | "개발자가 인프라를 몰라도 웹 앱을 빨리 배포", 기존 Java/.NET/Python/Node/Docker 앱 | CloudFormation(인프라 전체를 직접 코드로), App Runner·ECS(컨테이너) |
+| **Elastic Beanstalk** | 코드를 올리면 EC2·ASG·ELB·CloudWatch 경보를 대신 만들고 배포·상태 모니터링을 해 주는 PaaS. 서비스 자체는 무료(만들어진 리소스 비용만) | "개발자가 인프라를 몰라도 웹 앱을 빨리 배포", 기존 Java/.NET/Python/Node/Docker 앱 | CloudFormation(인프라 전체를 직접 코드로), App Runner·ECS(컨테이너 — App Runner는 2026-04-30부터 신규 고객 불가, M07 레슨 5) |
 | **Lightsail** | 서버·스토리지·데이터 전송을 묶은 **월 정액 번들**의 단순 VPS | 개인·소규모 사이트, 워드프레스, 예측 가능한 고정 비용 | EC2(세밀한 제어·대규모) |
 | **AWS Batch** | 컨테이너 배치 작업을 **큐에 넣으면** 필요한 만큼 EC2/스팟/Fargate를 띄워 실행하고 줄인다 | 대량·장시간 배치, 과학 계산, 정산. **Lambda 15분 제한을 넘는 작업** | Lambda(짧은 이벤트 처리), Step Functions(흐름 제어) |
 | **Outposts** | AWS가 설치·관리하는 랙/서버를 **내 데이터 센터**에 두고 같은 API로 EC2·EBS 등을 쓴다 | 온프레미스 시스템과 초저지연, 데이터 거주 요건, 로컬 처리 | Local Zones(AWS가 대도시에 둔 인프라), Wavelength(통신사 5G 망 안) |

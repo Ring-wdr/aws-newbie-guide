@@ -63,7 +63,7 @@ aws storagegateway create-nfs-file-share --client-token todayorder-m04-nfs-share
   --role "$SGW_ROLE" --location-arn "arn:aws:s3:::$SHARE_BUCKET" --client-list 10.0.0.0/16 \
   --default-storage-class S3_STANDARD --output json >/dev/null
 share_status=""
-for _ in $(seq 1 30); do   # CREATING → AVAILABLE 을 기다린다 (최대 60초)
+for _ in $(seq 1 60); do   # CREATING → AVAILABLE 을 기다린다 (최대 120초)
   share_status="$(aws storagegateway list-file-shares --gateway-arn "$FILE_GW" --query 'FileShareInfoList[0].FileShareStatus' --output text)"
   [ "$share_status" = "AVAILABLE" ] && break
   sleep 2
@@ -131,7 +131,7 @@ echo "== 4. Transfer Family — S3 에 저장하는 관리형 SFTP 서버 (협�
 SFTP="$(aws transfer create-server --protocols SFTP --domain S3 --identity-provider-type SERVICE_MANAGED \
   --endpoint-type PUBLIC --tags Key=Name,Value=todayorder-m04-sftp --query ServerId --output text)"
 sftp_state=""
-for _ in $(seq 1 30); do
+for _ in $(seq 1 60); do   # 최대 120초
   sftp_state="$(aws transfer describe-server --server-id "$SFTP" --query Server.State --output text)"
   [ "$sftp_state" = "ONLINE" ] && break
   sleep 2
@@ -147,8 +147,8 @@ for r in todayorder-m04-sgw-role todayorder-m04-datasync-role; do
 done
 
 # ---- 단언 (데이터가 움직이지 않는 것까지 확인: 에뮬레이터가 복사를 시작하면 문서 갱신 필요)
-[ "$share_status" = "AVAILABLE" ] || { echo "FAIL: 파일 공유가 AVAILABLE 이 되지 않음 (마지막 상태: $share_status)"; exit 1; }
+[ "$share_status" = "AVAILABLE" ] || { echo "FAIL: 120초 안에 파일 공유가 AVAILABLE 이 되지 않음 (마지막 상태: $share_status)"; exit 1; }
 [ "$ds_status" = "SUCCESS" ] || { echo "FAIL: DataSync 실행 상태 ($ds_status)"; exit 1; }
 [ "$dst_count" = "0" ] || { echo "NOTE: DataSync 가 실제로 복사하기 시작함 → 레슨 7·README 갱신 필요"; exit 1; }
-[ "$sftp_state" = "ONLINE" ] || { echo "FAIL: SFTP 서버가 ONLINE 이 되지 않음 (마지막 상태: $sftp_state)"; exit 1; }
+[ "$sftp_state" = "ONLINE" ] || { echo "FAIL: 120초 안에 SFTP 서버가 ONLINE 이 되지 않음 (마지막 상태: $sftp_state)"; exit 1; }
 echo "LAB11 OK"

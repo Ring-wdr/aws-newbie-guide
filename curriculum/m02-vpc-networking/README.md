@@ -53,9 +53,20 @@ curriculum/m02-vpc-networking/labs/verify.sh
 
 정리 자료: [cheatsheet.md](./cheatsheet.md) · [quiz.md](./quiz.md)
 
-## CIDR 계획 (M10에서 CloudFormation으로 재현할 기준)
+## CIDR 계획
 
-M10은 이 VPC를 CloudFormation 템플릿으로 다시 만든다. 이름·CIDR·연결 관계는 아래 표가 기준이며 [labs/_lib.sh](./labs/_lib.sh)의 `M02_SUBNETS`·`build_three_tier`와 같다. 모든 리소스에 `Name`과 `Project=todayorder` 태그를 붙인다. 리전 `us-east-1`.
+이 모듈이 만드는 VPC의 기준이다. 이름·CIDR·연결 관계는 아래 표가 기준이며 [labs/_lib.sh](./labs/_lib.sh)의 `M02_SUBNETS`·`build_three_tier`와 같다.
+
+> **M10과의 관계**: M10(레슨 3, lab04)은 이 VPC를 그대로 재현하지 않는다. 같은 요구(10.0.0.0/16, 2 AZ × 3 티어, IGW, NAT, SG 체인)를 만족하는 **자기 2-AZ 3-티어 VPC**를 CloudFormation 템플릿 [vpc-3tier.yaml](../m10-monitoring-iac/labs/templates/vpc-3tier.yaml)로 따로 만든다. 다른 점:
+>
+> | 항목 | M02 (CLI, `labs/_lib.sh`) | M10 (CloudFormation, `vpc-3tier.yaml`) |
+> |---|---|---|
+> | 서브넷 CIDR (퍼블릭 / 앱 / DB, a·b) | `10.0.0.0/24`·`10.0.1.0/24` / `10.0.10.0/24`·`10.0.11.0/24` / `10.0.20.0/24`·`10.0.21.0/24` | `10.0.1.0/24`·`10.0.2.0/24` / `10.0.11.0/24`·`10.0.12.0/24` / `10.0.21.0/24`·`10.0.22.0/24` |
+> | NAT 게이트웨이 | AZ마다 1개 (`todayorder-nat-a`·`-b`) | AZ a에 1개 (비용 절감용) |
+> | 앱 라우팅 테이블 | AZ별 2개 (`app-rt-a → nat-a`, `app-rt-b → nat-b`) | 1개 (두 앱 서브넷 → AZ a의 NAT) |
+> | 보안 그룹 | `todayorder-alb-sg` → `todayorder-app-sg` → `todayorder-db-sg` | 논리 ID `WebSg` → `AppSg` → `DbSg` (`GroupName` 미지정 — CloudFormation이 `<스택>-WebSg-<무작위>` 형식으로 이름을 붙인다) |
+> | 리소스 `Name` 태그 | 모든 리소스에 `todayorder-…` | VPC(`${EnvName}-vpc`)에만 |
+ 모든 리소스에 `Name`과 `Project=todayorder` 태그를 붙인다. 리전 `us-east-1`.
 
 **VPC**
 
@@ -99,7 +110,7 @@ M10은 이 VPC를 CloudFormation 템플릿으로 다시 만든다. 이름·CIDR�
 | `todayorder-app-sg` | tcp 8080 ← `todayorder-alb-sg` |
 | `todayorder-db-sg` | tcp 5432 ← `todayorder-app-sg` |
 
-lab05~lab09가 덧붙이는 것(선택 — M10 재현의 필수 범위는 위 표까지): NACL `todayorder-public-nacl`·`todayorder-db-nacl`([lab05](./labs/lab05-nacl-rules.sh) 참고), S3 게이트웨이 엔드포인트 `todayorder-s3-gw`(app-rt-a·app-rt-b), SQS 인터페이스 엔드포인트 `todayorder-sqs-if`(app-a·app-b, SG `todayorder-endpoint-sg`: tcp 443 ← `10.0.0.0/16`), 정산 VPC `todayorder-settlement-vpc` `10.20.0.0/16`(서브넷 `10.20.0.0/24`·`10.20.1.0/24`) + Transit Gateway `todayorder-tgw`, 분석 VPC `10.30.0.0/16`·레거시 VPC `10.0.0.0/16`(피어링 실습용), Network Firewall 서브넷 `10.0.30.0/28`(lab09가 만들었다가 지움). 연습용 VPC `10.99.0.0/16`(lab01), `10.98.0.0/16`(lab10)은 lab이 끝날 때 지운다.
+lab05~lab09가 덧붙이는 것(선택 — 3-티어 VPC의 핵심은 위 표까지): NACL `todayorder-public-nacl`·`todayorder-db-nacl`([lab05](./labs/lab05-nacl-rules.sh) 참고), S3 게이트웨이 엔드포인트 `todayorder-s3-gw`(app-rt-a·app-rt-b), SQS 인터페이스 엔드포인트 `todayorder-sqs-if`(app-a·app-b, SG `todayorder-endpoint-sg`: tcp 443 ← `10.0.0.0/16`), 정산 VPC `todayorder-settlement-vpc` `10.20.0.0/16`(서브넷 `10.20.0.0/24`·`10.20.1.0/24`) + Transit Gateway `todayorder-tgw`, 분석 VPC `10.30.0.0/16`·레거시 VPC `10.0.0.0/16`(피어링 실습용), Network Firewall 서브넷 `10.0.30.0/28`(lab09가 만들었다가 지움). 연습용 VPC `10.99.0.0/16`(lab01), `10.98.0.0/16`(lab10)은 lab이 끝날 때 지운다.
 
 ```mermaid
 flowchart TB

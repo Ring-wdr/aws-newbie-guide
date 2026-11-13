@@ -109,7 +109,7 @@ aws rds reboot-db-instance --db-instance-identifier todayorder-m05-maz --force-f
 ]
 ```
 
-방금 본 것: API는 받아들이고 `rebooting`을 거치지만 AZ는 그대로이고 이벤트도 "restarted"뿐이다. (이벤트는 이번 실행이 시작된 뒤의 것만 `--start-time`으로 본다. 이 필터가 없으면 같은 에뮬레이터에서 다시 실행할 때 이전 실행의 "created/restarted"가 반복해 보인다.) **장애 조치는 이 에뮬레이터에서 재현되지 않는다** → 위 시퀀스 다이어그램이 실제 동작이다. (실제 AWS의 이벤트 메시지에는 "Multi-AZ instance failover started/completed"가 찍힌다.)
+방금 본 것: API는 받아들이고 `rebooting`을 거치지만 AZ는 그대로이고 이벤트도 "restarted"뿐이다. (이벤트는 이번 실행이 시작된 뒤의 것만 `--start-time`으로 본다. 이 필터가 없으면 같은 에뮬레이터에서 다시 실행할 때 이전 실행의 "created/restarted"가 반복해 보인다. `--start-time`은 호스트 시계로 계산하므로, 노트북이 절전에서 깨어난 뒤 에뮬레이터 VM 시계가 어긋나 있으면 이벤트 목록이 **비어 보일 수 있다** — 그때는 `scripts/clock-check.sh`로 확인한다.) **장애 조치는 이 에뮬레이터에서 재현되지 않는다** → 위 시퀀스 다이어그램이 실제 동작이다. (실제 AWS의 이벤트 메시지에는 "Multi-AZ instance failover started/completed"가 찍힌다.)
 
 **3) 읽기 전용 복제본을 다른 AZ에**
 

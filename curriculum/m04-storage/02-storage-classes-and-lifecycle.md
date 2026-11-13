@@ -75,7 +75,7 @@ AWS가 **거부하는** 규칙(`InvalidArgument`):
 - 한 규칙 안에서 다음 전환이 이전 클래스의 최소 보관 기간보다 빠름. 예: Glacier IR 4일 → Deep Archive 20일은 안 되고 94일 이후여야 한다.
 - 폭포를 거스르는 전환(예: Glacier → Standard-IA).
 
-> 📌 **2026년 7월 변경**: 예전에는 "Standard-IA·One Zone-IA로의 전환은 생성 후 30일 이상"이어야 했고, 그보다 짧으면 `InvalidArgument`였다. 2026-07-16 발표로 이 제한이 없어져 **0일 전환도 가능**하다. 하지만 IA의 **최소 보관 기간 30일(요금)** 은 그대로다. 그 전에 지우거나 다른 클래스로 옮기면 남은 기간만큼 요금이 나온다. 시험 문제나 옛 자료는 여전히 "30일 이후부터"를 정답으로 기대할 수 있으니 두 가지를 모두 알아 둔다.
+> 📌 **2026년 7월 변경**: 예전에는 "Standard-IA·One Zone-IA로의 전환은 생성 후 30일 이상"이어야 했고, 그보다 짧으면 `InvalidArgument`였다. [2026-07-16 발표](https://aws.amazon.com/about-aws/whats-new/2026/07/s3-removes-30-day-transitions-standard-ia-one-zone-ia/)로 이 제한이 없어져 **0일 전환도 가능**하다. 하지만 IA의 **최소 보관 기간 30일(요금)** 은 그대로다. 그 전에 지우거나 다른 클래스로 옮기면 남은 기간만큼 요금이 나온다. 시험 문제나 옛 자료는 여전히 "30일 이후부터"를 정답으로 기대할 수 있으니 두 가지를 모두 알아 둔다.
 
 그리고 2024년 9월부터 **128 KB 미만 객체는 기본적으로 어떤 클래스로도 전환되지 않는다**. 작은 객체는 전환 요청 요금이 절감액보다 크기 때문이다. 필요하면 필터에 `ObjectSizeGreaterThan`/`ObjectSizeLessThan`을 직접 쓴다. 에뮬레이터 응답의 `"TransitionDefaultMinimumObjectSize": "all_storage_classes_128K"`가 이 기본값이다.
 

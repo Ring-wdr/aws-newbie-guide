@@ -62,7 +62,7 @@ curriculum/m04-storage/labs/verify.sh
 
 | 오퍼레이션 / 동작 | 증상 | 실습 대응 |
 |---|---|---|
-| S3에 대한 IAM 사용자 정책 **(M01과 같은 관찰)** | 객체·버킷 단위 데이터 요청(`GetObject`·`PutObject`·`ListObjectsV2`)은 정책이 없으면 암묵적 Deny, 명시적 Deny도 집행한다. 계정·관리 수준 요청(`ListBuckets`·`CreateBucket`·`DeleteBucket`·`PutBucketVersioning`)은 정책 없이도 통과 | 레슨 4 "실제 AWS에서는" |
+| S3에 대한 IAM 사용자 정책 **(M01과 같은 관찰)** | 객체·버킷 단위 데이터 요청(`GetObject`·`PutObject`·`ListObjectsV2`)은 정책이 없으면 암묵적 Deny, 명시적 Deny도 집행한다. 계정 수준·버킷 설정 요청(`ListBuckets`·`CreateBucket`·`DeleteBucket`·`PutBucketVersioning`)은 정책 없이도 통과 | 레슨 4 "실제 AWS에서는" |
 | 수명 주기 전환 | 규칙은 저장되지만 시간이 지나도 클래스가 바뀌지 않음 | lab02는 구성까지, 비용은 워크시트 |
 | `PutBucketLifecycleConfiguration` 검증 | **AWS 현재 규칙과 같게 동작한다.** STANDARD_IA·ONEZONE_IA를 30일 전에 전환하는 규칙(IA 10일, One Zone-IA 7일, IA 0일)과 이전 버전 IA 10일 전환을 받아 준다. 2026-07-16 AWS 발표로 현재 버전의 30일 최소 제한이 없어졌으므로 이것은 차이가 아니다(이전 버전은 발표가 언급하지 않아 미확인). 한 규칙 안에서 최소 보관 기간보다 빠른 연쇄 전환(Glacier IR 4일 → Deep Archive 20일, Glacier IR 0일 → Deep Archive 30일, 이전 버전 Glacier IR 5일 → Deep Archive 20일), 거꾸로 된 전환, 없는 클래스, 중복 규칙 ID, 0일 만료는 거부한다. **(신규)** FIDELITY의 "STANDARD_IA 30일 미만 → InvalidArgument 기대, 실제로는 성공(⚠️ 다름)"은 2026-07 이후 기준으로는 다름이 아니다 | lab02 10~12단계, `sdk/lifecycle_lint.py` |
 | Glacier 복원 | 수 초 만에 완료(실제 Standard 3–5시간) | 폴링으로 기다리고, 시간은 단언하지 않음 |

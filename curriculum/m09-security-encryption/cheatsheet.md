@@ -25,7 +25,7 @@
 | SSE-S3 | S3 | ❌ | ❌ | 기본값, 추가 비용 없음 |
 | SSE-KMS | KMS(aws/s3 또는 고객 관리형) | ✅ CloudTrail | ✅ | 감사·분리 통제 요구 (대량이면 S3 버킷 키) |
 | DSSE-KMS | KMS, 2계층 | ✅ | ✅ | 2계층 암호화 규정 |
-| SSE-C | 고객이 요청마다 키 제공 | ❌ | 고객 몫 | 키를 AWS에 두면 안 될 때 (HTTPS 필수, **2026-04부터 새 버킷은 기본 차단** → `BlockedEncryptionTypes`로 허용) |
+| SSE-C | 고객이 요청마다 키 제공 | ❌ | 고객 몫 | 키를 AWS에 두면 안 될 때 (HTTPS 필수, **2026-04부터 새 범용 버킷은 기본 차단**(바레인·UAE 리전 제외, 기존 버킷은 계정에 SSE-C 객체가 없을 때만) → `PutBucketEncryption`의 `BlockedEncryptionTypes`로 허용) |
 | 클라이언트 측 | 앱 | – | – | AWS가 평문을 보면 안 될 때 |
 
 ## KMS 숫자·규칙

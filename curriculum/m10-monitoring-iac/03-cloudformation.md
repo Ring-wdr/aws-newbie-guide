@@ -27,7 +27,7 @@ flowchart LR
 | `DeletionPolicy: Retain / Snapshot / RetainExceptOnCreate` | 스택(또는 리소스)을 지울 때 실제 리소스를 남기거나 스냅샷을 뜬다 |
 | `UpdateReplacePolicy: Retain / Snapshot` | 업데이트로 리소스가 **교체**될 때 옛 리소스를 남기거나 스냅샷 |
 | `CreationPolicy` + `cfn-signal` (또는 WaitCondition) | EC2·ASG가 "만들어졌다"가 아니라 **부트스트랩(사용자 데이터) 완료 신호**를 보낼 때까지 CREATE_COMPLETE를 미룬다. 신호가 안 오면 실패 → 롤백 |
-| 롤백 트리거 | 생성·업데이트 직후 지정한 CloudWatch 알람이 울리면 자동 롤백 |
+| 롤백 트리거 | 생성·업데이트 **중**과, 모든 리소스를 배포한 뒤의 **모니터링 기간**(0~180분, 기본 0) 동안 지정한 CloudWatch 알람이 `ALARM`이 되면 스택 작업 전체를 자동 롤백 ([롤백 트리거](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/using-cfn-rollback-triggers.html)) |
 
 ### 템플릿 해부
 
@@ -64,7 +64,7 @@ flowchart TB
   style X fill:none,stroke:none
 ```
 
-보안 그룹 체인: 인터넷 → `web`(443) → `app`(8080, **web SG에서만**) → `db`(5432, **app SG에서만**). NAT 게이트웨이는 비용 때문에 AZ a에 하나만 두었다 — 운영이라면 **AZ마다 하나**씩 두고 앱 라우팅 테이블도 AZ별로 나눠야 AZ a 장애 때 b의 앱이 살아남는다(M02 시험 포인트).
+보안 그룹 체인: 인터넷 → `web`(443) → `app`(8080, **web SG에서만**) → `db`(5432, **app SG에서만**). NAT 게이트웨이는 비용 때문에 AZ a에 하나만 두었다 — 운영이라면 **AZ마다 하나**씩 두고 앱 라우팅 테이블도 AZ별로 나눠야 AZ a 장애 때 b의 앱이 살아남는다(M02 시험 포인트). 이 템플릿은 M02의 VPC를 그대로 옮긴 것이 아니라 같은 요구를 만족하는 별도 설계다 — 서브넷 CIDR(M02는 `10.0.0.0/24`·`10.0.10.0/24`·`10.0.20.0/24` 계열), NAT 개수(M02는 AZ마다), 앱 라우팅 테이블 수(M02는 AZ별 2개), 보안 그룹 이름(M02는 `todayorder-alb-sg` 등)이 다르다(M10 README "설계 대비 대체 사유").
 
 ## 직접 해 보기
 

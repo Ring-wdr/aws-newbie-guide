@@ -309,8 +309,8 @@ def main() -> None:
     except InvalidTransition as e:
         print(f"같은 전이를 한 번 더: 거절 ({e})")
 
-    # GSI 는 테이블과 비동기로 맞춰진다(최종 일관). 실제 AWS에서는 방금 쓴 변경(A-1001 의 SHIPPED,
-    # A-1004 거절 등)이 인덱스에 반영되기까지 보통 1초 미만 걸릴 수 있어, 기대한 결과가 나올 때까지 짧게 재시도한다.
+    # GSI 는 테이블과 비동기로 맞춰진다(최종 일관). 실제 AWS에서는 방금 쓴 변경(A-1001 의 SHIPPED 전이)이
+    # 인덱스에 반영되기까지 보통 1초 미만 걸릴 수 있어, 기대한 결과가 나올 때까지 짧게 재시도한다.
     paid: list[str] = []
     shipped: list[str] = []
     for _ in range(10):

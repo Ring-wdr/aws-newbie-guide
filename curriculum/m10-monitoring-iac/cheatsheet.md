@@ -64,7 +64,7 @@
 | DeletionPolicy | `Retain` / `Snapshot` / `Delete` / `RetainExceptOnCreate` |
 | UpdateReplacePolicy | 교체될 때 옛 리소스 `Retain` / `Snapshot` |
 | CreationPolicy + cfn-signal | 부트스트랩 완료 신호까지 생성 완료를 미룸 |
-| 롤백 트리거 | 배포 직후 CloudWatch 알람이 울리면 롤백 |
+| 롤백 트리거 | 배포 중과 그 뒤 모니터링 기간(0~180분, 기본 0) 동안 지정한 CloudWatch 알람이 `ALARM`이 되면 롤백 (최대 5개) |
 | 종료 보호 / 스택 정책 | 스택 삭제 방지 / 특정 리소스 업데이트 방지 |
 | 한도 | 템플릿당 리소스 500 · 파라미터 200 · 출력 200 · 본문 51,200바이트(S3 URL이면 1 MB) |
 
