@@ -44,7 +44,7 @@ flowchart LR
 scripts/install.sh
 ```
 
-처음 실행하면 빠진 프로그램을 `brew install`로 설치하고(Colima, docker, awscli, uv 중 없는 것만), Colima VM을 켜고(CPU 2개, 메모리 4 GiB, 디스크 30 GiB — `COLIMA_CPU`·`COLIMA_MEMORY`·`COLIMA_DISK`로 바꿀 수 있다), 에뮬레이터 이미지를 빌드한다. 처음에는 VM 생성과 이미지 빌드에 몇 분 걸린다. 빌드 중 마지막 줄은 이렇게 끝난다.
+처음 실행하면 빠진 프로그램을 `brew install`로 설치하고(Colima, docker, awscli, uv, jq 중 없는 것만. jq는 실습 스크립트가 JSON을 다룰 때 쓰며 macOS 15부터는 기본으로 들어 있다), Colima VM을 켜고(CPU 2개, 메모리 4 GiB, 디스크 30 GiB — `COLIMA_CPU`·`COLIMA_MEMORY`·`COLIMA_DISK`로 바꿀 수 있다), 에뮬레이터 이미지를 빌드한다. 처음에는 VM 생성과 이미지 빌드에 몇 분 걸린다. 빌드 중 마지막 줄은 이렇게 끝난다.
 
 ```
 Successfully built c891f5ea0f36
@@ -227,7 +227,18 @@ scripts/emulator-down.sh && EMULATOR_TELEMETRY=on scripts/emulator-up.sh
 
 ### Linux·WSL
 
-`scripts/install.sh`는 Linux에서 docker·aws·uv가 없으면 설치 안내 링크를 출력하고 멈춘다. 설치 후 다시 실행하면 이미지 빌드부터 진행한다. Linux에서는 `emulator-up.sh`가 자동으로 `--user $(id -u):$(id -g)`를 붙여 `~/.aws/emulator/`의 파일이 내 소유가 되게 한다. Intel/AMD 머신은 `x86_64` RPM으로 빌드된다(아키텍처 자동 감지).
+`scripts/install.sh`는 Linux에서 docker·aws·uv·jq·python3 중 없는 것이 있으면 설치 안내를 출력하고 멈춘다(배포판마다 방법이 달라 직접 설치하지 않는다). 설치 후 다시 실행하면 이미지 빌드부터 진행한다. Ubuntu 24.04(ARM, 일반 사용자)에서 확인한 순서다. AWS CLI v2만은 공식 설치 프로그램 대신 같은 버전의 소스로 설치해 확인했다.
+
+<!-- external-host-ok: 사람이 실행하는 설치 명령(apt 패키지 이름 docker.io, uv 설치 스크립트) — 실습 중에는 호출하지 않는다 -->
+```bash
+sudo apt install git curl jq python3 docker.io   # docker 는 공식 안내(docs.docker.com)의 docker-ce 도 된다
+sudo usermod -aG docker $USER                     # 그 뒤 로그아웃했다가 다시 로그인
+curl -LsSf https://astral.sh/uv/install.sh | sh   # uv. 안내대로 새 셸을 열거나 source $HOME/.local/bin/env
+# AWS CLI v2: install.sh 가 출력하는 AWS 공식 설치 안내를 따른다 (Ubuntu 24.04 apt 에는 v2 패키지가 없다)
+scripts/install.sh
+```
+
+Linux에서는 `emulator-up.sh`가 자동으로 `--user $(id -u):$(id -g)`를 붙여 `~/.aws/emulator/`의 파일이 내 소유가 되게 한다. Intel/AMD 머신은 `x86_64` RPM으로, ARM 머신은 `aarch64` RPM으로 빌드된다(아키텍처 자동 감지). VM 없이 도는 Linux에서는 위 "노트북 잠자기 뒤 시계" 문제가 호스트 시계(NTP)의 문제가 된다. WSL2는 그 자체가 VM이라 잠자기 뒤 시계가 어긋날 수 있지만, WSL은 이 저장소에서 시험하지 못했다.
 
 ## 문제 해결
 

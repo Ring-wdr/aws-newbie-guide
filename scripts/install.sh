@@ -42,6 +42,8 @@ if [ "$OS" = "Darwin" ]; then
   have aws || want+=(awscli)
   have uv || want+=(uv)
   have docker || want+=(docker)
+  # 실습 스크립트가 쓰는 jq (macOS 15 부터는 /usr/bin/jq 가 기본으로 있다)
+  have jq || want+=(jq)
   # Docker Desktop 등 다른 런타임이 이미 동작 중이거나, Docker Desktop 이 설치돼 있으면(꺼져 있어도)
   # Colima를 설치하지 않는다 — 런타임을 두 개 두면 docker 컨텍스트가 엇갈린다.
   if ! have colima && ! { have docker && docker info >/dev/null 2>&1; } && [ ! -d "$DOCKER_DESKTOP_APP" ]; then
@@ -56,6 +58,9 @@ else
   have docker || missing+=("docker  → https://docs.docker.com/engine/install/ (설치 후 'sudo usermod -aG docker \$USER' 하고 다시 로그인)")  # external-host-ok: 설치 안내 문구(호출하지 않음)
   have aws || missing+=("aws CLI v2 → https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html")  # external-host-ok: 설치 안내 문구(호출하지 않음)
   have uv || missing+=("uv → curl -LsSf https://astral.sh/uv/install.sh | sh")  # external-host-ok: 설치 안내 문구(호출하지 않음)
+  # 실습 스크립트가 직접 부르는 도구 (Ubuntu 최소 이미지·WSL 기본 배포판에는 없을 수 있다)
+  have jq || missing+=("jq → Debian/Ubuntu: sudo apt install jq")
+  have python3 || missing+=("python3 → Debian/Ubuntu: sudo apt install python3")
   if [ ${#missing[@]} -gt 0 ]; then
     c_red "다음 프로그램을 설치한 뒤 다시 실행하세요:"
     for m in "${missing[@]}"; do echo "  - $m"; done
