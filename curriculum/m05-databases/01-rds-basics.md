@@ -82,7 +82,7 @@ flowchart TB
 
 ### 암호화는 생성할 때 정한다
 
-`--storage-encrypted`(KMS)는 **생성 시에** 정하고, 기존 인스턴스에서 `modify-db-instance`로 켤 수는 없다. 이미 암호화되지 않은 DB를 암호화하는 고전적인 방법(시험 단골 정답)은 스냅샷 → 스냅샷을 암호화하며 복사 → 그 스냅샷에서 복원이다. 지금은 **블루/그린 배포**로도 할 수 있다 — 그린 환경을 만들 때 KMS 키(`TargetKmsKeyId`)를 지정하면 그린 쪽이 암호화된 채 복제되고, 전환(switchover)으로 운영을 넘긴다([RDS 암호화](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Overview.Encryption.html), [블루/그린 고려 사항](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/blue-green-deployments-considerations.html)). 반대로 암호화를 끄는 것은 어느 방법으로도 안 된다.
+`--storage-encrypted`(KMS)는 **생성 시에** 정하고, 기존 인스턴스에서 `modify-db-instance`로 켤 수는 없다. 이미 암호화되지 않은 DB를 암호화하는 고전적인 방법(시험 단골 정답)은 스냅샷 → 스냅샷을 암호화하며 복사 → 그 스냅샷에서 복원이다. 지금은 **블루/그린 배포**로도 할 수 있다 — 그린 환경을 만들 때 KMS 키(`TargetKmsKeyId`)를 지정하면 그린 쪽이 암호화된 채 복제되고, 전환(switchover)으로 운영을 넘긴다([RDS 암호화](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Overview.Encryption.html), [블루/그린 고려 사항](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/blue-green-deployments-considerations.html)). 반대로 암호화된 인스턴스의 암호화를 끄는 것은 어느 방법으로도 안 된다. 암호화되지 않은 DB가 꼭 필요하면 암호화된 DB에서 **데이터를 내보내(export) 암호화되지 않은 DB로 가져오는(import)** 수밖에 없다(같은 RDS 암호화 문서).
 
 ## 직접 해 보기
 

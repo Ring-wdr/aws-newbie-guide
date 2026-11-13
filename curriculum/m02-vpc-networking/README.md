@@ -55,7 +55,9 @@ curriculum/m02-vpc-networking/labs/verify.sh
 
 ## CIDR 계획
 
-이 모듈이 만드는 VPC의 기준이다. 이름·CIDR·연결 관계는 아래 표가 기준이며 [labs/_lib.sh](./labs/_lib.sh)의 `M02_SUBNETS`·`build_three_tier`와 같다.
+<a id="cidr-계획-m10에서-cloudformation으로-재현할-기준"></a><!-- 예전 제목의 앵커: 다른 모듈(M14)의 기존 링크가 깨지지 않게 남겨 둔다 -->
+
+이 모듈이 만드는 VPC의 기준이다. 이름·CIDR·연결 관계는 아래 표가 기준이며 [labs/_lib.sh](./labs/_lib.sh)의 `M02_SUBNETS`·`build_three_tier`와 같다. 모든 리소스에 `Name`과 `Project=todayorder` 태그를 붙인다. 리전 `us-east-1`.
 
 > **M10과의 관계**: M10(레슨 3, lab04)은 이 VPC를 그대로 재현하지 않는다. 같은 요구(10.0.0.0/16, 2 AZ × 3 티어, IGW, NAT, SG 체인)를 만족하는 **자기 2-AZ 3-티어 VPC**를 CloudFormation 템플릿 [vpc-3tier.yaml](../m10-monitoring-iac/labs/templates/vpc-3tier.yaml)로 따로 만든다. 다른 점:
 >
@@ -66,7 +68,6 @@ curriculum/m02-vpc-networking/labs/verify.sh
 > | 앱 라우팅 테이블 | AZ별 2개 (`app-rt-a → nat-a`, `app-rt-b → nat-b`) | 1개 (두 앱 서브넷 → AZ a의 NAT) |
 > | 보안 그룹 | `todayorder-alb-sg` → `todayorder-app-sg` → `todayorder-db-sg` | 논리 ID `WebSg` → `AppSg` → `DbSg` (`GroupName` 미지정 — CloudFormation이 `<스택>-WebSg-<무작위>` 형식으로 이름을 붙인다) |
 > | 리소스 `Name` 태그 | 모든 리소스에 `todayorder-…` | VPC(`${EnvName}-vpc`)에만 |
- 모든 리소스에 `Name`과 `Project=todayorder` 태그를 붙인다. 리전 `us-east-1`.
 
 **VPC**
 
