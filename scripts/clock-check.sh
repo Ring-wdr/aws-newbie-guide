@@ -59,7 +59,7 @@ cat >&2 <<'EOF'
                 colima ssh -- sudo systemctl restart systemd-timesyncd   # 즉시 NTP 재동기화 (인터넷 필요)
                 colima ssh -- sudo date -u -s "@$(date -u +%s)"          # 오프라인이면: 맥의 시각을 VM에 그대로 설정
               최후 수단: colima restart (VM 재시작 — 에뮬레이터가 꺼지고 상태가 사라짐. 그 뒤 scripts/emulator-up.sh)
-              확인:  bash scripts/clock-check.sh  (아무것도 출력하지 않으면 정상)
+              확인:  bash scripts/clock-check.sh  (아무것도 출력하지 않고 끝나면 정상)
               Docker Desktop 이라면 Docker Desktop 을 재시작하세요. Linux(VM 없음)에서는 호스트 시계(NTP)를 확인하세요.
 EOF
 exit 3

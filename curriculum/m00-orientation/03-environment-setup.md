@@ -137,6 +137,27 @@ export AWS_PAGER=""                                              # CLI 출력이
 # → aws sts get-caller-identity 로 Account 000000000000 확인, 아니면 중단
 ```
 
+**거부하면 셸을 AWS에서 끊는다.** `env.sh`가 어떤 이유로든 거부하면(포트 오류, 에뮬레이터 꺼짐, 서명 거부 등), 이 셸에 원래 있던 실제 자격 증명·프로필 변수(`AWS_PROFILE`, `AWS_ACCESS_KEY_ID` 등)를 지운다. 또 `AWS_CONFIG_FILE`·`AWS_SHARED_CREDENTIALS_FILE`을 `~/.aws/emulator/.disconnected/` 아래의 **없는** 파일로, `AWS_ENDPOINT_URL`을 닫힌 포트 `https://127.0.0.1:9`로 돌려 둔다. 거부 메시지를 못 보고 다음 명령을 쳐도 실제 AWS로 나가지 않게 하려는 것이다. `~/.aws`의 실제 파일은 읽지도 고치지도 않는다. 에뮬레이터를 켜지 않은 채, 회사 프로필이 설정된 셸에서 source 한 경우:
+
+```bash
+export AWS_PROFILE=my-company      # (원래 셸에 있던 실제 프로필이라고 하자)
+source scripts/env.sh
+aws sts get-caller-identity
+aws s3 ls --no-sign-request
+```
+
+```
+[env.sh] 포트 9298 의 에뮬레이터 파일(~/.aws/emulator/9298)이 없습니다. 에뮬레이터가 꺼져 있습니다.
+         먼저 실행하세요: scripts/emulator-up.sh 9298
+[env.sh] 이 셸은 AWS에서 끊겼습니다: 실제 자격 증명·프로필 변수를 지웠고, aws 명령은 이 컴퓨터 안에서 실패합니다. 에뮬레이터는 원인을 고친 뒤 다시 source scripts/env.sh, 실제 AWS는 새 셸을 여세요.
+
+aws: [ERROR]: An error occurred (NoCredentials): Unable to locate credentials. You can configure credentials by running "aws login".
+
+aws: [ERROR]: Could not connect to the endpoint URL: "https://127.0.0.1:9/"
+```
+
+방금 본 것: 서명이 필요한 요청은 자격 증명이 없어 보내기 전에 실패했고, 서명이 필요 없는 요청도 닫힌 로컬 포트로 가서 실패했다(이 출력은 `EMULATOR_PORT=9298`로 꺼진 에뮬레이터를 가리켜 얻었다). 에뮬레이터를 켜고 다시 `source scripts/env.sh` 하면 정상으로 연결된다. 실제 AWS를 다시 쓰려면 새 터미널을 연다. `dr-env.sh`도 거부하면 `DR_AWS_*`를 지워 `dr_aws`와 `emulator_site("DR_")`가 거부되게 한다.
+
 엔드포인트는 반드시 **`127.0.0.1`** 이다. `localhost`를 쓰면 JavaScript·Java·Go SDK는 S3 버킷 이름을 호스트명에 붙여(`<버킷>.localhost`) 요청하는데, 에뮬레이터는 그런 요청을 받지 않는다.
 
 **어느 포트에 연결되나?** `EMULATOR_PORT`가 있으면 그 포트, 없으면 **터미널에서 직접 실행할 때만** 기본값 9297이다. 여러분이 터미널에 `source scripts/env.sh`나 `bash curriculum/m00-orientation/labs/lab01-emulator-health.sh`를 치는 경우는 모두 9297로 동작한다. 반대로 AI 에이전트·CI처럼 표준 입력이 터미널이 아닌 곳에서는 `EMULATOR_PORT`가 없으면 `env.sh`·lab·`verify.sh`·`emulator-reset.sh`·`emulator-down.sh`가 모두 거부한다. 여러 작업이 에뮬레이터를 나눠 쓸 때 남의 9297을 지우는 사고를 막기 위해서다.
@@ -259,10 +280,10 @@ Linux에서는 `emulator-up.sh`가 자동으로 `--user $(id -u):$(id -g)`를 �
 | 에뮬레이터를 재시작한 뒤, 계속 떠 있던 Python 프로세스(예: Jupyter, 대화형 셸)에서 `SSLError ... CERTIFICATE_VERIFY_FAILED` 또는 `AccessDenied ... Sign the request with the emulator credentials` | 재시작하면 인증서와 키가 새로 생성된다. 이미 떠 있는 프로세스는 예전 인증서·키를 메모리에 들고 있다 | 그 프로세스를 다시 시작한다. 터미널은 다시 열 필요 없다(환경 변수는 파일 경로라 그대로 맞다) |
 | `EMULATOR_PORT 가 설정되지 않았습니다. 비대화형 실행에서는 ...` | CI·AI 에이전트·`nohup`·`< /dev/null`처럼 표준 입력이 터미널이 아닌 곳에서 env.sh·lab·verify·reset·down을 포트 없이 실행 | `export EMULATOR_PORT=<포트>`. 다른 사람이 쓰는 9297을 실수로 건드리지 않게 하는 안전 장치다 |
 | `[emulator_guard] AWS_ENDPOINT_URL 이 로컬 에뮬레이터(...)가 아닙니다` | `source scripts/env.sh` 없이 boto3 예제를 실행 | env.sh를 source 한 셸에서 실행한다 ([레슨 5](./05-cli-and-boto3-survival.md)) |
-| 노트북을 덮었다(잠자기) 연 뒤 모든 요청이 `SignatureDoesNotMatch`(STS·boto3) 또는 `RequestTimeTooSkewed`(S3·DynamoDB 등), `env.sh`가 `[clock-check] 시계 어긋남 ...`을 출력 (env.sh 는 서명 거부 오류이고 시계 차이가 14분 이상일 때만 이렇게 진단한다. 그보다 작으면 측정값만 참고로 보여 준다) | 맥의 시계는 맞는데 Colima VM(=에뮬레이터 컨테이너)의 시계가 뒤처졌다. AWS 서명(SigV4)은 15분 넘게 어긋나면 거부된다. Colima 0.10(Lima 2.x)에서는 VM 안의 **게스트 에이전트가 맥 시각과 비교해 몇 초 안에 맞춘다** — 이 저장소를 만든 맥의 VM 기록에 잠자기 뒤 3~15분 어긋남을 스스로 맞춘 로그(`SyncTime: ... drift was -15m5s`)가 남아 있다. 그래서 대개 잠시 기다리면 풀린다 | 몇 초 기다려 다시 `source scripts/env.sh`. 그래도 그대로면 VM을 끄지 않고 바로 맞춘다: `colima ssh -- sudo systemctl restart systemd-timesyncd` (즉시 NTP 재동기화, 인터넷 필요) 또는 오프라인이면 `colima ssh -- sudo date -u -s "@$(date -u +%s)"` (맥 시각을 VM에 설정). 컨테이너는 VM 커널 시계를 그대로 쓰므로 **에뮬레이터를 재시작할 필요 없고 만든 리소스도 그대로다.** 최후 수단은 `colima restart`(에뮬레이터가 꺼지고 상태가 사라진다. 그 뒤 `scripts/emulator-up.sh`). 확인: `bash scripts/clock-check.sh` (아무것도 출력하지 않으면 정상). 맥의 언어가 한국어면 `date -u`가 시각 대신 `#오후`처럼 깨져 나오므로 직접 비교하려면 `LC_ALL=C date -u; colima ssh -- date -u`. ※ 세 방법 모두 VM 시계를 일부러 ±20분 바꿔(게스트 에이전트·timesyncd를 잠시 멈춘 상태) 확인했다. 실제 잠자기로 생긴 어긋남에 직접 써 본 것은 아니다 |
+| 노트북을 덮었다(잠자기) 연 뒤 모든 요청이 `SignatureDoesNotMatch`(STS·boto3) 또는 `RequestTimeTooSkewed`(S3·DynamoDB 등), `env.sh`가 `[clock-check] 시계 어긋남 ...`을 출력 (env.sh 는 서명 거부 오류이고 시계 차이가 14분 이상일 때만 이렇게 진단한다. 그보다 작으면 측정값만 참고로 보여 준다) | 맥의 시계는 맞는데 Colima VM(=에뮬레이터 컨테이너)의 시계가 뒤처졌다. AWS 서명(SigV4)은 15분 넘게 어긋나면 거부된다. Colima 0.10(Lima 2.x)에서는 VM 안의 **게스트 에이전트가 맥 시각과 비교해 몇 초 안에 맞춘다** — 이 저장소를 만든 맥의 VM 기록에 잠자기 뒤 3~15분 어긋남을 스스로 맞춘 로그(`SyncTime: ... drift was -15m5s`)가 남아 있다. 그래서 대개 잠시 기다리면 풀린다 | 몇 초 기다려 다시 `source scripts/env.sh`. 그래도 그대로면 VM을 끄지 않고 바로 맞춘다: `colima ssh -- sudo systemctl restart systemd-timesyncd` (즉시 NTP 재동기화, 인터넷 필요) 또는 오프라인이면 `colima ssh -- sudo date -u -s "@$(date -u +%s)"` (맥 시각을 VM에 설정). 컨테이너는 VM 커널 시계를 그대로 쓰므로 **에뮬레이터를 재시작할 필요 없고 만든 리소스도 그대로다.** 최후 수단은 `colima restart`(에뮬레이터가 꺼지고 상태가 사라진다. 그 뒤 `scripts/emulator-up.sh`). 확인: `bash scripts/clock-check.sh` (아무것도 출력하지 않고 끝나면 정상. 에뮬레이터가 꺼져 있으면 `측정하지 못했습니다`를 출력하고 종료 코드 2). 맥의 언어가 한국어면 `date -u`가 시각 대신 `#오후`처럼 깨져 나오므로 직접 비교하려면 `LC_ALL=C date -u; colima ssh -- date -u`. ※ 세 방법 모두 VM 시계를 일부러 ±20분 바꿔(게스트 에이전트·timesyncd를 잠시 멈춘 상태) 확인했다. 실제 잠자기로 생긴 어긋남에 직접 써 본 것은 아니다 |
 | `aws cloudformation wait stack-create-complete` 같은 긴 간격의 waiter가 오래 걸리거나 실제와 다르게 끝난다 | waiter는 AWS 기준 간격(예: 30초)으로 폴링하고, 에뮬레이터의 상태 전이 타이밍은 실제와 다르다 | 짧은 간격으로 직접 상태를 폴링한다. 자세한 내용은 M10(CloudFormation)에서 |
 | 잘 되던 명령이 갑자기 `Could not connect to the endpoint URL: "https://127.0.0.1:9297/"`, `env.sh`가 `메모리 상한을 넘어 강제 종료됐습니다 (... 137 ...)`, `emulator-status.sh`에 `OOM(137)` (도커가 `OOMKilled=true`로 기록한 경우만 OOM으로 표시한다. `docker kill`처럼 다른 이유로 137이면 "종료됨"으로 표시) | 에뮬레이터 컨테이너가 메모리 상한을 넘어 커널에 의해 종료됐다(OOM, 종료 코드 137). 에뮬레이터 1.0.322 에서는 **동기 Lambda 호출(`invoke`) 한 번마다 약 7 MiB가 회수되지 않고 쌓인다** — 측정: 빈 상태 175 MiB → 20회 327 MiB → 100회 883 MiB, 1 GiB 상한에서는 약 120회 만에 종료. M06·M07 실습을 리셋 없이 여러 번 돌리면 생긴다 | 리소스는 이미 사라졌다. `scripts/emulator-reset.sh`로 다시 띄운다(기본 상한 2 GiB에서는 약 270회까지 버틴다). Lambda 실습을 반복할 때는 중간중간 리셋하고, 자주 반복되면 `EMULATOR_MEMORY=3g scripts/emulator-reset.sh` |
-| 이미 실제 AWS 프로필(`AWS_PROFILE`)을 쓰던 셸에서 `source scripts/env.sh` 뒤 실제 AWS를 다시 쓰고 싶다 | `env.sh`가 그 변수들을 지웠다 | 새 터미널을 연다. 에뮬레이터용 셸과 실제 AWS용 셸을 섞지 않는 것이 가장 안전하다 |
+| 이미 실제 AWS 프로필(`AWS_PROFILE`)을 쓰던 셸에서 `source scripts/env.sh` 뒤 실제 AWS를 다시 쓰고 싶다, 또는 `[env.sh] 이 셸은 AWS에서 끊겼습니다` 뒤 모든 `aws` 명령이 `NoCredentials`·`127.0.0.1:9` 연결 실패 | `env.sh`가 그 변수들을 지웠다(성공해도, 거부해도) | 새 터미널을 연다. 에뮬레이터용 셸과 실제 AWS용 셸을 섞지 않는 것이 가장 안전하다 |
 
 ## 실제 AWS에서는
 
