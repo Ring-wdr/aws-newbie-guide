@@ -83,7 +83,7 @@ aws: [ERROR]: An error occurred (AccessDenied) when calling the ListUsers operat
 make_bucket: todayorder-intern-bucket
 ```
 
-방금 본 것: 같은 사용자인데 **IAM API는 거부되고, S3 버킷 생성은 통과했다.** 에뮬레이터의 IAM 평가는 서비스와 요청 종류에 따라 다르다. 탐침과 모듈 저자들이 확인한 바로는 IAM·EC2·KMS는 사용자 정책을 평가하고, S3·SQS·DynamoDB는 **객체·메시지·항목을 다루는 요청**(`GetObject`, `SendMessage`, `PutItem` 등)은 평가하지만 **버킷·큐·테이블을 만들고 지우고 나열하는 계정 수준 요청**(`CreateBucket`, `ListBuckets`, `CreateQueue`, `CreateTable` 등)은 평가하지 않는다. 그 밖에도 AssumeRole이 호출자 정책을 보지 않는 등 차이가 많다([FIDELITY.md](../../docs/FIDELITY.md) "IAM 평가"). 에뮬레이터에서 "통과했다"는 것이 "권한 설계가 맞다"는 뜻이 아님을 기억하자.
+방금 본 것: 같은 사용자인데 **IAM API는 거부되고, S3 버킷 생성은 통과했다.** 에뮬레이터의 IAM 평가는 서비스와 요청 종류에 따라 다르다. 탐침과 모듈 저자들이 확인한 바로는 IAM·EC2·KMS는 사용자 정책을 평가하고, S3·SQS·DynamoDB는 **객체·메시지·항목을 다루는 요청**(`GetObject`, `SendMessage`, `PutItem` 등)은 평가하지만 **버킷·큐·테이블을 만들고 지우고 나열하는 계정 수준 요청**(`CreateBucket`, `ListBuckets`, `CreateQueue`, `CreateTable` 등)은 평가하지 않는다. 그 밖에도 AssumeRole이 호출자 정책을 보지 않는 등 차이가 많다([FIDELITY.md "M01 IAM과 계정 관리"](../../docs/FIDELITY.md#m01-iam과-계정-관리)). 에뮬레이터에서 "통과했다"는 것이 "권한 설계가 맞다"는 뜻이 아님을 기억하자.
 
 ## 실제 AWS에서는
 
