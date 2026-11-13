@@ -137,7 +137,14 @@ export AWS_PAGER=""                                              # CLI 출력이
 # → aws sts get-caller-identity 로 Account 000000000000 확인, 아니면 중단
 ```
 
-**거부하면 셸을 AWS에서 끊는다.** `env.sh`가 어떤 이유로든 거부하면(포트 오류, 에뮬레이터 꺼짐, 서명 거부 등), 이 셸에 원래 있던 실제 자격 증명·프로필 변수(`AWS_PROFILE`, `AWS_ACCESS_KEY_ID` 등)를 지운다. 또 `AWS_CONFIG_FILE`·`AWS_SHARED_CREDENTIALS_FILE`을 `~/.aws/emulator/.disconnected/` 아래의 **없는** 파일로, `AWS_ENDPOINT_URL`을 닫힌 포트 `https://127.0.0.1:9`로 돌려 둔다. 거부 메시지를 못 보고 다음 명령을 쳐도 실제 AWS로 나가지 않게 하려는 것이다. `~/.aws`의 실제 파일은 읽지도 고치지도 않는다. 에뮬레이터를 켜지 않은 채, 회사 프로필이 설정된 셸에서 source 한 경우:
+**거부하면 셸을 AWS에서 끊는다.** `env.sh`는 맨 먼저 이 셸을 AWS에서 끊어 두고, 계정 확인이 통과한 **뒤에만** 에뮬레이터 설정을 넣는다. 그래서 어떤 이유로 거부하든(포트 오류, 에뮬레이터 꺼짐, 서명 거부 등) 도중에 Ctrl-C로 멈추든, 셸은 끊긴 상태로 남는다. 끊긴 상태에서는 다음과 같다.
+
+- 실제 자격 증명·프로필 변수(`AWS_PROFILE`, `AWS_ACCESS_KEY_ID` 등)가 지워진다.
+- 옛 방식 자격 증명(`~/.boto`, `AWS_CREDENTIAL_FILE`)이 꺼진다.
+- `AWS_CONFIG_FILE`·`AWS_SHARED_CREDENTIALS_FILE`·`BOTO_CONFIG`가 `/dev/null/` 아래의 **만들 수 없는** 경로를 가리킨다. 그래서 `aws configure`도 거기에 키를 쓰지 못한다.
+- `AWS_ENDPOINT_URL`은 닫힌 포트 `https://127.0.0.1:9`를 가리킨다.
+
+거부 메시지를 못 보고 다음 명령을 쳐도 요청이 이 컴퓨터 밖으로 나가지 않게 하려는 것이다. `~/.aws`의 실제 파일은 읽지도 고치지도 않는다. 에뮬레이터를 켜지 않은 채 회사 프로필이 설정된 셸에서 source 한 경우:
 
 ```bash
 export AWS_PROFILE=my-company      # (원래 셸에 있던 실제 프로필이라고 하자)
@@ -149,14 +156,14 @@ aws s3 ls --no-sign-request
 ```
 [env.sh] 포트 9298 의 에뮬레이터 파일(~/.aws/emulator/9298)이 없습니다. 에뮬레이터가 꺼져 있습니다.
          먼저 실행하세요: scripts/emulator-up.sh 9298
-[env.sh] 이 셸은 AWS에서 끊겼습니다: 실제 자격 증명·프로필 변수를 지웠고, aws 명령은 이 컴퓨터 안에서 실패합니다. 에뮬레이터는 원인을 고친 뒤 다시 source scripts/env.sh, 실제 AWS는 새 셸을 여세요.
+[env.sh] 이 셸은 AWS에서 끊겼습니다: 실제 자격 증명·프로필 변수와 ~/.boto 같은 옛 방식 자격 증명을 끄고, 엔드포인트를 닫힌 로컬 포트(127.0.0.1:9)로 돌렸습니다 — aws 요청은 이 컴퓨터 밖으로 나가지 않습니다. 에뮬레이터는 원인을 고친 뒤 다시 source scripts/env.sh, 실제 AWS는 새 셸을 여세요.
 
 aws: [ERROR]: An error occurred (NoCredentials): Unable to locate credentials. You can configure credentials by running "aws login".
 
 aws: [ERROR]: Could not connect to the endpoint URL: "https://127.0.0.1:9/"
 ```
 
-방금 본 것: 서명이 필요한 요청은 자격 증명이 없어 보내기 전에 실패했고, 서명이 필요 없는 요청도 닫힌 로컬 포트로 가서 실패했다(이 출력은 `EMULATOR_PORT=9298`로 꺼진 에뮬레이터를 가리켜 얻었다). 에뮬레이터를 켜고 다시 `source scripts/env.sh` 하면 정상으로 연결된다. 실제 AWS를 다시 쓰려면 새 터미널을 연다. `dr-env.sh`도 거부하면 `DR_AWS_*`를 지워 `dr_aws`와 `emulator_site("DR_")`가 거부되게 한다.
+방금 본 것: 서명이 필요한 요청은 자격 증명이 없어 보내기 전에 실패했고, 서명이 필요 없는 요청도 닫힌 로컬 포트로 가서 실패했다(이 출력은 `EMULATOR_PORT=9298`로 꺼진 에뮬레이터를 가리켜 얻었다). 에뮬레이터를 켜고 다시 `source scripts/env.sh` 하면 정상으로 연결된다. 실제 AWS를 다시 쓰려면 새 터미널을 연다. `dr-env.sh`도 거부하면 `DR_AWS_*`를 지워 `dr_aws`와 `emulator_site("DR_")`가 거부되게 한다. 주 사이트가 끊긴 셸(위처럼 `env.sh`가 거부한 셸)에서는 `dr-env.sh` 자체가 거부한다.
 
 엔드포인트는 반드시 **`127.0.0.1`** 이다. `localhost`를 쓰면 JavaScript·Java·Go SDK는 S3 버킷 이름을 호스트명에 붙여(`<버킷>.localhost`) 요청하는데, 에뮬레이터는 그런 요청을 받지 않는다.
 
