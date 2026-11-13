@@ -112,13 +112,72 @@ verify_refuses_missing_dr() {
 }
 
 # emulator-up.sh 의 EMULATOR_DNS 검증: 잘못된 값은 docker 를 건드리기 전에 거부한다 (포트 1024 — 컨테이너를 띄우지 않음)
+# docker 대신 호출만 기록하고 실패하는 가짜를 앞에 둔다 — 검증이 깨져도 컨테이너가 뜨지 않는다.
 emulator_dns_validation() {
-  local v out
+  local v out fake rc=0
+  fake="$(mktemp -d)"
+  printf '#!/bin/sh\necho "$*" >>"%s/calls"\nexit 1\n' "$fake" >"$fake/docker"
+  chmod +x "$fake/docker"
   for v in 999.999.999.999 127.0.0.01 127.0.0.1. 1.2.3 256.0.0.1 'host ' localhost; do
-    out="$(EMULATOR_DNS="$v" "$ROOT/scripts/emulator-up.sh" 1024 2>&1)" && { echo "허용해 버림: '$v'"; return 1; }
-    grep -q "EMULATOR_DNS 는 IPv4 주소이거나 host 여야 합니다" <<<"$out" || { echo "다른 이유로 실패: '$v' → $out"; return 1; }
+    if out="$(PATH="$fake:$PATH" EMULATOR_DNS="$v" "$ROOT/scripts/emulator-up.sh" 1024 2>&1)"; then
+      echo "허용해 버림: '$v'"; rc=1; break
+    fi
+    grep -q "EMULATOR_DNS 는 IPv4 주소이거나 host 여야 합니다" <<<"$out" || { echo "다른 이유로 실패: '$v' → $out"; rc=1; break; }
   done
-  echo "잘못된 값 7개 모두 거부"
+  if [ -s "$fake/calls" ]; then echo "검증 전에 docker 를 불렀다: $(head -1 "$fake/calls")"; rc=1; fi
+  rm -rf "$fake"
+  [ "$rc" -eq 0 ] && echo "잘못된 값 7개 모두 docker 호출 전에 거부"
+  return "$rc"
+}
+
+# env.sh 가 어떤 이유로든 거부하면, 학습자가 미리 넣어 둔 실제 자격 증명·프로필 변수가 남아 다음 aws 명령이
+# 실제 AWS로 가는 일이 없어야 한다. 가짜 AWS_PROFILE·키·서비스별 엔드포인트를 넣은 셸(bash, 있으면 zsh)에서
+# 거부시킨 뒤, 서명 요청은 "자격 증명 없음"으로, 서명 없는 요청은 닫힌 루프백 포트(127.0.0.1:9)로 이 컴퓨터 안에서
+# 실패하는지 본다. 바깥으로 나가는 요청이 있으면 닫힌 프록시로 보내 즉시 실패하게 한다(실제 AWS에 닿지 않음).
+envsh_refusal_disconnects() {
+  local sh sc out rc=0 shells="bash"
+  [ -x /bin/bash ] && [ "$(command -v bash)" != /bin/bash ] && shells="$shells /bin/bash"
+  command -v zsh >/dev/null 2>&1 && shells="$shells zsh"
+  for sh in $shells; do
+    for sc in noport badport nofiles sigfail; do
+      out="$("$sh" "$MOD_DIR/labs/_envsh_refusal_check.sh" "$ROOT" "$sc" "$EMULATOR_PORT" 2>/dev/null | grep '^RESULT')"
+      echo "$sh $sc: $out"
+      [[ "$out" == "RESULT OK"* ]] || rc=1
+    done
+  done
+  return "$rc"
+}
+
+# macOS 기본 bash 3.2 는 if 조건 안의 함수에서 source 된 파일이 실패하면 set -e 무시 상태를 잃는다.
+# env.sh·dr-env.sh 가 '_main || rc=$?' 로 부르지 않으면 호출한 셸 전체가 끝나 버린다(#25 이전 동작).
+# 거부하는 값(포트 오류)으로 source 시켜, 거부는 하되 호출한 셸은 계속 도는지 본다.
+sourced_refusal_is_contained() {
+  local sh out rc=0 shells="bash"
+  [ -x /bin/bash ] && [ "$(command -v bash)" != /bin/bash ] && shells="$shells /bin/bash"
+  for sh in $shells; do
+    out="$(EMULATOR_PORT=notaport "$sh" -c 'set -euo pipefail
+      f() { source "$1/scripts/env.sh" || return 1; echo "통과해 버림"; }
+      if f "$1"; then :; else echo "env.sh 거부됨"; fi
+      echo "env.sh 뒤 계속"' _ "$ROOT" </dev/null 2>/dev/null)"
+    echo "$sh: $(tr '\n' ' ' <<<"$out")"
+    grep -q "env.sh 거부됨" <<<"$out" && grep -q "env.sh 뒤 계속" <<<"$out" || rc=1
+    out="$(DR_EMULATOR_PORT=notaport "$sh" -c 'set -euo pipefail
+      source "$1/scripts/env.sh"
+      f() { source "$1/scripts/dr-env.sh" || return 1; echo "통과해 버림"; }
+      if f "$1"; then :; else echo "dr-env.sh 거부됨"; fi
+      echo "dr-env.sh 뒤 계속"' _ "$ROOT" </dev/null 2>/dev/null)"
+    echo "$sh: $(tr '\n' ' ' <<<"$out")"
+    grep -q "dr-env.sh 거부됨" <<<"$out" && grep -q "dr-env.sh 뒤 계속" <<<"$out" || rc=1
+  done
+  return "$rc"
+}
+
+# clock-check.sh: 에뮬레이터가 없으면 조용히 0 이 아니라 "측정하지 못했습니다" + 종료 코드 2
+clock_check_cannot_measure() {
+  local out rc
+  out="$(bash "$ROOT/scripts/clock-check.sh" 1024 2>&1)"; rc=$?
+  echo "rc=$rc $out"
+  [ "$rc" -eq 2 ] && grep -q "측정하지 못했습니다" <<<"$out"
 }
 
 # 두 번째 사이트(dr-env.sh + emulator_site("DR_")) 실시간 시험은 DR_EMULATOR_PORT 에 에뮬레이터가 떠 있을 때만.
@@ -147,6 +206,9 @@ run "dr-env.sh: 비대화형 + DR_EMULATOR_PORT 없음 → 거부, 이전 DR_AWS
 run "dr-env.sh: 잘못된 포트 → 거부, 이전 DR_AWS_* 지움" drenv_bad_port_clears
 [ -n "${DR_EMULATOR_PORT:-}" ] || run "verify.sh: DR_EMULATOR_PORT 에 에뮬레이터 없음 → 리셋 전에 원인·해결 방법 안내" verify_refuses_missing_dr
 run "emulator-up.sh: 잘못된 EMULATOR_DNS(999.999.999.999·127.0.0.01 등) → docker 호출 전 거부" emulator_dns_validation
+run "env.sh: 어떤 이유로 거부하든 기존 실제 자격 증명·프로필을 지우고 aws 가 이 컴퓨터 안에서 실패 (bash·zsh)" envsh_refusal_disconnects
+run "env.sh·dr-env.sh: if 조건 안에서 source 해 거부돼도 호출한 셸이 끝나지 않음 (macOS bash 3.2)" sourced_refusal_is_contained
+run "clock-check.sh: 에뮬레이터 없음 → '측정하지 못했습니다' + 종료 코드 2" clock_check_cannot_measure
 for py in "$MOD_DIR"/sdk/*.py; do
   run "안전 장치: env.sh 없이 sdk/$(basename "$py") 실행 → 네트워크 호출 전 거부" guard_refuses "$py"
 done
