@@ -19,7 +19,7 @@ CLEAN_HTML = "<!doctype html><html lang=ko><body><main><p>WebSocket 이라는 �
 
 # (이름, 심을 곳, 파일, 내용) — src 는 site/src, dist 는 빌드 산출물
 STATIC_CASES = [
-    ("src: 외부 주소", "src", "components/A.astro", '<link rel="stylesheet" href="https://fonts.example.com/a.css" />'),
+    ("src: 외부 주소", "src", "components/A.astro", '<link rel="stylesheet" href="https://fonts.selftest.invalid/a.css" />'),
     ("src: WebSocket", "src", "scripts/a.ts", "const u = location.host; new WebSocket('ws://' + u);"),
     ("src: EventSource", "src", "scripts/b.ts", "new EventSource(path);"),
     ("src: sendBeacon", "src", "scripts/c.ts", "navigator.sendBeacon(path, data);"),
@@ -28,17 +28,17 @@ STATIC_CASES = [
     ("src: Worker", "src", "scripts/f.ts", "const w = new Worker(url);"),
     ("src: importScripts", "src", "scripts/g.ts", "importScripts(url);"),
     ("src: preconnect", "src", "components/B.astro", '<link rel="preconnect" href={host} />'),
-    ("dist: 외부 <img>", "dist", "p1/index.html", '<img alt="" src="https://cdn.example.com/x.png">'),
-    ("dist: <link preconnect>", "dist", "p2/index.html", '<link rel="preconnect" href="https://cdn.example.com">'),
-    ("dist: <link dns-prefetch>", "dist", "p3/index.html", '<link rel="dns-prefetch" href="//cdn.example.com">'),
-    ("dist: CSS @import", "dist", "a.css", '@import "https://cdn.example.com/x.css";'),
-    ("dist: 문서 안 스크립트의 WebSocket", "dist", "p4/index.html", "<script>new WebSocket('w'+'ss://x.example')</script>"),
+    ("dist: 외부 <img>", "dist", "p1/index.html", '<img alt="" src="https://cdn.selftest.invalid/x.png">'),
+    ("dist: <link preconnect>", "dist", "p2/index.html", '<link rel="preconnect" href="https://cdn.selftest.invalid">'),
+    ("dist: <link dns-prefetch>", "dist", "p3/index.html", '<link rel="dns-prefetch" href="//cdn.selftest.invalid">'),
+    ("dist: CSS @import", "dist", "a.css", '@import "https://cdn.selftest.invalid/x.css";'),
+    ("dist: 문서 안 스크립트의 WebSocket", "dist", "p4/index.html", "<script>new WebSocket('w'+'ss://x.selftest.invalid')</script>"),
     ("dist: 스크립트 파일의 EventSource", "dist", "_astro/a.js", "new EventSource(u)"),
     ("dist: 스크립트 파일의 sendBeacon", "dist", "_astro/b.js", "navigator.sendBeacon(u,d)"),
     ("dist: 스크립트의 RTCPeerConnection", "dist", "_astro/c.js", "new RTCPeerConnection(c)"),
     ("dist: 스크립트의 service worker", "dist", "_astro/d.js", "navigator.serviceWorker.register(u)"),
-    ("dist: fetch 외부 주소", "dist", "_astro/e.js", 'fetch("https://api.example.com/x")'),
-    ("dist: meta refresh", "dist", "p5/index.html", '<meta http-equiv="refresh" content="0; url=https://x.example">'),
+    ("dist: fetch 외부 주소", "dist", "_astro/e.js", 'fetch("https://api.selftest.invalid/x")'),
+    ("dist: meta refresh", "dist", "p5/index.html", '<meta http-equiv="refresh" content="0; url=https://x.selftest.invalid">'),
 ]
 
 

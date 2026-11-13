@@ -403,6 +403,35 @@ def gate_run_commands(dist: Path) -> Gate:
     return g
 
 
+# ---------------------------------------------------------------- 저장소 외부 호스트 검사 + 심은 결함의 주소
+def gate_scanner() -> Gate:
+    """M00 verify.sh 와 같은 외부 호스트 정적 검사(tools/probe/no_external_hosts.py)가 0건이어야 한다.
+    그리고 검사기·브라우저 시험이 심는 가짜 주소는 모두 .invalid 나 루프백이어야 한다(놓친 결함이 실제 요청이 되지 않게)."""
+    g = Gate("외부 호스트 정적 검사(tools/probe) 0건 + 심은 결함 주소는 .invalid·루프백만")
+    p = subprocess.run([sys.executable, str(REPO / "tools/probe/no_external_hosts.py")], capture_output=True, text=True, cwd=REPO)
+    g.checked += 1
+    last = (p.stdout.strip().splitlines() or [""])[-1]
+    print(f"  tools/probe/no_external_hosts.py: {p.stdout.strip().splitlines()[0] if p.stdout.strip() else p.stderr[-300:]}")
+    if p.returncode != 0:
+        g.fail(f"no_external_hosts.py 종료 코드 {p.returncode}: {p.stdout.strip()[-1500:] or last}")
+    url = re.compile(r"(?:https?|wss?|stun|turns?|ftp):(?://)?[^\s\"'`<>)\\]+|(?<![:\w])//[a-z0-9-]+(?:\.[a-z0-9-]+)+", re.I)
+    roots = [SITE / "tests", HERE]
+    for root in roots:
+        for f in sorted(root.rglob("*")):
+            if not f.is_file() or f.suffix not in {".mjs", ".js", ".py", ".md", ".astro", ".html", ".txt"} or "__pycache__" in f.parts:
+                continue
+            g.checked += 1
+            for i, line in enumerate(f.read_text(encoding="utf-8", errors="replace").splitlines(), 1):
+                for u in url.findall(line):
+                    m = re.match(r"^(?:[a-z][a-z0-9+.-]*:)?(?://)?(\[[^\]]+\]|[A-Za-z0-9.-]+)", u, re.I)
+                    host = m.group(1) if m else ""
+                    if not host or "." not in host and not host.startswith("[") and host != "localhost":
+                        continue  # 'ws://' + 변수 처럼 호스트가 없는 조각
+                    if not re.fullmatch(r"\[::1\]|127\.0\.0\.1|localhost|[A-Za-z0-9.-]*\.invalid|www\.w3\.org", host, re.I):
+                        g.fail(f"{f.relative_to(REPO)}:{i}: .invalid·루프백이 아닌 주소 {u}")
+    return g
+
+
 # ---------------------------------------------------------------- 외부 리소스 정적 검사
 URL_RE = re.compile(r"(?:https?|wss?|ftp):\/\/[^\s\"'<>)\\]+", re.I)
 NAMESPACE_OK = re.compile(r"^https?://www\.w3\.org/(1999/xhtml|2000/svg|1999/xlink|1998/Math/MathML|XML/1998/namespace|2000/xmlns/?)")
@@ -519,7 +548,7 @@ def gate_browser(port: int, which: str) -> Gate:
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="가이드 사이트 검사기 (GUIDE-SITE 5장)")
-    ap.add_argument("check", choices=["all", "parity", "quiz", "exam", "links", "run-commands", "static", "selftest", "offline", "a11y", "keyboard", "diagrams", "browser"])
+    ap.add_argument("check", choices=["all", "parity", "quiz", "exam", "links", "run-commands", "static", "selftest", "scanner", "offline", "a11y", "keyboard", "diagrams", "browser"])
     ap.add_argument("--pages", default="pilot", help="pilot(기본) | all | 쉼표로 구분한 경로(/curriculum/.../)")
     ap.add_argument("--dist", default=None, help="빌드 산출물 폴더(기본: site/dist)")
     ap.add_argument("--site", default=None, help="site/ 폴더(기본: 저장소의 site/) — 검사기 자체를 시험할 때 사본을 가리킨다")
@@ -546,6 +575,8 @@ def main(argv: list[str] | None = None) -> int:
         gates.append(gate_exam())
     if c in ("all", "links"):
         gates.append(gate_links(dist, routes))
+    if c in ("all", "scanner"):
+        gates.append(gate_scanner())
     if c in ("all", "selftest"):
         g = Gate("검사기 자체 시험(정적·실행 명령 관문에 심은 결함)")
         st = subprocess.run([sys.executable, str(HERE / "selftest.py")], capture_output=True, text=True)
