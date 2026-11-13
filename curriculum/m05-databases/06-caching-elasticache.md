@@ -125,6 +125,8 @@ aws elasticache wait replication-group-available --replication-group-id todayord
 
 방금 본 것: 쓰기는 **기본(Primary) 엔드포인트**, 읽기는 **리더 엔드포인트**로. Aurora와 같은 모양이다. 노드는 서로 다른 AZ에 놓였다. 에뮬레이터가 돌려주는 이 주소는 실제 AWS 형식 이름(`*.cache.amazonaws.com`)이라 어디서도 해석되지 않는다. 접속할 수 없고, 접속을 시도하면 그 이름을 바깥 DNS에 묻게 되므로 실습은 접속하지 않는다([FIDELITY.md](../../docs/FIDELITY.md) 환경 메모) — 그래서 등급이 🟡다.
 
+lab 스크립트는 `wait replication-group-available` 대신 같은 상태(`Status`가 `available`)를 1초 간격으로 확인한다(`_common.sh`의 `wait_status`). CLI waiter는 15초 간격으로 조회하므로, 첫 조회가 생성 직후의 `creating`을 보면 에뮬레이터가 곧바로 `available`이 되어도 15초를 통째로 기다린다. 손으로 칠 때는 waiter로 충분하다.
+
 **2) 장애 조치 테스트**
 
 ```bash
