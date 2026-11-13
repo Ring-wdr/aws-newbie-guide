@@ -35,7 +35,7 @@ flowchart LR
 
 | 서비스 | 한 줄 | 시험 키워드 |
 |---|---|---|
-| **AWS Application Discovery Service** | 온프레미스 서버의 사양·사용률·**프로세스와 네트워크 연결(의존성)**을 수집. VMware용 에이전트리스 수집기, OS 에이전트 | "이전 계획을 위해 서버 사용률·의존성 파악" |
+| **AWS Application Discovery Service** | 온프레미스 서버의 사양·사용률·**프로세스와 네트워크 연결**(의존성)을 수집. VMware용 에이전트리스 수집기, OS 에이전트 | "이전 계획을 위해 서버 사용률·의존성 파악" |
 | **AWS Migration Hub** | 여러 도구의 이전 진행 상황을 한곳에서 추적 | "이전 진행 상황 중앙 추적" |
 | **AWS Application Migration Service (MGN)** | 서버 디스크를 블록 단위로 **연속 복제** → 테스트 → 짧은 다운타임으로 전환(cutover). 옛 SMS·CloudEndure Migration의 후속 | "최소 다운타임 lift-and-shift", "서버를 그대로" |
 | **AWS DMS** | DB → DB **데이터** 이전. 전체 로드(full load) + **CDC(변경 데이터 캡처)로 지속 복제** → 원본은 이전 중에도 계속 쓰기 가능. 동종(MySQL→MySQL)·이종(Oracle→PostgreSQL) 모두 | "다운타임 최소 DB 이전", "지속 복제" |
@@ -56,7 +56,7 @@ flowchart LR
 ```
 
 - **복제 인스턴스**: 실제로 데이터를 읽고 쓰는 일꾼. VPC 안에 놓이며 소스·타깃 모두에 네트워크로 닿아야 한다(온프레미스면 VPN/DX). 운영 이전에는 Multi-AZ로 둔다. **DMS Serverless**를 쓰면 용량을 자동으로 정한다.
-- **엔드포인트**: 소스·타깃 DB의 접속 정보(엔진, 호스트, 포트, 사용자, 비밀번호 — 실무에서는 Secrets Manager 참조). 만든 뒤 **연결 테스트(TestConnection)**를 통과시켜야 한다.
+- **엔드포인트**: 소스·타깃 DB의 접속 정보(엔진, 호스트, 포트, 사용자, 비밀번호 — 실무에서는 Secrets Manager 참조). 만든 뒤 **연결 테스트**(TestConnection)를 통과시켜야 한다.
 - **복제 작업**: 이전 유형과 테이블 매핑. `full-load-and-cdc`는 기존 데이터를 한 번 다 옮기고, 그동안과 그 뒤의 변경을 계속 적용한다. 원본 DB가 계속 주문을 받는 동안 따라잡고, 차이가 거의 0이 되면 앱의 연결 대상을 바꾼다(cutover). CDC를 위해 소스 MySQL은 바이너리 로그(binlog, ROW 형식)가 켜져 있어야 한다.
 
 ## 직접 해 보기 — [labs/lab04-dms-config.sh](./labs/lab04-dms-config.sh)
