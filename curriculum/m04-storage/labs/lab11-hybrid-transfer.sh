@@ -124,7 +124,8 @@ aws datasync describe-task-execution --task-execution-arn "$EXEC" \
 dst_count="$(aws s3api list-objects-v2 --bucket "$DST" --output json | jq '(.Contents // []) | length')"
 echo "대상 버킷 객체 수: $dst_count   ← 에뮬레이터는 작업 상태만 SUCCESS 로 바꾸고 실제로 복사하지 않는다"
 echo "-- 온프레미스 NFS 위치(에이전트 필요) → 501"
-expect_error NotImplemented aws datasync create-location-nfs --server-hostname 10.0.0.5 --subdirectory /export \
+# 서버 이름은 예약 이름(.invalid): 사설 IP(예: 10.0.0.5)는 학습자 LAN에 실제로 있을 수 있어, 에뮬레이터가 이 API를 구현하면 접속을 시도할 수 있다
+expect_error NotImplemented aws datasync create-location-nfs --server-hostname nfs.todayorder.invalid --subdirectory /export \
   --on-prem-config AgentArns=arn:aws:datasync:us-east-1:000000000000:agent/agent-0123456789abcdef0
 
 echo "== 4. Transfer Family — S3 에 저장하는 관리형 SFTP 서버 (협력사가 정산 파일을 SFTP 로 올린다)"
