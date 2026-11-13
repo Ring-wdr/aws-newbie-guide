@@ -181,7 +181,8 @@ for a in json.load(sys.stdin).get("Items", []):
 call() {
   local m="$1" u="$2"
   shift 2
-  case "$u" in https://127.0.0.1:* | http://127.0.0.1:*) ;; *) echo "call: 루프백(127.0.0.1)이 아닌 주소는 호출하지 않는다: $u" >&2; return 1 ;; esac
+  # 호스트가 정확히 127.0.0.1:<포트> 인 URL 만 (userinfo 표기 127.0.0.1:<포트>@<다른 호스트>, 127.0.0.1.<도메인> 같은 이름은 거부)
+  [[ "$u" =~ ^https?://127\.0\.0\.1:[0-9]+(/|$) ]] || { echo "call: 루프백(127.0.0.1:<포트>)이 아닌 주소는 호출하지 않는다: $u" >&2; return 1; }
   curl -s --cacert "$AWS_CA_BUNDLE" -X "$m" -w '\n[HTTP %{http_code}]\n' "$@" "$u"
 }
 

@@ -165,6 +165,7 @@ LAB02 OK
 bash curriculum/m14-capstone-exam/labs/lab03-order-pipeline.sh
 ```
 
+<!-- external-host-ok: lab이 비교용으로 출력한 실제 AWS 주소 형식. 실습은 127.0.0.1 주소만 호출한다 -->
 ```text
 == 0. 선행 계층
 (선행 계층 있음: lab02-data-security.sh)
