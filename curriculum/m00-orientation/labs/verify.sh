@@ -100,6 +100,27 @@ drenv_bad_port_clears() {
   grep -q '^rc=1$' <<<"$out" && grep -q '^left=$' <<<"$out"
 }
 
+# DR_EMULATOR_PORT 를 지정했는데 그 포트에 에뮬레이터 컨테이너가 없으면, 아무것도 리셋하기 전에 원인·해결 방법을 내고 멈춘다.
+# (포트 1024 에는 이 저장소의 에뮬레이터 컨테이너가 있을 수 없다 — emulator-up.sh 는 포트를 이름에 쓰므로 aws-emulator-1024 가 없다)
+verify_refuses_missing_dr() {
+  local out
+  if docker container inspect aws-emulator-1024 >/dev/null 2>&1; then echo "aws-emulator-1024 가 있어 시험할 수 없음"; return 1; fi
+  out="$(DR_EMULATOR_PORT=1024 bash "$MOD_DIR/labs/verify.sh" </dev/null 2>&1)" && { echo "통과해 버림"; return 1; }
+  echo "$out"
+  grep -q "DR_EMULATOR_PORT=1024 에 에뮬레이터가 떠 있지 않아" <<<"$out" && grep -q "scripts/emulator-up.sh 1024" <<<"$out" \
+    && ! grep -q "종료했습니다\|시작합니다" <<<"$out"
+}
+
+# emulator-up.sh 의 EMULATOR_DNS 검증: 잘못된 값은 docker 를 건드리기 전에 거부한다 (포트 1024 — 컨테이너를 띄우지 않음)
+emulator_dns_validation() {
+  local v out
+  for v in 999.999.999.999 127.0.0.01 127.0.0.1. 1.2.3 256.0.0.1 'host ' localhost; do
+    out="$(EMULATOR_DNS="$v" "$ROOT/scripts/emulator-up.sh" 1024 2>&1)" && { echo "허용해 버림: '$v'"; return 1; }
+    grep -q "EMULATOR_DNS 는 IPv4 주소이거나 host 여야 합니다" <<<"$out" || { echo "다른 이유로 실패: '$v' → $out"; return 1; }
+  done
+  echo "잘못된 값 7개 모두 거부"
+}
+
 # 두 번째 사이트(dr-env.sh + emulator_site("DR_")) 실시간 시험은 DR_EMULATOR_PORT 에 에뮬레이터가 떠 있을 때만.
 # 하위 셸에서 실행해, dr-env.sh 가 실패해도(bash 3.2 의 set -e 처리 포함) verify.sh 전체가 아니라 이 항목만 FAIL 이 되게 한다.
 guard_selftest() (
@@ -124,6 +145,8 @@ run "env.sh: 서명 거부 + 시계 2분 차이(허용 범위 안) → 서명 �
 run "env.sh: 응답 없음(서명 오류 아님) + 시계 20분 차이 → 시계 탓 안 함" envsh_nosig_skew20
 run "dr-env.sh: 비대화형 + DR_EMULATOR_PORT 없음 → 거부, 이전 DR_AWS_* 지움" drenv_refuses_without_port
 run "dr-env.sh: 잘못된 포트 → 거부, 이전 DR_AWS_* 지움" drenv_bad_port_clears
+[ -n "${DR_EMULATOR_PORT:-}" ] || run "verify.sh: DR_EMULATOR_PORT 에 에뮬레이터 없음 → 리셋 전에 원인·해결 방법 안내" verify_refuses_missing_dr
+run "emulator-up.sh: 잘못된 EMULATOR_DNS(999.999.999.999·127.0.0.01 등) → docker 호출 전 거부" emulator_dns_validation
 for py in "$MOD_DIR"/sdk/*.py; do
   run "안전 장치: env.sh 없이 sdk/$(basename "$py") 실행 → 네트워크 호출 전 거부" guard_refuses "$py"
 done
