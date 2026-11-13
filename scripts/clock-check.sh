@@ -8,16 +8,19 @@
 # 차이 나면 거부되므로(에뮬레이터도 같다), 노트북이 잠들었다 깬 뒤 VM 시계가 뒤처지면
 # 모든 요청이 SignatureDoesNotMatch / RequestTimeTooSkewed 로 실패한다.
 #
-# 종료 코드: 3 = 14분(840초) 이상 어긋남 — SigV4 허용 범위(15분)에 닿아 서명이 거부될 수 있는 수준(해결 방법 출력)
-#           0 = 그보다 작음(60초를 넘으면 측정값만 참고로 출력) 또는 측정 불가
+# 종료 코드: 0 = 정상 — 차이가 14분보다 작음(아무것도 출력하지 않음. 60초를 넘으면 측정값만 참고로 출력)
+#           3 = 14분(840초) 이상 어긋남 — SigV4 허용 범위(15분)에 닿아 서명이 거부될 수 있는 수준(해결 방법 출력)
+#           2 = 측정하지 못함 (에뮬레이터가 꺼져 있음·포트 오류 등 — 이유를 한 줄 출력)
+#           호출하는 쪽(env.sh·dr-env.sh)은 3 만 "시계 어긋남"으로 본다.
 # env.sh / dr-env.sh 는 에뮬레이터가 **서명을 거부했을 때만**(SignatureDoesNotMatch 등) 원인 진단용으로 부른다.
 # (EMULATOR_CLOCK_FAKE_NOW: 테스트용으로 "현재 시각(epoch 초)"을 바꿔 끼운다)
 set -uo pipefail
 
 PORT="${1:-${EMULATOR_PORT:-9297}}"
-case "$PORT" in '' | *[!0-9]*) echo "포트가 숫자가 아닙니다: $PORT" >&2; exit 0 ;; esac
+cannot() { printf '[clock-check] 측정하지 못했습니다: %s\n' "$1" >&2; exit 2; }
+case "$PORT" in '' | *[!0-9]*) cannot "포트가 숫자가 아닙니다: '$PORT'" ;; esac
 CA="$HOME/.aws/emulator/$PORT/ca.pem"
-[ -f "$CA" ] || exit 0
+[ -f "$CA" ] || cannot "포트 $PORT 의 에뮬레이터가 떠 있지 않습니다 ($CA 없음). 먼저 scripts/emulator-up.sh $PORT"
 
 # 1순위: 컨테이너의 커널 시계 (컨테이너는 VM 커널 시계를 그대로 쓴다)
 server_epoch=""
@@ -29,10 +32,11 @@ if [ -z "$server_epoch" ]; then
   # 2순위: HTTP Date 헤더
   server_date="$(curl -sI --max-time 3 --cacert "$CA" "https://127.0.0.1:$PORT/__admin/health" 2>/dev/null \
     | tr -d '\r' | sed -n 's/^[Dd]ate: //p' | head -1)"
-  [ -n "$server_date" ] || exit 0
+  [ -n "$server_date" ] || cannot "포트 $PORT 의 에뮬레이터가 응답하지 않습니다 (scripts/emulator-status.sh 로 확인)"
   # GNU date(Linux) → BSD date(macOS) 순서로 HTTP 날짜를 epoch 초로 바꾼다.
   server_epoch="$(LC_ALL=C date -u -d "$server_date" +%s 2>/dev/null \
-    || LC_ALL=C date -u -j -f '%a, %d %b %Y %H:%M:%S GMT' "$server_date" +%s 2>/dev/null)" || exit 0
+    || LC_ALL=C date -u -j -f '%a, %d %b %Y %H:%M:%S GMT' "$server_date" +%s 2>/dev/null)" \
+    || cannot "에뮬레이터 시각을 해석하지 못했습니다: '$server_date'"
 fi
 now="${EMULATOR_CLOCK_FAKE_NOW:-$(date -u +%s)}"
 skew=$((now - server_epoch))
