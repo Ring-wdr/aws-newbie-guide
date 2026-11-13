@@ -45,6 +45,13 @@ fi
 echo "사용자 풀 $POOL · 앱 클라이언트 $CLIENT"
 
 echo "== 3. 실행 역할 2개 — 각자 필요한 것만 (최소 권한)"
+# 테이블·영수증·비밀은 모두 고객 관리형 키로 암호화돼 있고, 키 정책은 계정(IAM)에 위임만 한다. 그래서 각 역할의
+# IAM 정책에 키 사용 권한이 있어야 한다. DynamoDB·S3·Secrets Manager 는 "호출자 대신" KMS 를 부르므로
+# kms:ViaService 로 "그 서비스를 거친 호출만" 허용한다(역할이 키를 직접 쓰는 것은 막힌다).
+#   order-api:    DynamoDB 테이블 키 풀기 → kms:Decrypt (+ DescribeKey)
+#   order-worker: DynamoDB(Decrypt) · S3 SSE-KMS 쓰기(GenerateDataKey, 버킷 키·멀티파트용 Decrypt) · 비밀 읽기(Decrypt)
+#   SQS·SNS 는 SSE-SQS(관리형)라 KMS 권한이 필요 없다(messaging.yaml 머리말).
+VIA_DDB="dynamodb.$REGION.amazonaws.com"
 TRUST='{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"lambda.amazonaws.com"},"Action":"sts:AssumeRole"}]}'
 for r in "$API_ROLE" "$WORKER_ROLE"; do
   aws iam get-role --role-name "$r" >/dev/null 2>&1 || aws iam create-role --role-name "$r" --assume-role-policy-document "$TRUST" >/dev/null
@@ -53,16 +60,27 @@ done
 aws iam put-role-policy --role-name "$API_ROLE" --policy-name order-api --policy-document "{\"Version\":\"2012-10-17\",\"Statement\":[
   {\"Sid\":\"Orders\",\"Effect\":\"Allow\",\"Action\":[\"dynamodb:PutItem\",\"dynamodb:GetItem\",\"dynamodb:Query\"],
    \"Resource\":[\"$TABLE_ARN\",\"$TABLE_ARN/index/byCustomer\"]},
+  {\"Sid\":\"OrdersTableKey\",\"Effect\":\"Allow\",\"Action\":[\"kms:Decrypt\",\"kms:DescribeKey\"],\"Resource\":\"$KEY_ARN\",
+   \"Condition\":{\"StringEquals\":{\"kms:ViaService\":\"$VIA_DDB\"}}},
   {\"Sid\":\"Events\",\"Effect\":\"Allow\",\"Action\":\"events:PutEvents\",\"Resource\":\"$BUS_ARN\"}]}"
 aws iam put-role-policy --role-name "$WORKER_ROLE" --policy-name order-worker --policy-document "{\"Version\":\"2012-10-17\",\"Statement\":[
   {\"Sid\":\"Queue\",\"Effect\":\"Allow\",\"Action\":[\"sqs:ReceiveMessage\",\"sqs:DeleteMessage\",\"sqs:GetQueueAttributes\"],\"Resource\":\"$WORK_Q_ARN\"},
   {\"Sid\":\"Orders\",\"Effect\":\"Allow\",\"Action\":\"dynamodb:UpdateItem\",\"Resource\":\"$TABLE_ARN\"},
   {\"Sid\":\"Receipts\",\"Effect\":\"Allow\",\"Action\":\"s3:PutObject\",\"Resource\":\"arn:aws:s3:::$RECEIPTS/receipts/*\"},
   {\"Sid\":\"Secret\",\"Effect\":\"Allow\",\"Action\":\"secretsmanager:GetSecretValue\",\"Resource\":\"$SECRET_ARN\"},
-  {\"Sid\":\"Kms\",\"Effect\":\"Allow\",\"Action\":[\"kms:Decrypt\",\"kms:GenerateDataKey\"],\"Resource\":\"$KEY_ARN\"},
+  {\"Sid\":\"Kms\",\"Effect\":\"Allow\",\"Action\":[\"kms:Decrypt\",\"kms:GenerateDataKey\",\"kms:DescribeKey\"],\"Resource\":\"$KEY_ARN\",
+   \"Condition\":{\"StringEquals\":{\"kms:ViaService\":[\"$VIA_DDB\",\"s3.$REGION.amazonaws.com\",\"secretsmanager.$REGION.amazonaws.com\"]}}},
   {\"Sid\":\"Metric\",\"Effect\":\"Allow\",\"Action\":\"cloudwatch:PutMetricData\",\"Resource\":\"*\",
    \"Condition\":{\"StringEquals\":{\"cloudwatch:namespace\":\"$METRIC_NS\"}}}]}"
 aws iam list-role-policies --role-name "$WORKER_ROLE" --query PolicyNames --output text
+for r in "$API_ROLE" "$WORKER_ROLE"; do
+  printf '%s\t' "$r"
+  aws iam get-role-policy --role-name "$r" --policy-name "$(n="${r#"$P-"}"; echo "${n%-role}")" --query PolicyDocument --output json | py '
+for st in json.load(sys.stdin)["Statement"]:
+    if any(a.startswith("kms:") for a in ([st["Action"]] if isinstance(st["Action"], str) else st["Action"])):
+        v = st["Condition"]["StringEquals"]["kms:ViaService"]
+        print(st["Sid"], " ".join(sorted(st["Action"])), "via", " ".join(v if isinstance(v, list) else [v]))'
+done
 
 echo "== 4. Lambda 2개 (설정은 배포 시 Parameter Store 에서 읽어 환경 변수로)"
 MAX_ITEMS="$(aws ssm get-parameter --name "$PARAM_PREFIX/order/max-items" --query Parameter.Value --output text)"
@@ -94,7 +112,7 @@ UUID="$(aws lambda create-event-source-mapping --function-name "$WORKER_FN" --ev
 poll 60 "매핑 Enabled" sh -c "aws lambda get-event-source-mapping --uuid '$UUID' --query State --output text | grep -qx Enabled"
 aws lambda get-event-source-mapping --uuid "$UUID" --query '{State: State, BatchSize: BatchSize, Report: FunctionResponseTypes}' --output json
 
-echo "== 6. HTTP API + JWT 권한 부여자(사용자 풀) + 스로틀링 + 라우트 3개"
+echo "== 6. HTTP API + JWT 권한 부여자(사용자 풀) + 스테이지 스로틀(이 lab 이 지정: 초당 500, 버스트 1000) + 라우트 3개"
 for id in $(aws apigatewayv2 get-apis --output json | py '
 for a in json.load(sys.stdin).get("Items", []):
     if a["Name"] == sys.argv[1]:
@@ -127,8 +145,10 @@ for rk in 'POST /orders' 'GET /orders/{orderId}' 'GET /me/orders'; do
   aws apigatewayv2 create-route --api-id "$API" --route-key "$rk" --target "integrations/$INTEG" \
     --authorization-type JWT --authorizer-id "$AUTHZ" --query '[RouteKey, AuthorizationType]' --output text
 done
+# 스로틀 값 = NFR-P1 피크(초당 300건) × 여유 약 1.7 → 초당 500, 버스트 1000. 지정하지 않으면 계정 한도
+# (리전당 초당 10,000·버스트 5,000)만 적용되어 한 API 가 계정 몫을 다 쓸 수 있다(레슨 02 결정 기록).
 aws apigatewayv2 create-stage --api-id "$API" --stage-name '$default' --auto-deploy \
-  --default-route-settings ThrottlingBurstLimit=200,ThrottlingRateLimit=100 \
+  --default-route-settings ThrottlingBurstLimit=1000,ThrottlingRateLimit=500 \
   --query 'DefaultRouteSettings.[ThrottlingBurstLimit, ThrottlingRateLimit]' --output text
 # 실제 AWS 에서는 이 리소스 정책이 없으면 API Gateway 가 함수를 부르지 못한다(에뮬레이터 HTTP API 는 검사하지 않음 — M07)
 aws lambda add-permission --function-name "$API_FN" --statement-id http-api-invoke --action lambda:InvokeFunction \
@@ -143,6 +163,12 @@ call GET "$B/me/orders" -H "Authorization: Bearer $TOKEN" | tee "$WORK/auth"
 # ---- 단언
 grep -q 'HTTP 401' "$WORK/noauth" || fail "토큰 없는 요청이 401 이 아님"
 grep -q 'HTTP 200' "$WORK/auth" || fail "토큰 있는 요청이 200 이 아님"
+assert_eq "$(aws apigatewayv2 get-stage --api-id "$API" --stage-name '$default' --query 'DefaultRouteSettings.ThrottlingRateLimit' --output text)" 500.0 "스테이지 스로틀 ≥ NFR-P1 300건/초"
+for r in "$API_ROLE" "$WORKER_ROLE"; do
+  aws iam get-role-policy --role-name "$r" --policy-name "$(n="${r#"$P-"}"; echo "${n%-role}")" --query PolicyDocument --output json | py '
+ok = any("kms:Decrypt" in st["Action"] and st["Resource"] == sys.argv[1] for st in json.load(sys.stdin)["Statement"])
+sys.exit(0 if ok else 1)' "$KEY_ARN" || fail "$r 에 데이터 키 kms:Decrypt 권한 없음"
+done
 assert_eq "$(aws lambda get-event-source-mapping --uuid "$UUID" --query 'FunctionResponseTypes[0]' --output text)" ReportBatchItemFailures "부분 배치 실패 보고"
 assert_eq "$(aws sqs get-queue-attributes --queue-url "$(queue_url "$WORK_QUEUE")" --attribute-names RedrivePolicy --query Attributes.RedrivePolicy --output text | py 'print(json.load(sys.stdin)["maxReceiveCount"])')" 2 "DLQ maxReceiveCount"
 assert_eq "$(aws events list-targets-by-rule --rule "$P-order-placed" --event-bus-name "$BUS" --query 'Targets[0].Arn' --output text)" "$(stack_output "$MSG_STACK" OrderEventsTopicArn)" "규칙 대상 = 주문 이벤트 토픽"

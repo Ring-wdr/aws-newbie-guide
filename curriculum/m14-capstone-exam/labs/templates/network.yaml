@@ -33,7 +33,7 @@ Resources:
     Properties:
       VpcId: !Ref Vpc
       CidrBlock: 10.0.0.0/24
-      AvailabilityZone: us-east-1a
+      AvailabilityZone: !Select [0, !GetAZs ""]
       MapPublicIpOnLaunch: true
       Tags: [{Key: Name, Value: !Sub "${Prefix}-public-a"}, {Key: Tier, Value: public}]
   PublicB:
@@ -41,7 +41,7 @@ Resources:
     Properties:
       VpcId: !Ref Vpc
       CidrBlock: 10.0.1.0/24
-      AvailabilityZone: us-east-1b
+      AvailabilityZone: !Select [1, !GetAZs ""]
       MapPublicIpOnLaunch: true
       Tags: [{Key: Name, Value: !Sub "${Prefix}-public-b"}, {Key: Tier, Value: public}]
   AppA:
@@ -49,28 +49,28 @@ Resources:
     Properties:
       VpcId: !Ref Vpc
       CidrBlock: 10.0.10.0/24
-      AvailabilityZone: us-east-1a
+      AvailabilityZone: !Select [0, !GetAZs ""]
       Tags: [{Key: Name, Value: !Sub "${Prefix}-app-a"}, {Key: Tier, Value: app}]
   AppB:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref Vpc
       CidrBlock: 10.0.11.0/24
-      AvailabilityZone: us-east-1b
+      AvailabilityZone: !Select [1, !GetAZs ""]
       Tags: [{Key: Name, Value: !Sub "${Prefix}-app-b"}, {Key: Tier, Value: app}]
   DbA:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref Vpc
       CidrBlock: 10.0.20.0/24
-      AvailabilityZone: us-east-1a
+      AvailabilityZone: !Select [0, !GetAZs ""]
       Tags: [{Key: Name, Value: !Sub "${Prefix}-db-a"}, {Key: Tier, Value: db}]
   DbB:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref Vpc
       CidrBlock: 10.0.21.0/24
-      AvailabilityZone: us-east-1b
+      AvailabilityZone: !Select [1, !GetAZs ""]
       Tags: [{Key: Name, Value: !Sub "${Prefix}-db-b"}, {Key: Tier, Value: db}]
 
   NatEipA:
@@ -150,14 +150,14 @@ Resources:
     Type: AWS::EC2::VPCEndpoint
     Properties:
       VpcId: !Ref Vpc
-      ServiceName: com.amazonaws.us-east-1.s3
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.s3"
       VpcEndpointType: Gateway
       RouteTableIds: [!Ref AppRtA, !Ref AppRtB]
   DynamoDbEndpoint:
     Type: AWS::EC2::VPCEndpoint
     Properties:
       VpcId: !Ref Vpc
-      ServiceName: com.amazonaws.us-east-1.dynamodb
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.dynamodb"
       VpcEndpointType: Gateway
       RouteTableIds: [!Ref AppRtA, !Ref AppRtB]
 

@@ -157,9 +157,9 @@ sequenceDiagram
 | 4 | **조건부 쓰기**로 멱등 접수, 워커도 **조건부 상태 전이**(영수증을 먼저 쓰고 상태를 바꿔, 중간 실패 후 재시도에도 영수증이 빠지지 않게) | 클라이언트 재시도·SQS 최소 한 번 전달에도 결과는 한 번(FR-1, FR-3) | 별도 멱등 키 테이블: 같은 효과에 테이블 하나 더 | M05-04, M06-02 |
 | 5 | 이벤트는 **EventBridge 버스 → 규칙 → SNS → SQS** | 생산자는 토폴로지를 모르고 이벤트만 발행(새 소비자는 규칙·구독 추가). SNS는 소비자별 큐로 팬아웃하고 **본문 기반 필터 정책**(FR-4) | Lambda에서 SNS 직접 게시: 실제 AWS에선 가능하고 더 단순하지만, 에뮬레이터의 Lambda 런타임은 SNS에 닿지 못한다(README 제약). EventBridge → SQS 두 대상: 가능, 대신 큐별 필터를 규칙으로 나눠야 함 | M06-03·04 |
 | 6 | 처리는 **SQS + 이벤트 소스 매핑 + 부분 배치 실패 + DLQ(maxReceiveCount 2)** | 처리가 늦어도 접수는 계속(FR-3), 독이 든 메시지가 나머지를 막지 않음, 재처리 가능(FR-6) | 큐 없이 비동기 Lambda: 실패 대상은 있지만 버퍼·재처리 통제가 약함 | M06-02, M07-02 |
-| 7 | 가시성 타임아웃 30초 = 함수 타임아웃 5초 × 6 | AWS 권장(ESM). 짧으면 중복 처리(모의고사 49번) | 기본 30초를 함수 60초와 함께 쓰는 실수 | M07-02 |
+| 7 | 가시성 타임아웃 30초 = 함수 타임아웃 5초 × 6 | AWS 권장(ESM). 짧으면 처리 중인 메시지가 다시 보여 중복 처리된다([M07 lab02](../m07-serverless-containers/labs/lab02-lambda-sqs-esm.sh)는 짧으면 매핑 생성 자체를 거부함을 보여 준다) | 기본 30초를 함수 60초와 함께 쓰는 실수 | M07-02 |
 | 8 | 결제 API 키는 **Secrets Manager(KMS)**, 일반 설정은 **Parameter Store**(배포 시 읽어 환경 변수) | 비밀과 설정을 분리(NFR-S5). 비밀은 교체 가능한 곳에, 설정은 무료 계층에 | 환경 변수에 비밀: 콘솔·`GetFunctionConfiguration`으로 노출. 매 호출 조회: 지연·비용 → 실행 환경당 캐시 | M09-02 |
-| 9 | **고객 관리형 KMS 키 하나**(자동 교체)로 테이블·버킷·비밀 암호화, 버킷은 **S3 버킷 키** | 키 사용 감사·비활성화(NFR-S2), 버킷 키로 KMS 요청 비용·스로틀링 감소 | 데이터별 키 분리: 더 강한 격리지만 이 규모에선 관리 부담. SSE-S3: 감사·비활성화 불가 | M09-01, M04-04 |
+| 9 | **고객 관리형 KMS 키 하나**(자동 교체)로 테이블·버킷·비밀 암호화, 버킷은 **S3 버킷 키** | 키 사용 감사·비활성화(NFR-S2), 버킷 키로 KMS 요청 비용·스로틀링 감소. 키 정책은 계정(IAM)에 위임만 하므로 **두 실행 역할의 IAM 정책에 키 사용 권한**을 넣는다 — DynamoDB·S3·Secrets Manager가 호출자 대신 KMS를 부르기 때문(order-api: `kms:Decrypt`, order-worker: `kms:Decrypt`·`kms:GenerateDataKey`), `kms:ViaService`로 그 서비스를 거친 호출만 허용. 빠뜨리면 실제 AWS에서 테이블 읽기·쓰기가 `AccessDenied`(에뮬레이터는 검사하지 않음) | 데이터별 키 분리: 더 강한 격리지만 이 규모에선 관리 부담. SSE-S3: 감사·비활성화 불가 | M09-01, M04-04 |
 | 10 | 큐는 **SSE-SQS**(관리형) | 저장 암호화 충족, SNS→SQS 전달에 키 정책 작업 불필요 | 큐에 고객 관리형 키: 키 정책에 `sns.amazonaws.com`의 `kms:GenerateDataKey*`·`kms:Decrypt` 허용 필요 — 빠뜨리면 **조용히 전달 실패** | M06-03 |
 | 11 | 영수증 버킷: **퍼블릭 차단·버전 관리·HTTPS 강제·수명 주기(30일 IA → 365일 Deep Archive → 1825일 만료, 이전 버전 30일, 미완료 MPU 7일)** | NFR-S7·C. 영수증은 첫 달 이후 거의 안 봄 | Intelligent-Tiering: 접근 패턴이 분명해 규칙이 더 쌈. 객체 잠금: 이번 요구엔 법적 WORM이 없어 버전 관리로 충분(규제가 생기면 규정 준수 모드) | M04-02·03 |
 | 12 | 관리 웹은 **ALB(2 AZ) + ASG(2 AZ, 최소 2, ELB 헬스 체크) + t4g(Graviton) + IMDSv2 필수** | 기존 Spring 앱 유지(FR-5), AZ 장애 견딤(NFR-A2), 같은 성능 더 싸게 | Elastic Beanstalk: 같은 구조를 대신 만들어 주지만 이 커리큘럼은 구성 요소를 직접 이해하는 것이 목표. 단일 대형 인스턴스: SPOF | M03 |
@@ -173,6 +173,8 @@ sequenceDiagram
 | 20 | **CloudTrail 멀티 리전 + 무결성 검증**(감사 버킷 전용 정책·버전 관리), 영수증 버킷 **데이터 이벤트** | NFR-S6 | 이벤트 기록(90일)만: 1년 요구 불충족 | M09-04 |
 | 21 | **Config 기록기 + 관리형 규칙**(버킷 암호화·버전 관리), `Project` 태그로 범위 | NFR-S6 "설정 위반 자동 판정" | 사람 점검: 놓친다 | M09-04 |
 | 22 | **Budgets 월 200 USD, 예측 80% 알림 → 같은 운영 채널**, 모든 리소스 `Project=todayorder` 태그 | NFR-C1 | Cost Explorer만: 사후 분석이지 알림이 아님 | M13-05 |
+| 23 | HTTP API **스테이지 스로틀 초당 500, 버스트 1,000** (lab03이 지정) | 스로틀 값 = NFR-P1 피크 300건/초 × 여유 약 1.7. 피크를 받으면서, 한 API의 폭주가 계정 한도(리전당 초당 10,000·버스트 5,000)를 다 쓰지 못하게 상한을 둔다 | 지정하지 않음: HTTP API에는 별도 "기본 스테이지 스로틀"이 없어 계정 한도만 걸린다. 피크보다 낮게(예: 100): 행사 때 429 | M07-03 |
+| 24 | 감사 버킷 **수명 주기: 90일 뒤 Glacier Flexible Retrieval, 400일(13개월) 뒤 만료**(이전 버전도 400일) | NFR-S6 "1년 이상 보관". 감사 로그는 사고 조사 때만 읽으므로 90일 뒤 아카이브 | 무기한 보관: 요구는 충족하지만 비용이 계속 는다. 객체 잠금(규정 준수 모드): 덮어쓰기·삭제 금지까지 규제가 요구하면 버킷 생성 시 켠다 — 지금은 CloudTrail 무결성 검증(다이제스트)으로 변조 탐지가 충분 | M04-02·03, M09-04 |
 
 **관리 웹 ASG의 조정 정책** (에뮬레이터 `PutScalingPolicy` 501 — 실제 AWS에서 lab01 뒤에 붙일 것):
 
@@ -195,12 +197,12 @@ sequenceDiagram
 
 | 영역 | 짓고 단언함 (lab) | 다이어그램·문서로만 | 이유 |
 |---|---|---|---|
-| 주문 경로 | 로그인 → API → DynamoDB → 이벤트 → 팬아웃 → 워커 → 영수증, 409·400·401·404, 필터 정책, DLQ, 알람 → 운영 큐 | — | 에뮬레이터가 Lambda를 실제 실행하고 서비스 간 전달도 실제로 일어난다 |
+| 주문 경로 | 로그인 → API → DynamoDB → 이벤트 → 팬아웃 → 워커 → 영수증(고객 관리형 키 일치), 409·400·401, 다른 고객의 조회 404와 목록 분리(FR-2), 필터 정책, DLQ, 이번 장애 주문이 일으킨 알람 → 운영 큐 | — | 에뮬레이터가 Lambda를 실제 실행하고 서비스 간 전달도 실제로 일어난다 |
 | 관리 웹 | 네트워크·SG 체인·ALB·리스너·인증서·시작 템플릿·ASG(2 AZ)·대상 healthy·RDS Multi-AZ | 실제 HTTPS 요청, 조정 정책, 자가 치유, DB 장애 조치·SQL | 인스턴스가 부팅하지 않고 ALB·RDS 주소는 컨테이너 안([M03](../m03-compute-scaling/README.md)·[M05](../m05-databases/README.md)) |
 | 엣지 | — | CloudFront + WAF를 HTTP API 앞에(HTTP API는 WAF 직접 연결 불가), Route 53 `api.`·`partner.` Alias, Shield Standard | 에뮬레이터의 CloudFront·WAF는 컨테이너 안에서만 관찰 가능([M08](../m08-dns-edge/README.md)) — 캡스톤 스모크 테스트를 호스트에서 돌리기 위해 제외 |
 | 데이터 보호 | PITR·버전 관리·수명 주기 구성 | AWS Backup 계획(일일, 다른 리전 볼트 복사), 수명 주기 전환 실제 발생 | Backup 복원 데이터가 비어 오고([M12](../m12-resilience-dr-migration/README.md)) 전환은 일어나지 않는다([M04](../m04-storage/README.md)) |
 | 리전 DR (NFR-A4) | — | 아래 그림 | 두 번째 에뮬레이터로 흉내는 M12에서 했다. 캡스톤은 단일 리전 |
-| 거버넌스 | CloudTrail·S3 Config 규칙·Budgets | DynamoDB PITR·RDS Multi-AZ Config 규칙(→ `sdk/capstone_audit.py`가 직접 점검), GuardDuty·Security Hub, Organizations SCP | 에뮬레이터의 Config가 S3 버킷만 기록하고, SCP는 501 |
+| 거버넌스 | CloudTrail·S3 Config 규칙·Budgets | DynamoDB PITR·RDS Multi-AZ Config 규칙(→ `sdk/capstone_audit.py`가 직접 점검), GuardDuty·Security Hub CSPM, Organizations SCP | 에뮬레이터의 Config가 S3 버킷만 기록하고, SCP는 501 |
 
 ```mermaid
 flowchart LR
@@ -251,7 +253,7 @@ NFR-A4(RTO 4시간, RPO 1시간)는 **백업·복원**으로 충분하다: AWS B
 
 <details><summary>답</summary>
 
-1. 1번(Lambda 콜드 스타트 → 프로비저닝된 동시성, 또는 계정 동시성 한도 증설), 3번(행사 트래픽 패턴이 정해지면 프로비저닝 용량 + Auto Scaling, 핫 파티션 주의 — `orderId`는 분산이 좋아 괜찮다), 결정 1의 API Gateway 스로틀(stage 기본 100/200을 올리고 계정 한도 10,000 rps 확인). 50 ms p95면 결제 처리처럼 무거운 일은 반드시 비동기 쪽(이미 그렇다)에 둔다.
+1. 1번(Lambda 콜드 스타트 → 프로비저닝된 동시성, 또는 계정 동시성 한도 증설), 3번(행사 트래픽 패턴이 정해지면 프로비저닝 용량 + Auto Scaling, 핫 파티션 주의 — `orderId`는 분산이 좋아 괜찮다), 결정 23의 스테이지 스로틀(lab03이 지정한 초당 500·버스트 1,000을 3,000 × 여유로 올린다. 그러면 계정 한도 초당 10,000·버스트 5,000에 가까워지므로 한도 증설 요청도 함께). 50 ms p95면 결제 처리처럼 무거운 일은 반드시 비동기 쪽(이미 그렇다)에 둔다.
 2. 생산자가 토폴로지를 모르는 장점은 SNS만으로도 상당 부분 유지된다(구독만 추가). 잃는 것은 **내용 기반 규칙으로 여러 종류의 대상(Step Functions 등)에 보내기**, **아카이브·재생**, 다른 AWS 서비스·SaaS 이벤트와 같은 버스에서 다루기다. 대신 호출 한 단계와 비용이 줄어든다 — 이 규모라면 SNS 직접 게시도 좋은 답이다.
 3. 백업·복원으로는 불가. 데이터는 **상시 복제**(DynamoDB 전역 테이블 또는 교차 리전 복제, RDS 교차 리전 읽기 복제본/Aurora Global Database, S3 CRR + RTC)로 RPO를 맞추고, 컴퓨트는 최소 웜 스탠바이(작게 상시 실행) + Route 53 장애 조치 또는 Global Accelerator로 RTO 15분을 맞춘다.
 </details>

@@ -29,7 +29,7 @@ aws cloudwatch put-metric-alarm --alarm-name "$P-dlq-not-empty" \
   --treat-missing-data notBreaching --alarm-actions "$OPS_TOPIC_ARN"
 aws cloudwatch describe-alarms --alarm-name-prefix "$P-" --query 'MetricAlarms[].[AlarmName, Namespace, MetricName, StateValue]' --output text
 
-echo "== 2. CloudTrail: 감사 버킷(퍼블릭 차단·버전 관리·CloudTrail 전용 정책) + 멀티 리전 추적 + 무결성 검증"
+echo "== 2. CloudTrail: 감사 버킷(퍼블릭 차단·버전 관리·보존 400일·CloudTrail 전용 정책) + 멀티 리전 추적 + 무결성 검증"
 TRAIL_ARN="arn:aws:cloudtrail:$REGION:$ACCOUNT:trail/$TRAIL"
 aws cloudtrail delete-trail --name "$TRAIL" >/dev/null 2>&1 || true
 aws s3api head-bucket --bucket "$TRAIL_BUCKET" >/dev/null 2>&1 || aws s3api create-bucket --bucket "$TRAIL_BUCKET" >/dev/null
@@ -37,6 +37,12 @@ aws s3api put-public-access-block --bucket "$TRAIL_BUCKET" --public-access-block
   BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true
 aws s3api put-bucket-versioning --bucket "$TRAIL_BUCKET" --versioning-configuration Status=Enabled
 aws s3api put-bucket-tagging --bucket "$TRAIL_BUCKET" --tagging 'TagSet=[{Key=Project,Value=todayorder},{Key=DataClass,Value=audit}]'
+# 보존 기간(NFR-S6 "1년 이상"): 90일 뒤 Glacier Flexible Retrieval, 400일(13개월) 뒤 만료. 버전 관리가 켜져 있으므로
+# 이전 버전도 400일 뒤 지운다. 규제가 덮어쓰기·삭제 금지까지 요구하면 버킷 생성 시 객체 잠금(규정 준수 모드)을 켠다(레슨 02 결정 24).
+aws s3api put-bucket-lifecycle-configuration --bucket "$TRAIL_BUCKET" --lifecycle-configuration '{"Rules": [{
+  "ID": "audit-retention", "Status": "Enabled", "Filter": {"Prefix": ""},
+  "Transitions": [{"Days": 90, "StorageClass": "GLACIER"}], "Expiration": {"Days": 400},
+  "NoncurrentVersionExpiration": {"NoncurrentDays": 400}}]}' >/dev/null
 cat >"$WORK/trail-policy.json" <<EOF
 {"Version": "2012-10-17", "Statement": [
   {"Sid": "AWSCloudTrailAclCheck", "Effect": "Allow", "Principal": {"Service": "cloudtrail.amazonaws.com"},
@@ -62,6 +68,12 @@ aws configservice delete-delivery-channel --delivery-channel-name default >/dev/
 aws iam get-role --role-name "$CONFIG_ROLE" >/dev/null 2>&1 || aws iam create-role --role-name "$CONFIG_ROLE" --assume-role-policy-document \
   '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"config.amazonaws.com"},"Action":"sts:AssumeRole"}]}' >/dev/null
 aws iam attach-role-policy --role-name "$CONFIG_ROLE" --policy-arn arn:aws:iam::aws:policy/service-role/AWS_ConfigRole
+# 사용자 지정 역할이면 전달 버킷 쓰기 권한도 역할에 있어야 한다(AWS_ConfigRole 은 리소스 읽기 권한뿐).
+# 서비스 연결 역할(AWSServiceRoleForConfig)을 쓰면 이 정책 대신 아래 버킷 정책이 쓰인다.
+aws iam put-role-policy --role-name "$CONFIG_ROLE" --policy-name config-delivery --policy-document "{\"Version\":\"2012-10-17\",\"Statement\":[
+  {\"Sid\":\"Deliver\",\"Effect\":\"Allow\",\"Action\":\"s3:PutObject\",\"Resource\":\"arn:aws:s3:::$CONFIG_BUCKET/AWSLogs/$ACCOUNT/*\",
+   \"Condition\":{\"StringLike\":{\"s3:x-amz-acl\":\"bucket-owner-full-control\"}}},
+  {\"Sid\":\"CheckAcl\",\"Effect\":\"Allow\",\"Action\":\"s3:GetBucketAcl\",\"Resource\":\"arn:aws:s3:::$CONFIG_BUCKET\"}]}"
 aws configservice put-configuration-recorder --configuration-recorder "name=default,roleARN=arn:aws:iam::$ACCOUNT:role/$CONFIG_ROLE" \
   --recording-group allSupported=true,includeGlobalResourceTypes=true
 aws s3api head-bucket --bucket "$CONFIG_BUCKET" >/dev/null 2>&1 || aws s3api create-bucket --bucket "$CONFIG_BUCKET" >/dev/null
@@ -122,6 +134,8 @@ aws budgets describe-budget --account-id "$ACCOUNT" --budget-name "$BUDGET" \
 assert_eq "$(aws cloudwatch describe-alarms --alarm-names "$ALARM" --query 'MetricAlarms[0].AlarmActions[0]' --output text)" "$OPS_TOPIC_ARN" "알람 동작"
 assert_eq "$(aws cloudtrail get-trail-status --name "$TRAIL" --query IsLogging --output text)" True "CloudTrail 로깅"
 assert_eq "$(aws cloudtrail describe-trails --trail-name-list "$TRAIL" --query 'trailList[0].LogFileValidationEnabled' --output text)" True "로그 무결성 검증"
+assert_eq "$(aws s3api get-bucket-lifecycle-configuration --bucket "$TRAIL_BUCKET" --query 'Rules[0].Expiration.Days' --output text)" 400 "감사 로그 보존 400일(≥ 1년)"
+assert_eq "$(aws iam list-role-policies --role-name "$CONFIG_ROLE" --query 'PolicyNames[0]' --output text)" config-delivery "Config 역할 전달 권한"
 assert_eq "$(aws configservice describe-configuration-recorder-status --query 'ConfigurationRecordersStatus[0].recording' --output text)" True "Config 기록 중"
 assert_eq "$(result_of "$P-s3-sse" "$RECEIPTS")" COMPLIANT "영수증 버킷 암호화 규칙"
 assert_eq "$(result_of "$P-s3-versioning" "$RECEIPTS")" COMPLIANT "영수증 버킷 버전 관리 규칙"

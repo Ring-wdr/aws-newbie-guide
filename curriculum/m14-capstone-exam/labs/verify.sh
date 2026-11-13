@@ -67,15 +67,24 @@ grader_blank_sheet() {  # 빈 답안지 → 0점, 미달
   uv run --quiet python "$GRADE" "$MOD_DIR/mock-exam/answer-sheet.txt" | tee "$LOG_DIR/g3"
   grep -q '전체 0/65' "$LOG_DIR/g3" && grep -q '판정: 미달' "$LOG_DIR/g3"
 }
+grader_warns() {  # 같은 번호 두 번 · 66번 · 글자 없는 답 → 경고 3개(표준 오류), 빈 답안지 → 경고 0개
+  printf '1 C\n1 B\n66 A\n2 Z\n' >"$LOG_DIR/odd.txt"
+  uv run --quiet python "$GRADE" "$LOG_DIR/odd.txt" 2>"$LOG_DIR/g4" >/dev/null
+  uv run --quiet python "$GRADE" "$MOD_DIR/mock-exam/answer-sheet.txt" 2>"$LOG_DIR/g5" >/dev/null
+  cat "$LOG_DIR/g4"
+  [ "$(grep -c '^경고:' "$LOG_DIR/g4")" = 3 ] && grep -q '1번이 두 번' "$LOG_DIR/g4" && grep -q '66번은 없는 문항' "$LOG_DIR/g4" \
+    && grep -q '2번 답에 A~F 글자가 없다' "$LOG_DIR/g4" && [ ! -s "$LOG_DIR/g5" ]
+}
 
 cd "$ROOT"
 for py in "$MOD_DIR"/sdk/*.py; do
   run "안전 장치: env.sh 없이 sdk/$(basename "$py") 실행 → 네트워크 호출 전 거부" guard_refuses "$py"
 done
-run "모의고사 형식 점검 (65문항, 도메인 20/17/15/13, 정답표·문제·해설 일치, 단일 응답 정답 글자 30% 이하)" uv run --quiet python "$GRADE" --stats
+run "모의고사 형식 점검 (65문항, 도메인 20/17/15/13, 정답표·문제·해설 일치, 단일 응답 정답 글자 30% 이하, 정답이 가장 긴 보기 30% 이하)" uv run --quiet python "$GRADE" --stats
 run "채점기: 정답표 그대로 → 65/65" grader_full_marks
 run "채점기: 47문항 정답 → 72.3% 통과, 틀린 문항 표시" grader_partial
 run "채점기: 빈 답안지 → 0점 미달" grader_blank_sheet
+run "채점기: 중복 번호·없는 번호·글자 없는 답 → 경고" grader_warns
 
 AUDIT=(uv run --quiet python "$MOD_DIR/sdk/capstone_audit.py")
 L="$MOD_DIR/labs"

@@ -22,7 +22,11 @@ done
 nuke_bucket "$CONFIG_BUCKET"
 nuke_bucket "$TRAIL_BUCKET"
 delete_role "$CONFIG_ROLE"
-echo "삭제: 예산·Config 규칙/기록기·추적·알람·감사/Config 버킷"
+# lab07 의 Well-Architected Tool 워크로드(무료지만 "흔적 없이" 지운다)
+for w in $(aws wellarchitected list-workloads --workload-name-prefix "$P-workload" --query 'WorkloadSummaries[].WorkloadId' --output text); do
+  aws wellarchitected delete-workload --workload-id "$w" --client-request-token "del-$w-$(date +%s)"
+done
+echo "삭제: 예산·Config 규칙/기록기·추적·알람·감사/Config 버킷·WA 워크로드"
 
 echo "== 2. 주문 파이프라인: API, 매핑, 함수, 로그 그룹, 역할, 사용자 풀, 메시징 스택, 버스"
 for id in $(aws apigatewayv2 get-apis --output json | py '
@@ -103,13 +107,15 @@ buckets="$(aws s3api list-buckets --query "Buckets[?starts_with(Name, '$P-')].Na
 fns="$(aws lambda list-functions --query "Functions[?starts_with(FunctionName, '$P-')].FunctionName" --output text)"
 tables="$(aws dynamodb list-tables --query "TableNames[?starts_with(@, '$P-')]" --output text)"
 vpcs="$(aws ec2 describe-vpcs --filters "Name=tag:Name,Values=$P-vpc" --query 'Vpcs[].VpcId' --output text)"
+wa="$(aws wellarchitected list-workloads --workload-name-prefix "$P-workload" --query 'WorkloadSummaries[].WorkloadId' --output text)"
 queues="$(aws sqs list-queues --queue-name-prefix "$P-" --query 'QueueUrls' --output text 2>/dev/null || true)"
-printf '스택:[%s] 버킷:[%s] 함수:[%s] 테이블:[%s] VPC:[%s] 큐:[%s]\n' "$left" "$buckets" "$fns" "$tables" "$vpcs" "${queues/None/}"
+printf '스택:[%s] 버킷:[%s] 함수:[%s] 테이블:[%s] VPC:[%s] 큐:[%s] WA:[%s]\n' "$left" "$buckets" "$fns" "$tables" "$vpcs" "${queues/None/}" "$wa"
 [ -z "$left" ] || fail "스택이 남음: $left"
 [ -z "$buckets" ] || fail "버킷이 남음: $buckets"
 [ -z "$fns" ] || fail "함수가 남음: $fns"
 [ -z "$tables" ] || fail "테이블이 남음: $tables"
 [ -z "$vpcs" ] || fail "VPC 가 남음: $vpcs"
 [ -z "$queues" ] || [ "$queues" = None ] || fail "큐가 남음: $queues"
+[ -z "$wa" ] || fail "WA 워크로드가 남음: $wa"
 aws rds describe-db-instances --db-instance-identifier "$DB_ID" >/dev/null 2>&1 && fail "DB 가 남음"
 echo "LAB06 OK"

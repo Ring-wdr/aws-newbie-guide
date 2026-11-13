@@ -49,6 +49,7 @@ def run_checks() -> list[Check]:
     sqs, lam, iam = boto3.client("sqs"), boto3.client("lambda"), boto3.client("iam")
     cw, logs, trail = boto3.client("cloudwatch"), boto3.client("logs"), boto3.client("cloudtrail")
     cfn, sm, budgets = boto3.client("cloudformation"), boto3.client("secretsmanager"), boto3.client("budgets")
+    kms = boto3.client("kms")
     checks: list[Check] = []
 
     def add(pillar: str, name: str, fn: Callable[[], tuple[bool, str]]) -> None:
@@ -58,12 +59,20 @@ def run_checks() -> list[Check]:
     vpc_id = ec2.describe_vpcs(Filters=[{"Name": "tag:Name", "Values": [f"{P}-vpc"]}])["Vpcs"][0]["VpcId"]
     table = ddb.describe_table(TableName=f"{P}-orders")["Table"]
     bucket = f"{P}-receipts"
+    # NFR-S2 는 "고객 관리형 키"다. "KMS 로 암호화됐는가"만 보면 AWS 관리형 키(aws/s3 등)로도 통과하므로,
+    # 각 리소스가 가리키는 키를 ARN 으로 바꿔 캡스톤 데이터 키와 같은지 비교한다.
+    data_key = kms.describe_key(KeyId=f"alias/{P}-data")["KeyMetadata"]["Arn"]
+
+    def is_data_key(key_id: str | None) -> bool:
+        return bool(key_id) and kms.describe_key(KeyId=key_id)["KeyMetadata"]["Arn"] == data_key
 
     # ---------- 보안 ----------
     def bucket_kms() -> tuple[bool, str]:
         rule = s3.get_bucket_encryption(Bucket=bucket)["ServerSideEncryptionConfiguration"]["Rules"][0]
         algo = rule["ApplyServerSideEncryptionByDefault"]["SSEAlgorithm"]
-        return algo == "aws:kms" and rule.get("BucketKeyEnabled", False), f"{algo}, 버킷 키 {rule.get('BucketKeyEnabled')}"
+        mine = is_data_key(rule["ApplyServerSideEncryptionByDefault"].get("KMSMasterKeyID"))
+        return (algo == "aws:kms" and mine and rule.get("BucketKeyEnabled", False),
+                f"{algo}, 데이터 키 {'일치' if mine else '불일치'}, 버킷 키 {rule.get('BucketKeyEnabled')}")
 
     def bucket_public_blocked() -> tuple[bool, str]:
         cfg = s3.get_public_access_block(Bucket=bucket)["PublicAccessBlockConfiguration"]
@@ -77,11 +86,15 @@ def run_checks() -> list[Check]:
 
     def table_cmk() -> tuple[bool, str]:
         sse = table.get("SSEDescription", {})
-        return sse.get("SSEType") == "KMS", f"SSEType={sse.get('SSEType')}"
+        mine = is_data_key(sse.get("KMSMasterKeyArn"))
+        return sse.get("SSEType") == "KMS" and mine, f"SSEType={sse.get('SSEType')}, 데이터 키 {'일치' if mine else '불일치'}"
 
     def secret_cmk() -> tuple[bool, str]:
         kid = sm.describe_secret(SecretId=f"{P}/payment-gateway").get("KmsKeyId")
-        return bool(kid), f"KmsKeyId={'있음' if kid else '없음(aws/secretsmanager 기본 키)'}"
+        if not kid:
+            return False, "KmsKeyId 없음(aws/secretsmanager 기본 키)"
+        mine = is_data_key(kid)
+        return mine, f"데이터 키 {'일치' if mine else '불일치'}"
 
     def rds_private_encrypted() -> tuple[bool, str]:
         db = rds.describe_db_instances(DBInstanceIdentifier=f"{P}-settlement-db")["DBInstances"][0]
@@ -120,7 +133,7 @@ def run_checks() -> list[Check]:
 
     for name, fn in [("영수증 버킷 SSE-KMS + 버킷 키", bucket_kms), ("영수증 버킷 퍼블릭 차단", bucket_public_blocked),
                      ("영수증 버킷 HTTPS 강제", bucket_tls_only), ("주문 테이블 고객 관리형 키", table_cmk),
-                     ("결제 비밀 KMS 암호화", secret_cmk), ("정산 DB 비공개·암호화·암호 자동 관리", rds_private_encrypted),
+                     ("결제 비밀 고객 관리형 키", secret_cmk), ("정산 DB 비공개·암호화·암호 자동 관리", rds_private_encrypted),
                      ("관리 웹 IMDSv2 필수", imdsv2), ("Lambda 역할 최소 권한", no_wildcard_actions),
                      ("보안 그룹 체이닝", sg_chain), ("CloudTrail 멀티 리전 + 무결성", trail_on)]:
         add("보안", name, fn)
@@ -208,8 +221,16 @@ def run_checks() -> list[Check]:
         return mode == "PAY_PER_REQUEST", f"용량 모드 {mode} (트래픽 예측 불가 초기 단계)"
 
     def budget() -> tuple[bool, str]:
-        b = budgets.describe_budget(AccountId="000000000000", BudgetName=f"{P}-monthly")["Budget"]
-        return True, f"예산 {b['BudgetLimit']['Amount']} {b['BudgetLimit']['Unit']}/월"
+        name = f"{P}-monthly"
+        b = budgets.describe_budget(AccountId="000000000000", BudgetName=name)["Budget"]
+        ops_topic = f"arn:aws:sns:us-east-1:000000000000:{P}-ops-alerts"
+        subs = []
+        for n in budgets.describe_notifications_for_budget(AccountId="000000000000", BudgetName=name)["Notifications"]:
+            n.pop("NotificationState", None)
+            subs += [s["Address"] for s in budgets.describe_subscribers_for_notification(
+                AccountId="000000000000", BudgetName=name, Notification=n)["Subscribers"]]
+        ok = float(b["BudgetLimit"]["Amount"]) > 0 and ops_topic in subs
+        return ok, f"예산 {b['BudgetLimit']['Amount']} {b['BudgetLimit']['Unit']}/월, 알림 구독 → {ops_topic.split(':')[-1] if ok else subs}"
 
     for name, fn in [("S3·DynamoDB 게이트웨이 엔드포인트", gateway_endpoints), ("영수증 수명 주기", lifecycle),
                      ("로그 보존 기간", log_retention), ("DynamoDB 온디맨드", on_demand), ("월 예산·알림", budget)]:

@@ -60,7 +60,7 @@
 | 단일 테넌트 HSM, 고객 단독 키 통제 | **CloudHSM** (KMS의 HSM도 FIPS 140-3 Level 3 — 차이는 "전용·단독 통제") |
 | 4 KB 넘는 데이터를 KMS로 | **봉투 암호화**(`GenerateDataKey`) |
 | 다른 리전에서 재암호화 없이 복호화 | **KMS 다중 리전 키** |
-| 기존 비암호화 RDS·EBS | 스냅샷 → **암호화 복사** → 복원 / EBS는 **기본 암호화**(앞으로 만들 것) |
+| 기존 비암호화 RDS·EBS | 스냅샷 → **암호화 복사** → 복원 (RDS는 green 환경을 KMS 키로 만드는 **블루/그린 배포**도 가능) / EBS는 **기본 암호화**(앞으로 만들 것) |
 | DB 암호 자동 교체 | **Secrets Manager**(교체, RDS 관리형 암호) / 교체 없는 설정·SecureString은 **Parameter Store** |
 | 공인 인증서 무료·자동 갱신 | **ACM**(가져온 인증서는 자동 갱신 ❌). **CloudFront용은 us-east-1** |
 | HTTPS 강제(S3) | 버킷 정책 Deny `aws:SecureTransport=false` |
@@ -77,7 +77,7 @@
 | 위협·침해(채굴, 비정상 API, 악성 IP) | **GuardDuty** |
 | 소프트웨어 취약점(CVE)·네트워크 노출 | **Inspector**(EC2·ECR·Lambda) |
 | S3의 민감 데이터(PII) | **Macie** |
-| 결과 모으기 + 표준 준수 점수 | **Security Hub** |
+| 결과 모으기 + 표준 준수 점수 | **Security Hub CSPM**(구 Security Hub). 2025-12 출시된 새 **Security Hub**는 GuardDuty·Inspector·CSPM 신호를 상관 분석해 위험 우선순위를 매긴다 |
 | 결과의 원인·범위 조사 | **Detective** |
 | 누가 어떤 API를(90일 무료 / 장기·조직·무결성) | **CloudTrail** 이벤트 기록 / **추적 → S3**(멀티 리전, 무결성 검증) |
 | 구성 이력 + 규칙 준수 + 자동 수정 | **Config**(+ SSM Automation) |
@@ -279,6 +279,7 @@
 | Timestream for LiveAnalytics 신규 고객 불가 → for InfluxDB | 2025-06-20 | | M05 |
 | QLDB 지원 종료 | 2025 | 범위 밖 | M05 |
 | Snowball Edge 기존 고객 전용, Migration Hub·Application Discovery Service 신규 불가(후속 AWS Transform) | 2025-11-07 | 옛 문제의 "오프라인 수십 TB" 답은 Snow | M04·M12 |
+| Security Hub의 결과 모으기·표준 준수 점수 → **Security Hub CSPM**으로 이름 변경, 새 Security Hub는 신호 상관 분석 | 2025-12 | 옛 문제의 "Security Hub" = 지금의 CSPM | M09 |
 | QuickSight → **Amazon Quick** 표기 | | | M11 |
 | S3 Select·Data Pipeline 신규 고객 불가 → Athena / Glue·Step Functions·MWAA | | | M04·M11 |
 

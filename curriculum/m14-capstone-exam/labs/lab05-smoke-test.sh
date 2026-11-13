@@ -82,6 +82,10 @@ aws dynamodb get-item --table-name "$TABLE" --key "{\"orderId\":{\"S\":\"$BIG\"}
 RKEY="$(aws dynamodb get-item --table-name "$TABLE" --key "{\"orderId\":{\"S\":\"$BIG\"}}" --query 'Item.receiptKey.S' --output text)"
 aws s3api head-object --bucket "$RECEIPTS" --key "$RKEY" --query '{SSE: ServerSideEncryption, BucketKey: BucketKeyEnabled, Type: ContentType}' --output json
 SSE="$(aws s3api head-object --bucket "$RECEIPTS" --key "$RKEY" --query ServerSideEncryption --output text)"
+# "aws:kms" 만 보면 AWS 관리형 키(aws/s3)로도 통과한다. NFR-S2 는 고객 관리형 키이므로 키 ARN 까지 비교한다.
+SSE_KEY="$(aws s3api head-object --bucket "$RECEIPTS" --key "$RKEY" --query SSEKMSKeyId --output text)"
+KEY_ARN="$(stack_output "$DATA_STACK" KeyArn)"
+echo "영수증 KMS 키: $SSE_KEY"
 
 echo "== 4. 팬아웃 + 필터 정책: 고액 주문은 알림 큐에도 도착"
 poll 30 "알림 큐에 $BIG" find_in_queue "$NOTIFY_URL" "$BIG"
@@ -102,19 +106,78 @@ ids = [o["orderId"] for o in json.load(sys.stdin)["orders"]]
 print(sum(1 for i in ids if i in sys.argv[1:]))' "$BIG" "$SMALL")"
 echo "내 주문 목록에서 이번 실행의 주문: ${mine}건"
 
+echo "== 6-1. FR-2: 다른 고객은 남의 주문을 볼 수 없다 (단건 404, 목록에는 자기 주문만)"
+OTHER="smoke-other@todayorder.example.com"
+aws cognito-idp admin-get-user --user-pool-id "$POOL" --username "$OTHER" >/dev/null 2>&1 || {
+  aws cognito-idp admin-create-user --user-pool-id "$POOL" --username "$OTHER" --message-action SUPPRESS \
+    --user-attributes Name=email,Value="$OTHER" Name=email_verified,Value=true >/dev/null
+  aws cognito-idp admin-set-user-password --user-pool-id "$POOL" --username "$OTHER" --password "$PW" --permanent
+}
+TOKEN2="$(aws cognito-idp initiate-auth --client-id "$CLIENT" --auth-flow USER_PASSWORD_AUTH \
+  --auth-parameters "USERNAME=$OTHER,PASSWORD=$PW" --query AuthenticationResult.IdToken --output text)"
+AUTH2=(-H "Authorization: Bearer $TOKEN2" -H 'content-type: application/json')
+THEIRS="C-$RUN"
+call POST "$B/orders" "${AUTH2[@]}" -d "{\"orderId\":\"$THEIRS\",\"items\":1,\"total\":5000}" | tee "$WORK/theirs"
+call GET "$B/orders/$BIG" "${AUTH2[@]}" | tee "$WORK/peek"
+call GET "$B/me/orders" "${AUTH2[@]}" >"$WORK/list2"
+call GET "$B/me/orders" "${AUTH[@]}" >"$WORK/list1"
+# 목록에 이번 실행의 주문 중 무엇이 보이는가: 다른 고객 → C 만, 첫 고객 → A·B 만
+seen() { head -1 "$1" | py '
+ids = {o["orderId"] for o in json.load(sys.stdin)["orders"]}
+print(",".join(i for i in sys.argv[1:] if i in ids))' "$BIG" "$SMALL" "$THEIRS"; }
+seen2="$(seen "$WORK/list2")"
+seen1="$(seen "$WORK/list1")"
+echo "다른 고객의 목록: $seen2 · 첫 고객의 목록: $seen1"
+
 echo "== 7. 장애 경로: 결제 대행사 장애 주문 $BAD → 재시도(maxReceiveCount 2) → DLQ, 실패 지표 → 알람 → 운영 큐"
-aws cloudwatch set-alarm-state --alarm-name "$ALARM" --state-value OK --state-reason "smoke test reset" >/dev/null
+# 인과를 증명하려면: 알람이 "이번 장애 주문 전"에는 ALARM 이 아니었고, ALARM 전환과 운영 알림이 "이번 주문 뒤"에
+# 일어났으며, 그 전환을 만든 데이터 포인트가 이전 실행의 것이 아니어야 한다. set-alarm-state OK 로 되돌리면
+# 몇 초 뒤 이전 실행의 데이터 포인트로 다시 ALARM 이 될 수 있으므로(같은 환경에서 연달아 실행할 때) 쓰지 않는다.
+# (1) 이전 실행이 남긴 실패 데이터 포인트 중 가장 늦은 것(분 단위)을 찾고, 그 분이 평가 창에서 완전히 빠질 때까지
+#     (+180초 — 이 에뮬레이터는 1~2분 늦게 평가한다) 기다린 뒤 알람이 스스로 OK 가 되는 것을 본다.
+LAST_STALE="$(aws cloudwatch get-metric-statistics --namespace "$METRIC_NS" --metric-name "$METRIC_NAME" \
+  --start-time "$(py 'import datetime as d; print((d.datetime.now(d.timezone.utc) - d.timedelta(minutes=15)).isoformat())')" \
+  --end-time "$(py 'import datetime as d; print(d.datetime.now(d.timezone.utc).isoformat())')" \
+  --period 60 --statistics Sum --output json | py '
+import datetime as d
+ts = [d.datetime.fromisoformat(p["Timestamp"].replace("Z", "+00:00")) for p in json.load(sys.stdin)["Datapoints"] if p["Sum"] > 0]
+print(max(ts).timestamp() if ts else 0)')"
+stale_gone() { py 'import time; sys.exit(0 if time.time() >= float(sys.argv[1]) + 180 else 1)' "$LAST_STALE"; }
+not_alarm() { [ "$(aws cloudwatch describe-alarms --alarm-names "$ALARM" --query 'MetricAlarms[0].StateValue' --output text)" != ALARM ]; }
+poll 240 "이전 실행의 실패 데이터 포인트가 평가 창에서 빠짐" stale_gone
+poll 120 "알람이 스스로 ALARM 이 아님(장애 주문 전)" not_alarm
+BEFORE="$(aws cloudwatch describe-alarms --alarm-names "$ALARM" --query 'MetricAlarms[0].StateValue' --output text)"
+echo "장애 주문 전 알람 상태: $BEFORE (이전 실행의 실패 지표: $([ "$LAST_STALE" = 0 ] && echo 없음 || echo '있었음 — 창에서 빠질 때까지 기다림'))"
 drain "$OPS_URL"
+T0="$(py 'import time; print(time.time())')"
 call POST "$B/orders" "${AUTH[@]}" -d "{\"orderId\":\"$BAD\",\"items\":2,\"total\":15000}" | tee "$WORK/badgw"
-poll 120 "알람 ALARM" sh -c "aws cloudwatch describe-alarms --alarm-names '$ALARM' --query 'MetricAlarms[0].StateValue' --output text | grep -qx ALARM"
+# (2) ALARM 전환 시각 > T0, 그리고 전환을 만든 데이터 포인트의 분 >= T0 의 분(시계 차이 5초 여유)
+alarm_after_t0() {
+  aws cloudwatch describe-alarms --alarm-names "$ALARM" --output json | py '
+import datetime as d
+a = json.load(sys.stdin)["MetricAlarms"][0]
+t0 = float(sys.argv[1])
+if a["StateValue"] != "ALARM":
+    sys.exit(1)
+changed = d.datetime.fromisoformat(a["StateUpdatedTimestamp"]).timestamp()
+pts = json.loads(a.get("StateReasonData") or "{}").get("evaluatedDatapoints", [])
+fresh = [p for p in pts if p.get("value", 0) >= 1 and
+         d.datetime.strptime(p["timestamp"], "%Y-%m-%dT%H:%M:%S.%f%z").timestamp() >= (t0 - 5) // 60 * 60]
+sys.exit(0 if changed > t0 and fresh else 1)' "$T0"
+}
+poll 150 "이번 장애 주문으로 알람 ALARM" alarm_after_t0
 aws cloudwatch describe-alarms --alarm-names "$ALARM" --query 'MetricAlarms[0].[StateValue, StateReason]' --output text
-# 운영 큐의 메시지는 SNS 봉투(JSON) 안에 알람 JSON 이 문자열로 들어 있다. 이 알람의 메시지를 하나씩 꺼내
-# NewStateValue 가 ALARM 인 것을 찾는다(앞의 set-alarm-state OK 가 만든 OK 알림은 꺼내서 버린다).
+# 운영 큐의 메시지는 SNS 봉투(JSON) 안에 알람 JSON 이 문자열로 들어 있다. NewStateValue 가 ALARM 이고
+# StateChangeTime 이 T0 뒤인 것을 찾는다(그 밖의 알림은 꺼내서 버린다).
 ops_has_alarm() {
   find_in_queue "$OPS_URL" "$ALARM" >"$WORK/ops" || return 1
-  py 'sys.exit(0 if json.loads(json.load(open(sys.argv[1]))["Message"])["NewStateValue"] == "ALARM" else 1)' "$WORK/ops"
+  py '
+import datetime as d
+m = json.loads(json.load(open(sys.argv[1]))["Message"])
+t = d.datetime.strptime(m["StateChangeTime"], "%Y-%m-%dT%H:%M:%S.%f%z").timestamp()
+sys.exit(0 if m["NewStateValue"] == "ALARM" and t > float(sys.argv[2]) else 1)' "$WORK/ops" "$T0"
 }
-poll 60 "운영 큐에 ALARM 알림" ops_has_alarm
+poll 60 "운영 큐에 이번 ALARM 알림" ops_has_alarm
 py '
 body = json.load(open(sys.argv[1]))
 msg = json.loads(body["Message"])
@@ -131,8 +194,14 @@ grep -q 'HTTP 400' "$WORK/bad" || fail "잘못된 주문 400 아님"
 grep -q 'HTTP 201' "$WORK/small" || fail "소액 주문 201 아님"
 grep -q '"status": "CONFIRMED"' "$WORK/get" && grep -q 'HTTP 200' "$WORK/get" || fail "주문 조회"
 assert_eq "$SSE" aws:kms "영수증 암호화"
+assert_eq "$SSE_KEY" "$KEY_ARN" "영수증 암호화 키 = 캡스톤 고객 관리형 키"
+grep -q 'HTTP 201' "$WORK/theirs" || fail "다른 고객의 주문 생성 201 아님"
+grep -q 'HTTP 404' "$WORK/peek" || fail "남의 주문 조회가 404 아님(FR-2)"
+assert_eq "$seen2" "$THEIRS" "다른 고객의 목록에는 자기 주문만(FR-2)"
+assert_eq "$seen1" "$BIG,$SMALL" "첫 고객의 목록에는 자기 주문만(FR-2)"
+[ "$BEFORE" != ALARM ] || fail "장애 주문 전에 알람이 이미 ALARM"
 assert_eq "$small_notified" no "소액 주문은 알림 큐에 오지 않음(필터 정책)"
 assert_eq "$mine" 2 "GSI 로 내 주문 2건"
 assert_eq "$bad_status" PENDING "장애 주문 상태"
-echo "SMOKE OK — 주문 → 저장 → 이벤트 → 팬아웃 → 처리·영수증 → 장애 시 DLQ·알람·운영 알림까지 확인"
+echo "SMOKE OK — 주문 → 저장 → 이벤트 → 팬아웃 → 처리·영수증(고객 관리형 키) → 남의 주문 404 → 장애 시 DLQ·알람·운영 알림까지 확인"
 echo "LAB05 OK"

@@ -9,7 +9,7 @@
 
 ### Well-Architected Framework와 Tool
 
-- **Framework**: 6개 기둥(pillar)마다 설계 원칙과 질문(예: "워크로드의 상태를 어떻게 파악하는가?")과 모범 사례를 정리한 문서. SAA-C03 시험 가이드 첫 문장이 "Well-Architected Framework에 기반한 설계 능력을 검증한다"이다.
+- **Framework**: 6개 기둥(pillar)마다 설계 원칙과 질문(예: "워크로드의 상태를 어떻게 파악하는가?")과 모범 사례를 정리한 문서. SAA-C03 시험 가이드의 두 번째 문장(첫 문장은 대상 응시자 설명)이 "Well-Architected Framework에 기반한 설계 능력을 검증한다"이다.
 - **Well-Architected Tool**: 워크로드를 등록하고 질문에 답하면 **고위험(HRI)·중위험(MRI) 이슈**를 집계하고, 마일스톤으로 개선을 추적하는 무료 콘솔 도구. 렌즈(Serverless Lens, SaaS Lens 등)로 질문을 보탠다.
 - 리뷰는 감사가 아니다. "지금 이 위험을 알고 받아들였는가, 아니면 몰랐는가"를 드러내는 대화다. 받아들인 위험은 결정 기록에 이유를 남긴다.
 
@@ -140,7 +140,7 @@ LAB07 OK
 
 - Well-Architected Tool은 **무료**다. 콘솔에서 워크로드를 정의하고 질문에 답하면 개선 계획(Improvement plan)과 모범 사례 링크가 나온다. 마일스톤을 저장해 리뷰 사이의 개선을 비교한다.
 - 실제 AWS에서 해 보려면: 콘솔 → AWS Well-Architected Tool → Define workload. 리소스를 만들지 않으므로 비용이 들지 않는다. 끝나면 워크로드를 삭제한다(`aws wellarchitected delete-workload`).
-- 리뷰는 아키텍처가 바뀔 때마다(분기마다 등) 반복한다. Trusted Advisor·Compute Optimizer·Security Hub의 자동 점검 결과를 근거로 함께 본다([M10-05](../m10-monitoring-iac/05-operations-support.md)).
+- 리뷰는 아키텍처가 바뀔 때마다(분기마다 등) 반복한다. Trusted Advisor·Compute Optimizer·Security Hub CSPM의 자동 점검 결과를 근거로 함께 본다([M10-05](../m10-monitoring-iac/05-operations-support.md)).
 
 ## 시험 포인트
 

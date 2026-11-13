@@ -26,7 +26,8 @@ KEY_FILE = HERE / "answer-key.md"
 QUESTIONS_FILE = HERE / "questions.md"
 DOMAINS = {"D1": "보안 아키텍처", "D2": "복원력 있는 아키텍처", "D3": "고성능 아키텍처", "D4": "비용 최적화 아키텍처"}
 WEIGHTS = {"D1": 30, "D2": 26, "D3": 24, "D4": 20}  # 시험 가이드의 도메인 비중(%)
-PASS_PCT = 72.0  # docs/CURRICULUM.md §7 의 자체 기준
+PASS_PCT = 72.0
+MAX_LONGEST_SHARE = 0.30  # 단일 응답에서 "정답이 가장 긴 보기"인 비율 상한 — 길이만 보고 찍는 단서를 막는다  # docs/CURRICULUM.md §7 의 자체 기준
 TOTAL = 65
 
 
@@ -59,13 +60,14 @@ def load_questions(path: Path = QUESTIONS_FILE) -> dict[int, dict[str, object]]:
         h = re.match(r"^## 문항 (\d+)\s*$", line)
         if h:
             current = int(h.group(1))
-            qs[current] = {"options": [], "choose": 1}
+            qs[current] = {"options": [], "choose": 1, "texts": {}}
             continue
         if current is None:
             continue
-        o = re.match(r"^- ([A-F])\. ", line)
+        o = re.match(r"^- ([A-F])\. (.*)$", line)
         if o:
             qs[current]["options"].append(o.group(1))  # type: ignore[union-attr]
+            qs[current]["texts"][o.group(1)] = o.group(2)  # type: ignore[index]
         if "(두 개를 고르시오.)" in line:
             qs[current]["choose"] = 2
         elif "(세 개를 고르시오.)" in line:
@@ -115,7 +117,24 @@ def check_consistency(key: dict[int, KeyItem], qs: dict[int, dict[str, object]])
     for letter, c in Counter(singles).items():
         if singles and c / len(singles) > 0.30:
             problems.append(f"단일 응답 정답 {letter} 이 {c}/{len(singles)} = {c / len(singles):.0%} (30% 초과)")
+    share, _ = longest_share(key, qs)
+    if share > MAX_LONGEST_SHARE:
+        problems.append(f"단일 응답에서 정답이 가장 긴 보기인 비율 {share:.0%} (상한 {MAX_LONGEST_SHARE:.0%})")
     return problems
+
+
+def longest_share(key: dict[int, KeyItem], qs: dict[int, dict[str, object]]) -> tuple[float, list[int]]:
+    """단일 응답 중 정답 보기가 (동률 포함) 가장 긴 문항의 비율과 번호 목록."""
+    hits, total = [], 0
+    for n, item in key.items():
+        texts = qs.get(n, {}).get("texts", {})
+        if len(item.answer) != 1 or not texts:
+            continue
+        total += 1
+        ans = next(iter(item.answer))
+        if len(texts[ans]) >= max(len(t) for t in texts.values()):  # type: ignore[union-attr,arg-type]
+            hits.append(n)
+    return (len(hits) / total if total else 0.0), sorted(hits)
 
 
 def print_stats(key: dict[int, KeyItem], qs: dict[int, dict[str, object]]) -> int:
@@ -131,6 +150,8 @@ def print_stats(key: dict[int, KeyItem], qs: dict[int, dict[str, object]]) -> in
     print("단일 응답 정답 분포: " + " · ".join(f"{k} {sc[k]} ({sc[k] / len(singles):.1%})" for k in "ABCD"))
     mc = Counter(letter for i in multis for letter in i.answer)
     print("복수 응답 정답 글자: " + " · ".join(f"{k} {mc[k]}" for k in "ABCDEF"))
+    share, hits = longest_share(key, qs)
+    print(f"정답이 가장 긴 보기인 단일 응답: {len(hits)}/{len(singles)} = {share:.1%} (상한 {MAX_LONGEST_SHARE:.0%}) — {', '.join(map(str, hits))}")
     tasks = Counter(i.task for i in key.values())
     print("과제(Task)별: " + " · ".join(f"{t} {tasks[t]}" for t in sorted(tasks)))
     problems = check_consistency(key, qs)
@@ -143,9 +164,11 @@ def print_stats(key: dict[int, KeyItem], qs: dict[int, dict[str, object]]) -> in
     return 0
 
 
-def parse_answers(path: Path) -> tuple[dict[int, frozenset[str]], set[int]]:
+def parse_answers(path: Path, total: int = 65) -> tuple[dict[int, frozenset[str]], set[int], list[str]]:
+    """답안 파일을 읽는다. 조용히 무시하면 점수가 틀어지는 줄은 경고 목록으로 돌려준다."""
     answers: dict[int, frozenset[str]] = {}
     unsure: set[int] = set()
+    warnings: list[str] = []
     for raw in path.read_text(encoding="utf-8").splitlines():
         line = raw.split("#", 1)[0].strip()
         if not line:
@@ -157,9 +180,16 @@ def parse_answers(path: Path) -> tuple[dict[int, frozenset[str]], set[int]]:
         if "?" in rest:
             unsure.add(n)
         letters = frozenset(re.findall(r"[A-F]", rest))
+        if not 1 <= n <= total:
+            warnings.append(f"{n}번은 없는 문항이다(1~{total}) — 무시: {raw.strip()!r}")
+            continue
+        if not letters and re.sub(r"[\s?]", "", rest):
+            warnings.append(f"{n}번 답에 A~F 글자가 없다 — 무응답으로 처리: {raw.strip()!r}")
+        if letters and n in answers:
+            warnings.append(f"{n}번이 두 번 나온다 — 뒤의 답({''.join(sorted(letters))})을 쓴다")
         if letters:
             answers[n] = letters
-    return answers, unsure
+    return answers, unsure, warnings
 
 
 def grade(key: dict[int, KeyItem], answers: dict[int, frozenset[str]], unsure: set[int]) -> int:
@@ -219,7 +249,11 @@ def main(argv: list[str] | None = None) -> int:
     if not args.answers:
         ap.print_help()
         return 2
-    answers, unsure = parse_answers(Path(args.answers))
+    answers, unsure, warnings = parse_answers(Path(args.answers), len(key))
+    # 정답표가 손상됐으면(편집 실수 등) 채점 전에 알린다. 분포 기준은 --stats 가 따로 본다.
+    broken = [p for p in check_consistency(key, load_questions()) if "%" not in p]
+    for w in warnings + [f"정답표 점검: {p}" for p in broken]:
+        print(f"경고: {w}", file=sys.stderr)
     return grade(key, answers, unsure)
 
 
