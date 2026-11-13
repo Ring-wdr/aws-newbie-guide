@@ -30,7 +30,7 @@ function cacheVersion() {
         return '?';
       }
     };
-    versionTag = `mi${v('mermaid-isomorphic')}-pw${v('playwright')}-v3`;
+    versionTag = `mi${v('mermaid-isomorphic')}-pw${v('playwright')}-v4`;
   }
   return versionTag;
 }
@@ -53,43 +53,107 @@ function prefixFor(source, theme) {
   return `mmd-${crypto.createHash('sha256').update(source).digest('hex').slice(0, 10)}-${theme}`;
 }
 
+// Mermaid 기본 배치(dagre)는 서브그래프 제목이 내용보다 넓으면 이웃 서브그래프와 겹쳐 라벨을 가린다.
+// 그런 그림만, 내용은 그대로 두고 간격을 넓힌 배치로 다시 그린다(겹침이 없어지는 첫 설정을 쓴다).
+const LAYOUTS = [
+  { name: 'default', flowchart: {} },
+  { name: 'spacious', flowchart: { nodeSpacing: 90, rankSpacing: 60, padding: 30 } },
+  { name: 'wide', flowchart: { nodeSpacing: 120, rankSpacing: 70, padding: 40 } },
+  { name: 'widest', flowchart: { nodeSpacing: 150, rankSpacing: 80, padding: 40 } },
+];
+
+// 겹침을 재는 브라우저는 여러 원고가 동시에 쓰므로, 쓰는 쪽이 하나도 없을 때만 닫는다(열어 두면 빌드가 끝나지 않는다).
+let browserPromise;
+let active = 0;
+async function measurePageFor() {
+  if (!browserPromise) {
+    browserPromise = import('playwright').then(async ({ chromium }) => {
+      const browser = await chromium.launch();
+      return { browser };
+    });
+  }
+  return browserPromise;
+}
+async function overlaps(svg, width) {
+  const { browser } = await measurePageFor();
+  const measurePage = await browser.newPage({ viewport: { width: 1600, height: 1200 } });
+  try {
+    return await measure(measurePage, svg, width);
+  } finally {
+    await measurePage.close().catch(() => {});
+  }
+}
+async function measure(measurePage, svg, width) {
+  await measurePage.setContent(`<div style="width:${Math.ceil(width)}px">${svg}</div>`);
+  return measurePage.evaluate(() => {
+    const inter = (a, b) => a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1;
+    const con = (a, b) => a.left <= b.left + 1 && a.right >= b.right - 1 && a.top <= b.top + 1 && a.bottom >= b.bottom - 1;
+    const cl = [...document.querySelectorAll('g.cluster > rect')].map((r) => r.getBoundingClientRect());
+    const nd = [...document.querySelectorAll('g.node')].map((r) => r.getBoundingClientRect());
+    let k = 0;
+    for (let i = 0; i < cl.length; i++) for (let j = i + 1; j < cl.length; j++) if (inter(cl[i], cl[j]) && !con(cl[i], cl[j]) && !con(cl[j], cl[i])) k++;
+    for (let i = 0; i < nd.length; i++) for (let j = i + 1; j < nd.length; j++) if (inter(nd[i], nd[j])) k++;
+    return k;
+  });
+}
+
+async function renderOne(source, theme, layout) {
+  const render = await getRenderer();
+  const [res] = await render([source], {
+    prefix: prefixFor(source, theme),
+    mermaidConfig: {
+      ...THEMES[theme],
+      fontFamily: FONT_STACK,
+      securityLevel: 'strict',
+      flowchart: { htmlLabels: true, ...layout.flowchart },
+    },
+  });
+  if (res.status !== 'fulfilled') throw new Error(String(res.reason?.message || res.reason));
+  return { svg: res.value.svg, width: res.value.width, height: res.value.height, layout: layout.name };
+}
+
 /**
  * @param {string[]} sources Mermaid 원문 목록
- * @returns {Promise<Array<{light: {svg:string,width:number,height:number}, dark: {...}} | {error: string}>>}
+ * @returns {Promise<Array<{light, dark} | {error: string}>>}
  */
 export async function renderMermaid(sources) {
+  active++;
+  try {
+    return await renderAll(sources);
+  } finally {
+    active--;
+    if (active === 0 && browserPromise) {
+      const p = browserPromise;
+      browserPromise = undefined;
+      p.then(({ browser }) => browser.close()).catch(() => {});
+    }
+  }
+}
+
+async function renderAll(sources) {
   fs.mkdirSync(CACHE_DIR, { recursive: true });
-  const out = sources.map(() => ({}));
-  for (const theme of Object.keys(THEMES)) {
-    const todo = [];
-    sources.forEach((src, i) => {
-      if (out[i].error) return;
-      const file = path.join(CACHE_DIR, `${keyFor(src, theme)}.json`);
-      if (fs.existsSync(file)) {
-        out[i][theme] = JSON.parse(fs.readFileSync(file, 'utf8'));
-      } else {
-        todo.push(i);
+  const out = [];
+  for (const src of sources) {
+    const files = Object.fromEntries(Object.keys(THEMES).map((t) => [t, path.join(CACHE_DIR, `${keyFor(src, t)}.json`)]));
+    if (Object.values(files).every((f) => fs.existsSync(f))) {
+      out.push(Object.fromEntries(Object.entries(files).map(([t, f]) => [t, JSON.parse(fs.readFileSync(f, 'utf8'))])));
+      continue;
+    }
+    try {
+      // 라이트 테마로 배치를 정하고(겹침이 없는 첫 설정), 다크 테마도 같은 배치로 그린다.
+      let light;
+      let chosen = LAYOUTS[0];
+      for (const layout of LAYOUTS) {
+        light = await renderOne(src, 'light', layout);
+        chosen = layout;
+        if (!/^\s*(flowchart|graph)\b/.test(src) || (await overlaps(light.svg, light.width)) === 0) break;
       }
-    });
-    // 한 번에 하나씩 그린다: 접두어가 원문마다 달라야 하므로(같은 페이지의 두 그림이 같은 id를 쓰지 않게).
-    for (const i of todo) {
-      const render = await getRenderer();
-      const [res] = await render([sources[i]], {
-        prefix: prefixFor(sources[i], theme),
-        mermaidConfig: {
-          ...THEMES[theme],
-          fontFamily: FONT_STACK,
-          securityLevel: 'strict',
-          flowchart: { htmlLabels: true },
-        },
-      });
-      if (res.status === 'fulfilled') {
-        const value = { svg: res.value.svg, width: res.value.width, height: res.value.height };
-        out[i][theme] = value;
-        fs.writeFileSync(path.join(CACHE_DIR, `${keyFor(sources[i], theme)}.json`), JSON.stringify(value));
-      } else {
-        out[i] = { error: String(res.reason?.message || res.reason) };
-      }
+      const dark = await renderOne(src, 'dark', chosen);
+      fs.writeFileSync(files.light, JSON.stringify(light));
+      fs.writeFileSync(files.dark, JSON.stringify(dark));
+      out.push({ light, dark });
+    } catch (e) {
+      out.push({ error: String(e.message || e) });
     }
   }
   return out;

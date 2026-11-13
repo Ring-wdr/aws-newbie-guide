@@ -42,7 +42,8 @@
 
 body {
   word-break: keep-all;
-  overflow-wrap: anywhere;
+  /* 한 줄에 다 들어가지 않는 긴 낱말만 끊는다(break-word 는 최소 폭 계산에 끼지 않아 표가 좁아지지 않는다) */
+  overflow-wrap: break-word;
   line-height: var(--sl-line-height);
 }
 .sl-markdown-content {
@@ -65,7 +66,7 @@ body {
 }
 .sl-markdown-content code:not(pre code) {
   word-break: normal;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
   font-size: 0.9em;
 }
 /* 페이지 제목: 길고 한국어 조사·영문이 섞이므로 균형 있게 줄을 나눈다 */
@@ -273,6 +274,19 @@ kbd {
   max-width: none !important;
   width: min(var(--diagram-w), max(100%, calc(var(--diagram-w) * 0.8))) !important;
 }
+/* SVG 안의 HTML 라벨(foreignObject)은 Mermaid 가 빌드 때 잰 조건(줄 간격 normal, 여백 0, 일반 줄바꿈)으로 되돌린다.
+   본문 스타일(줄 간격 1.8, keep-all 등)이 들어가면 라벨이 상자보다 커져 잘린다. */
+.diagram foreignObject,
+.diagram foreignObject * {
+  line-height: 1.5 !important;
+  word-break: normal !important;
+  overflow-wrap: normal !important;
+  text-wrap: wrap;
+  letter-spacing: normal;
+}
+.diagram foreignObject p {
+  margin: 0 !important;
+}
 .diagram-dark { display: none; }
 :root[data-theme='dark'] .diagram-light { display: none; }
 :root[data-theme='dark'] .diagram-dark { display: block; }
@@ -305,6 +319,12 @@ kbd {
 .sl-markdown-content .table-scroll :is(th, td) {
   min-width: 6.5rem;
   vertical-align: top;
+  /* 표 칸은 낱말 중간에서 끊지 않는다. 넓으면 표가 자기 상자 안에서 가로로 스크롤된다 */
+  overflow-wrap: normal;
+  word-break: keep-all;
+}
+.sl-markdown-content .table-scroll :is(th, td) code {
+  overflow-wrap: normal;
 }
 .sl-markdown-content .table-scroll :is(th, td):first-child {
   min-width: 4.5rem;
@@ -386,15 +406,7 @@ details.reveal[open] {
 .storage-panel .storage-actions {
   margin-top: 0.4rem;
 }
-/* 넓은 화면에서만 진행 요약을 화면 위에 붙여 둔다(좁은 화면에서는 본문을 가린다) */
-@media (min-width: 72em) {
-  .quiz-summary,
-  .checklist-summary {
-    position: sticky;
-    top: calc(var(--sl-nav-height) + 0.5rem);
-    z-index: 2;
-  }
-}
+
 .storage-actions {
   display: flex;
   flex-wrap: wrap;
@@ -478,8 +490,11 @@ section.quiz-q[data-result='wrong'] { border-left: 4px solid var(--guide-bad); }
   cursor: default;
 }
 /* 채점 뒤: 색과 함께 글자 표시를 붙인다(색만으로 전하지 않는다) */
-:is(.quiz-option, .exam-option).is-answer {
-  border-color: var(--guide-ok);
+:is(.quiz-option, .exam-option).is-answer,
+:is(.quiz-option, .exam-option).is-answer:has(input:checked) {
+  border: 2px solid var(--guide-ok);
+  box-shadow: none;
+  background: var(--guide-g-bg);
 }
 :is(.quiz-option, .exam-option).is-answer::after {
   content: '✓ 정답';
@@ -489,8 +504,12 @@ section.quiz-q[data-result='wrong'] { border-left: 4px solid var(--guide-bad); }
   font-size: 0.8125rem;
   color: var(--guide-ok);
 }
-:is(.quiz-option, .exam-option).is-wrong {
-  border-color: var(--guide-bad);
+:is(.quiz-option, .exam-option).is-wrong,
+:is(.quiz-option, .exam-option).is-wrong:has(input:checked) {
+  /* 고른 오답: 빨강 + 점선 테두리 + "✕ 고른 답" 글자 — 색을 못 구분해도 모양과 글자로 구분된다 */
+  border: 2px dashed var(--guide-bad);
+  box-shadow: none;
+  background: var(--guide-r-bg);
 }
 :is(.quiz-option, .exam-option).is-wrong::after {
   content: '✕ 고른 답';
@@ -725,6 +744,7 @@ section.exam-q {
   justify-content: space-between;
 }
 .exam-controls button {
+  white-space: nowrap;
   font: inherit;
   padding: 0.45rem 1rem;
   min-height: 2.5rem;
@@ -868,6 +888,19 @@ section.exam-q {
 }
 
 /* ---------- 소스 보기 페이지 ---------- */
+.source-run-basis {
+  margin: 0 !important;
+  padding: 0.4rem 0.85rem;
+  font-size: 0.8125rem;
+  color: var(--guide-muted);
+  border-top: 1px dashed var(--guide-border);
+}
+.source-norun {
+  padding: 0.6rem 0.85rem;
+  border-left: 4px solid var(--guide-border);
+  background: var(--guide-surface);
+  font-size: 0.9375rem;
+}
 .source-meta {
   display: flex;
   flex-wrap: wrap;
