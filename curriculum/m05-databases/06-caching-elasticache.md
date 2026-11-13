@@ -123,7 +123,7 @@ aws elasticache wait replication-group-available --replication-group-id todayord
 }
 ```
 
-방금 본 것: 쓰기는 **기본(Primary) 엔드포인트**, 읽기는 **리더 엔드포인트**로. Aurora와 같은 모양이다. 노드는 서로 다른 AZ에 놓였다. 에뮬레이터는 이 주소에 실제 캐시 서버를 띄우지 않는다(접속 불가) — 그래서 등급이 🟡다.
+방금 본 것: 쓰기는 **기본(Primary) 엔드포인트**, 읽기는 **리더 엔드포인트**로. Aurora와 같은 모양이다. 노드는 서로 다른 AZ에 놓였다. 에뮬레이터가 돌려주는 이 주소는 실제 AWS 형식 이름(`*.cache.amazonaws.com`)이라 어디서도 해석되지 않는다. 접속할 수 없고, 접속을 시도하면 그 이름을 바깥 DNS에 묻게 되므로 실습은 접속하지 않는다([FIDELITY.md](../../docs/FIDELITY.md) 환경 메모) — 그래서 등급이 🟡다.
 
 **2) 장애 조치 테스트**
 

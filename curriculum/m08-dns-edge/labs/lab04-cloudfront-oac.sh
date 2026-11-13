@@ -55,6 +55,7 @@ OAC="$(aws cloudfront create-origin-access-control --origin-access-control-confi
 aws cloudfront get-origin-access-control --id "$OAC" --query 'OriginAccessControl.OriginAccessControlConfig'
 
 echo "== 3. 배포 만들기"
+# external-host-ok: 아래 원본 DomainName(<버킷>.s3.us-east-1.amazonaws.com)은 에뮬레이터가 이름 해석 없이 내부에서 S3 버킷으로 매핑한다(docs/FIDELITY.md 환경 메모)
 cat >"$WORK/dist.json" <<EOF
 {
   "CallerReference": "m08-lab04-$(date +%s)-$RANDOM",
@@ -91,6 +92,8 @@ aws cloudfront get-distribution-config --id "$DIST" \
 cf_get() { docker exec "$CONTAINER" curl -s -o /dev/null -w '%{http_code}' "http://$DOMAIN$1"; }
 can_exec=false
 if docker exec "$CONTAINER" true >/dev/null 2>&1; then can_exec=true; fi
+# 에뮬레이터가 돌려준 주소가 루프백일 때만 접속한다(바깥 호스트일 수 있으면 관찰을 건너뛴다)
+case "$DOMAIN" in 127.*) ;; *) echo "참고: DomainName 이 루프백이 아니다($DOMAIN) — 접속하지 않는다"; can_exec=false ;; esac
 
 echo "== 4. 버킷 정책 없이 배포로 GET (선택 과제: docker exec)"
 code_before="SKIP"

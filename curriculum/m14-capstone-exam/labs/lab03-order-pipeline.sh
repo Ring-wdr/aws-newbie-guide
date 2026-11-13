@@ -120,6 +120,7 @@ for a in json.load(sys.stdin).get("Items", []):
   aws apigatewayv2 delete-api --api-id "$id"
 done
 # 권한 부여자의 Issuer 는 토큰의 iss 와 같아야 한다. 에뮬레이터의 iss 는 https://127.0.0.1:<포트>/<풀 ID> 라
+# external-host-ok: 아래 줄은 실제 AWS의 발급자 형식을 설명하는 주석일 뿐 어디에도 등록·접속하지 않는다
 # (실제 AWS: https://cognito-idp.us-east-1.amazonaws.com/<풀 ID>) 점검용 사용자로 토큰을 받아 읽는다.
 PROBE_USER="lab03-probe@todayorder.example.com"
 PROBE_PW='Probe-Passw0rd!'

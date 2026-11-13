@@ -55,6 +55,8 @@ aws elbv2 create-rule --listener-arn "$LIS" --priority 50 --conditions Field=hos
 aws elbv2 wait load-balancer-available --load-balancer-arns "$ALB"
 DNS="$(aws elbv2 describe-load-balancers --load-balancer-arns "$ALB" --query 'LoadBalancers[0].DNSName' --output text)"
 echo "ALB DNSName = $DNS  (에뮬레이터: 컨테이너 안의 주소)"
+# 에뮬레이터가 돌려준 주소에만 접속한다: 루프백이 아니면(바깥 호스트일 수 있으면) 접속하지 않고 멈춘다
+case "$DNS" in 127.*) ;; *) fail "ALB DNSName 이 루프백 주소가 아니다($DNS) — 접속하지 않는다 (에뮬레이터가 바뀌었을 수 있다 → 레슨 갱신)" ;; esac
 
 req() { docker exec "$CONTAINER" curl -s -m 5 -w ' [HTTP %{http_code}]' "$@"; echo; }
 echo "== 2. 내 Mac 에서 직접 → 연결 안 됨"

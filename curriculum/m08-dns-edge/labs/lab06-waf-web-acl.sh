@@ -54,6 +54,8 @@ echo "ALB DNSName: $DNS  (컨테이너 안 주소)"
 
 can_exec=false
 if docker exec "$CONTAINER" true >/dev/null 2>&1; then can_exec=true; fi
+# 에뮬레이터가 돌려준 주소가 루프백일 때만 접속한다(바깥 호스트일 수 있으면 관찰을 건너뛴다)
+case "$DNS" in 127.*) ;; *) echo "참고: ALB DNSName 이 루프백이 아니다($DNS) — 접속하지 않는다"; can_exec=false ;; esac
 hit() { docker exec "$CONTAINER" curl -s -o /dev/null -w '%{http_code}' -m 5 "$@"; }
 before_sqli=""
 SQLI="/orders?id=1%27%20OR%20%271%27=%271"

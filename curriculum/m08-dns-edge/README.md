@@ -73,7 +73,7 @@ curriculum/m08-dns-edge/labs/verify.sh
 
 CURRICULUM.md의 M08 실습을 모두 구현했고, 확인 결과에 따라 등급을 다음과 같이 확정했다.
 
-- **WAF Web ACL: 🟡 → 🟢(구성)**. CURRICULUM·FIDELITY는 "저장만, 차단은 시험 안 함"이었으나, 이 버전은 ALB에 연결한 Web ACL이 IP 세트·SQLi·XSS·User-Agent 없음·속도 기반 규칙으로 **실제로 403 차단**하고 `get-sampled-requests`에 막은 규칙이 나온다. 다만 ALB 주소가 컨테이너 안에만 있으므로 차단 관찰은 AUTHORING 3장 9항에 따라 `docker exec` 선택 과제로 두었다.
+- **WAF Web ACL: 🟡 → 🟢(구성)**. CURRICULUM은 "저장만, 차단은 시험 안 함"이었으나, 이 버전은 ALB에 연결한 Web ACL이 IP 세트·SQLi·XSS·User-Agent 없음·속도 기반 규칙으로 **실제로 403 차단**하고 `get-sampled-requests`에 막은 규칙이 나온다. 다만 ALB 주소가 컨테이너 안에만 있으므로 차단 관찰은 AUTHORING 3장 9항에 따라 `docker exec` 선택 과제로 두었다. (재생성된 FIDELITY.md의 `edge-better` 탐침도 ALB 앞 WAF의 실제 403 차단을 확인한다.)
 - **가중치·지연 시간 레코드와 `test-dns-answer` (🟢)**: 가중치·단순·다중값의 응답은 🟢로 확정. 지연 시간(및 지리적 위치·지리 근접·IP 기반)은 레코드는 🟢지만 응답이 위치를 따르지 않으므로 응답 선택을 🟡로 내리고 워크시트로 보충했다.
 - **상태 확인·장애 조치 🔴**: 그대로. 워크시트(레슨 2, 정답 포함)와 "PRIMARY 삭제로 흉내 내기"로 대체.
 - **CloudFront 🟡**: 그대로. 컨테이너 안에서는 OAC(정책 없음 403 → 정책 후 200)와 캐시 Miss→Hit까지 실제로 관찰된다.

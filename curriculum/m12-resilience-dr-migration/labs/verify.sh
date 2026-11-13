@@ -78,12 +78,14 @@ guard_refuses() {
 # 닫힌 프록시 포트로 보내 즉시 실패하게 한다(127.0.0.1 은 프록시를 거치지 않으므로 주 리전 확인은 정상 동작).
 guard_refuses_dr() {
   local out rc
+  # external-host-ok: 가드가 거부해야 하는 실제 AWS 주소(가드 자체 시험). 요청은 나가지 않는다 — 거부되고, 혹시 나가도 닫힌 프록시(127.0.0.1:9)로 막힌다
   out="$(env -u TODAYORDER_ALLOW_REAL_AWS DR_AWS_ENDPOINT_URL=https://dynamodb.ap-northeast-1.amazonaws.com \
     HTTPS_PROXY=http://127.0.0.1:9 HTTP_PROXY=http://127.0.0.1:9 NO_PROXY=127.0.0.1 UV_OFFLINE=1 \
     uv run --quiet python "$1" status 2>&1)"
   rc=$?
   echo "$out"
   [ "$rc" -eq 1 ] || { echo "종료 코드가 1이 아님: $rc"; return 1; }
+  # external-host-ok: 위 거부 메시지에 담긴 주소를 확인할 뿐 접속하지 않는다
   grep -q "^\[emulator_guard\] DR_AWS_ENDPOINT_URL 이 로컬 에뮬레이터(https://127.0.0.1:<포트>)가 아닙니다: 'https://dynamodb.ap-northeast-1" <<<"$out" || return 1
   ! grep -qE 'Traceback|연결하지 못했습니다' <<<"$out"
 }

@@ -96,7 +96,7 @@ LAB01 OK
 
 **방금 본 것**
 
-- 서브넷 6개는 [M02의 주소 계획](../m02-vpc-networking/README.md#cidr-계획-m10에서-cloudformation으로-재현할-기준) 그대로다. 앱 라우팅 테이블이 AZ마다 하나씩이고, 각자 **자기 AZ의 NAT**(`…98`, `…9b`)를 기본 경로로 쓴다 — AZ a의 NAT가 죽어도 AZ b의 앱은 영향이 없다.
+- 서브넷 6개는 [M02의 주소 계획](../m02-vpc-networking/README.md#cidr-계획) 그대로다. 앱 라우팅 테이블이 AZ마다 하나씩이고, 각자 **자기 AZ의 NAT**(`…98`, `…9b`)를 기본 경로로 쓴다 — AZ a의 NAT가 죽어도 AZ b의 앱은 영향이 없다.
 - `pl-…` 두 줄이 S3·DynamoDB 게이트웨이 엔드포인트 경로다. 최장 접두사 일치로 `0.0.0.0/0 → NAT`보다 우선해, 같은 리전 S3·DynamoDB 트래픽은 NAT 처리 요금을 내지 않는다.
 - 인증서는 실습을 위해 자체 서명 인증서를 **가져왔다**(`IMPORTED`). 가져온 인증서는 ACM이 자동 갱신하지 않는다 — 실제로는 DNS 검증 공인 인증서를 쓴다([M09-03](../m09-security-encryption/03-acm-and-encryption-in-transit.md)).
 - ASG 인스턴스는 두 AZ에 하나씩 떴다. 에뮬레이터는 ASG 인스턴스를 대상 그룹에 자동 등록하지 않아(M03·M12 제약) 스크립트가 `register-targets`로 등록했다. 인스턴스가 부팅하지 않으므로 `healthy`는 "running이면 healthy"라는 에뮬레이터 규칙의 결과일 뿐이다.
@@ -459,7 +459,7 @@ LAB06 OK
 ## 스스로 확인
 
 1. lab05의 장애 주문이 DLQ로 가기까지 워커는 몇 번 호출되는가? `maxReceiveCount`를 5로 바꾸면 DLQ 도착까지 대략 얼마나 걸리는가?
-2. 실제 AWS에서 메시징 스택의 큐 정책(`OrderQueuesPolicy`)을 지우면 lab05의 어느 단계에서 어떤 증상으로 실패하는가? (에뮬레이터는 큐 정책을 검사하지 않으므로 직접 지워 봐도 통과한다)
+2. 실제 AWS에서 메시징 스택의 큐 정책(`OrderQueuesPolicy`)을 지우면 lab05의 어느 단계에서 어떤 증상으로 실패하는가? (에뮬레이터도 SNS → SQS 전달에는 큐 정책을 검사한다 — [M06 lab04](../m06-integration-messaging/labs/lab04-sns-fanout-filter.sh), FIDELITY `sns` 행)
 3. lab06이 네트워크 스택을 마지막에 지우는 이유를 ENI 관점에서 설명하라.
 
 <details><summary>답</summary>

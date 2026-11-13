@@ -1,7 +1,7 @@
 # M14 치트시트 — "요구 사항 → 서비스" 통합판 (시험 도메인별)
 
 > M00~M13 치트시트의 비교표를 한 장으로 모았다. 표 끝의 `Mxx`는 자세한 설명이 있는 모듈이다.
-> 수치는 2026-11 기준이며 자주 바뀐다. 모듈 사이에 표현이 달랐던 곳은 맨 아래 "정리한 불일치"에 근거와 함께 적었다.
+> 수치는 2026-11 기준이며 자주 바뀐다. 모듈 사이에 표현이 달랐던 곳은 맨 아래 "정리한 불일치"에 기록했다(모두 원래 모듈에서 고쳐졌다).
 
 ## 문제 푸는 순서 (모든 도메인 공통)
 
@@ -281,19 +281,20 @@
 | Snowball Edge 기존 고객 전용, Migration Hub·Application Discovery Service 신규 불가(후속 AWS Transform) | 2025-11-07 | 옛 문제의 "오프라인 수십 TB" 답은 Snow | M04·M12 |
 | Security Hub의 결과 모으기·표준 준수 점수 → **Security Hub CSPM**으로 이름 변경, 새 Security Hub는 신호 상관 분석 | 2025-12 | 옛 문제의 "Security Hub" = 지금의 CSPM | M09 |
 | 비용 할당 태그 **소급 적용(backfill)** 최대 12개월(관리 계정) | 2024-03 | 옛 자료의 "소급 안 됨"은 이제 틀림 | M13 |
-| CloudFront **Anycast 고정 IP**(방화벽 허용 목록용, HTTP(S) 배포) | 2024-11 | "고정 IP + **UDP**/임의 TCP" → 여전히 Global Accelerator(또는 NLB의 AZ별 EIP). 아래 불일치 6 | M08 |
+| CloudFront **Anycast 고정 IP**(방화벽 허용 목록용, HTTP(S) 배포) | 2024-11 | "고정 IP + **UDP**/임의 TCP" → 여전히 Global Accelerator(또는 NLB의 AZ별 EIP). 아래 불일치 6(해결됨) | M08 |
 | QuickSight → **Amazon Quick** 표기 | | | M11 |
 | S3 Select·Data Pipeline 신규 고객 불가 → Athena / Glue·Step Functions·MWAA | | | M04·M11 |
 
 ## 정리한 불일치 (모듈 사이에서 표현이 달랐던 곳)
 
-이 치트시트는 아래와 같이 정리했다. 원래 모듈의 수정은 해당 모듈 담당에게 요청했다(PR 본문).
+이 치트시트를 만들 때 모듈 사이에서 표현이 달랐던 곳이다. **모두 원래 모듈에서 고쳐졌다**(편집 PR #18·#19). 지금은 모듈과 이 치트시트가 같은 내용을 말한다. 기록으로만 남긴다.
 
-| # | 내용 | 어디 | 이 치트시트의 판단 (근거) |
+| # | 내용 | 지금(정정된 사실) | 상태 |
 |---|---|---|---|
-| 1 | M13 README "에뮬레이터 제약"은 "잘못된 규칙(30일 미만 IA 등)도 거부하지 않는다"고 쓴다. M04는 2026-07 AWS 변경으로 **30일 미만 IA 전환은 더 이상 잘못된 규칙이 아니고**, 에뮬레이터는 최소 보관 기간을 어기는 연쇄 전환은 거부한다고 확인했다 | [M13 README](../m13-cost-optimization/README.md) ↔ [M04 README](../m04-storage/README.md) | M04가 맞다. M13의 문장은 "전환이 일어나지 않는다"만 남기는 것이 정확 |
-| 2 | S3 RTC 수치: M04 레슨 3은 "새 객체의 99.99%를 15분 안에", M12 치트시트는 "99.9% 15분 이내" | [M04-03](../m04-storage/03-versioning-lock-replication.md) ↔ [M12 치트시트](../m12-resilience-dr-migration/cheatsheet.md) | 현재 S3 사용 설명서는 "**99.9%**를 15분 안에"(2026-11 확인). M12가 맞다 |
-| 3 | M02 README는 "M10은 이 VPC(10.0.0.0/24·10.0.10.0/24·10.0.20.0/24…, AZ별 NAT 2개)를 CloudFormation으로 재현한다"고 쓰지만, M10 템플릿은 다른 CIDR(10.0.1·2 / 11·12 / 21·22)과 **NAT 1개**·앱 라우팅 테이블 1개를 쓴다(M10 README가 독립 설계라고 밝힘) | [M02 README](../m02-vpc-networking/README.md) ↔ [M10 vpc-3tier.yaml](../m10-monitoring-iac/labs/templates/vpc-3tier.yaml) | 캡스톤은 M02 계획(NAT 2개)을 따른다. NAT 1개는 비용 절충임을 레슨 01 R1로 다뤘다. M02 README의 "재현" 문장 또는 M10 템플릿 중 하나를 맞추는 것이 좋다 |
-| 4 | 보안 그룹 이름: M02 `todayorder-alb-sg`/`app-sg`/`db-sg`, M10 템플릿 `WebSg`/`AppSg`/`DbSg`(설명 "web tier") | 위와 같음 | 같은 개념. 캡스톤은 M02 이름(`-alb-sg` 등) |
-| 5 | 비용 할당 태그: M13 치트시트·퀴즈 해설은 "소급 안 됨"이라 쓴다 | [M13 치트시트](../m13-cost-optimization/cheatsheet.md) · [M13 퀴즈](../m13-cost-optimization/quiz.md) | 2024-03부터 관리 계정이 **최대 12개월 소급 적용(backfill)**을 요청할 수 있다([Backfill cost allocation tags](https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/cost-allocation-backfill.html)). 활성화가 먼저 필요하다는 점은 그대로 |
-| 6 | CloudFront 고정 IP: M08 레슨 4·퀴즈는 "CloudFront는 고정 IP를 주지 않는다/IP가 수시로 바뀐다"고 쓴다 | [M08-04](../m08-dns-edge/04-global-accelerator-vs-cloudfront.md) · [M08 퀴즈](../m08-dns-edge/quiz.md) | 2024-11부터 CloudFront **Anycast 고정 IP**가 있다(HTTP(S) 배포용). "고정 IP + UDP/임의 TCP·몇 초 리전 전환" → Global Accelerator라는 결론은 그대로 |
+| 1 | M13 README가 "잘못된 규칙(30일 미만 IA 등)도 거부하지 않는다"고 썼다 | 2026-07부터 30일 미만 IA·One Zone-IA 전환은 AWS에서도 허용(최소 보관 30일 요금은 유지). 에뮬레이터는 현재 AWS 규칙대로 검증한다([M13 README](../m13-cost-optimization/README.md), [M04 레슨 2](../m04-storage/02-storage-classes-and-lifecycle.md)) | ✅ 해결 (PR #18) |
+| 2 | S3 RTC: M04 레슨 3은 99.99%, M12는 99.9% | **99.9%**를 15분 안에([M04-03](../m04-storage/03-versioning-lock-replication.md), [S3 RTC 문서](https://docs.aws.amazon.com/AmazonS3/latest/userguide/replication-time-control.html)) | ✅ 해결 (PR #18) |
+| 3 | M02 README가 "M10이 이 VPC를 재현한다"고 썼다(실제 M10 템플릿은 CIDR·NAT 수·앱 라우팅 테이블 수가 다름) | M10은 같은 요구를 만족하는 **자기 2-AZ 3-티어 VPC**를 따로 만든다. 차이는 두 README의 표에 있다([M02 README](../m02-vpc-networking/README.md#cidr-계획)). 캡스톤은 M02 계획(NAT 2개)을 따른다 | ✅ 해결 (PR #18) |
+| 4 | 보안 그룹 이름: M02 `todayorder-alb-sg`/`app-sg`/`db-sg`, M10 템플릿 `WebSg`/`AppSg`/`DbSg` | 같은 개념이고 이름 차이는 위 차이 표에 있다. 캡스톤은 M02 이름 | ✅ 해결 (PR #18) |
+| 5 | 비용 할당 태그 "소급 안 됨"(M13) | 2024-03부터 관리 계정이 **최대 12개월 백필**을 요청할 수 있다(그 기간에 태그가 붙어 있던 리소스만)([M13 레슨 5](../m13-cost-optimization/05-cost-tools.md)) | ✅ 해결 (PR #19) |
+| 6 | "CloudFront는 고정 IP를 주지 않는다"(M08) | 2024-11부터 CloudFront **Anycast 고정 IP 목록**(HTTP(S) 전용, 신청 필요). "고정 IP + UDP/임의 TCP·빠른 리전 전환" → Global Accelerator라는 결론은 그대로([M08-04](../m08-dns-edge/04-global-accelerator-vs-cloudfront.md)) | ✅ 해결 (PR #19) |
+| 7 | 기존 비암호화 RDS 암호화를 "스냅샷 복사·복원뿐"이라고 썼다(M05) | 스냅샷 → 암호화 복사 → 복원(고전적 정답) 또는 **블루/그린 배포**의 그린 환경에 KMS 키([M05 레슨 1](../m05-databases/01-rds-basics.md)) | ✅ 해결 (PR #18) |

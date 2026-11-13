@@ -70,8 +70,9 @@ aws iam get-role --role-name "$CONFIG_ROLE" >/dev/null 2>&1 || aws iam create-ro
 aws iam attach-role-policy --role-name "$CONFIG_ROLE" --policy-arn arn:aws:iam::aws:policy/service-role/AWS_ConfigRole
 # 사용자 지정 역할이면 전달 버킷 쓰기 권한도 역할에 있어야 한다(AWS_ConfigRole 은 리소스 읽기 권한뿐).
 # 서비스 연결 역할(AWSServiceRoleForConfig)을 쓰면 이 정책 대신 아래 버킷 정책이 쓰인다.
+# 액션은 AWS Config 개발자 안내서의 역할 정책 예시와 같다(s3:PutObject + s3:PutObjectAcl, bucket-owner-full-control 조건).
 aws iam put-role-policy --role-name "$CONFIG_ROLE" --policy-name config-delivery --policy-document "{\"Version\":\"2012-10-17\",\"Statement\":[
-  {\"Sid\":\"Deliver\",\"Effect\":\"Allow\",\"Action\":\"s3:PutObject\",\"Resource\":\"arn:aws:s3:::$CONFIG_BUCKET/AWSLogs/$ACCOUNT/*\",
+  {\"Sid\":\"Deliver\",\"Effect\":\"Allow\",\"Action\":[\"s3:PutObject\",\"s3:PutObjectAcl\"],\"Resource\":\"arn:aws:s3:::$CONFIG_BUCKET/AWSLogs/$ACCOUNT/*\",
    \"Condition\":{\"StringLike\":{\"s3:x-amz-acl\":\"bucket-owner-full-control\"}}},
   {\"Sid\":\"CheckAcl\",\"Effect\":\"Allow\",\"Action\":\"s3:GetBucketAcl\",\"Resource\":\"arn:aws:s3:::$CONFIG_BUCKET\"}]}"
 aws configservice put-configuration-recorder --configuration-recorder "name=default,roleARN=arn:aws:iam::$ACCOUNT:role/$CONFIG_ROLE" \

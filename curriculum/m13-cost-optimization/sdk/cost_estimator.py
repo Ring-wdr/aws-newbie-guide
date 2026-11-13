@@ -5,7 +5,7 @@ Cost Explorer(GetCostAndUsage)는 에뮬레이터에서 501 이고, 에뮬레이
 실제 업무에서도 "아직 청구서가 없는 설계안"을 비교할 때 쓰는 방식이다(AWS Pricing Calculator 가 하는 일).
 
 ⚠️ 아래 PRICES 는 계산 연습용 **예시 단가**다. 실제 AWS 가격이 아니며 리전·시기마다 다르다.
-   실제 숫자는 AWS Pricing Calculator(https://calculator.aws/)로 확인한다.
+   실제 숫자는 AWS Pricing Calculator(https://calculator.aws/)로 확인한다.  (external-host-ok: 학습자가 브라우저로 여는 안내 링크)
 
 읽는 것 (태그 cost-lab=<값> 이 붙은 리소스만)
     EC2 인스턴스   InstanceType, 태그 workload(steady|batch), hours-per-month(없으면 730)

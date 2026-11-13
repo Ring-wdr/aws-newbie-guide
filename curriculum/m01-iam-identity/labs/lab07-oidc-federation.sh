@@ -1,17 +1,19 @@
 #!/usr/bin/env bash
 # M01 lab07 — 자격 증명 연동: GitHub Actions(OIDC) 배포 역할 구성 (🟡)
 # 액세스 키를 CI 비밀 값에 넣는 대신, CI 가 발급받은 OIDC 토큰으로 역할을 맡게 하는 구성을 만든다.
-#   1) IAM OIDC 자격 증명 공급자(token.actions.githubusercontent.com) 등록
+#   1) IAM OIDC 자격 증명 공급자 등록 — 발급자는 예약 이름 token.todayorder.invalid
+#      (실제 GitHub Actions 발급자 https://token.actions.githubusercontent.com 은 레슨 6 "실제 AWS에서는"에만 쓴다. external-host-ok: 설명 주석
+#       에뮬레이터는 받은 발급자 주소를 따라가 공개 키를 가져오려 할 수 있으므로 실제 주소를 등록하지 않는다)
 #   2) 신뢰 정책 Principal 이 Federated 인 역할 + 조건(aud, sub = 저장소·브랜치)
 #   3) 일반 sts:AssumeRole 로는 이 역할을 맡을 수 없음을 확인
 # 실제 토큰 교환(AssumeRoleWithWebIdentity)은 하지 않는다: 에뮬레이터가 토큰 서명을 검증하려고
-# 발급자(GitHub)의 공개 키를 가져오려 하며, 이 실습은 외부로 나가는 요청을 만들지 않는다.
+# 발급자의 공개 키를 가져오려 하며, 이 실습은 외부로 나가는 요청을 만들지 않는다.
 set -euo pipefail
 source "$(git rev-parse --show-toplevel)/scripts/env.sh"
 source "$(dirname "$0")/_lib.sh"
 
 ACCOUNT=000000000000
-ISSUER=token.actions.githubusercontent.com
+ISSUER=token.todayorder.invalid   # 실제 GitHub Actions: token.actions.githubusercontent.com
 PROVIDER_ARN="arn:aws:iam::$ACCOUNT:oidc-provider/$ISSUER"
 ROLE=todayorder-gha-deploy
 
@@ -23,6 +25,7 @@ cleanup
 
 echo "== 1. OIDC 자격 증명 공급자 등록"
 # 지문(thumbprint)은 예시 값이다. 실제 AWS는 GitHub 같은 주요 공급자에 대해 자체 신뢰 루트로 검증한다.
+# 신뢰 정책의 조건 키 이름도 발급자를 따른다: $ISSUER:aud, $ISSUER:sub (실제 GitHub이면 token.actions.githubusercontent.com:aud·:sub)
 aws iam create-open-id-connect-provider --url "https://$ISSUER" \
   --client-id-list sts.amazonaws.com \
   --thumbprint-list 6938fd4d98bab03faadb97b34396831e3780aea1
@@ -62,6 +65,7 @@ e_assume="$ERR"
 # ---- 단언
 must_contain "$trust_back" "\"Federated\": \"$PROVIDER_ARN\"" "Federated 주체"
 must_contain "$trust_back" "repo:todayorder/api:ref:refs/heads/main" "sub 조건"
+must_contain "$trust_back" "\"$ISSUER:sub\"" "조건 키가 발급자 이름을 따름"
 must_contain "$e_assume" "AccessDenied" "일반 AssumeRole 거부"
 
 cleanup

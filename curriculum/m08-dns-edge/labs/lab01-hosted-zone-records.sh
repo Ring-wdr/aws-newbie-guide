@@ -24,13 +24,15 @@ aws route53 list-resource-record-sets --hosted-zone-id "$ZID" --no-paginate \
   --query 'ResourceRecordSets[].{Name: Name, Type: Type, TTL: TTL}' --output table
 
 echo "== 2. 레코드 만들기: A(api), CNAME(shop), TXT(apex)"
+# external-host-ok: example.net 은 RFC 2606 예약 도메인(문서용). CNAME 값으로 저장만 하고 해석·접속하지 않는다
+SHOP_TARGET=todayorder-shop.example.net
 cat >"$WORK/create.json" <<EOF
 {"Comment": "M08 lab01 첫 레코드",
  "Changes": [
   {"Action": "CREATE", "ResourceRecordSet": {"Name": "api.$ZONE", "Type": "A", "TTL": 60,
     "ResourceRecords": [{"Value": "192.0.2.10"}, {"Value": "192.0.2.11"}]}},
   {"Action": "CREATE", "ResourceRecordSet": {"Name": "shop.$ZONE", "Type": "CNAME", "TTL": 300,
-    "ResourceRecords": [{"Value": "todayorder-shop.example.net"}]}},
+    "ResourceRecords": [{"Value": "$SHOP_TARGET"}]}},
   {"Action": "CREATE", "ResourceRecordSet": {"Name": "$ZONE", "Type": "TXT", "TTL": 300,
     "ResourceRecords": [{"Value": "\"v=spf1 -all\""}]}}
  ]}

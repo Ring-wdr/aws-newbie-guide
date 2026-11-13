@@ -26,8 +26,8 @@ KEY_FILE = HERE / "answer-key.md"
 QUESTIONS_FILE = HERE / "questions.md"
 DOMAINS = {"D1": "보안 아키텍처", "D2": "복원력 있는 아키텍처", "D3": "고성능 아키텍처", "D4": "비용 최적화 아키텍처"}
 WEIGHTS = {"D1": 30, "D2": 26, "D3": 24, "D4": 20}  # 시험 가이드의 도메인 비중(%)
-PASS_PCT = 72.0
-MAX_LONGEST_SHARE = 0.30  # 단일 응답에서 "정답이 가장 긴 보기"인 비율 상한 — 길이만 보고 찍는 단서를 막는다  # docs/CURRICULUM.md §7 의 자체 기준
+PASS_PCT = 72.0  # 통과 기준 정답률 — docs/CURRICULUM.md §7 의 자체 기준
+MAX_LONGEST_SHARE = 0.30  # 단일 응답에서 "정답이 가장 긴 보기"인 비율 상한 — 길이만 보고 찍는 단서를 막는다
 TOTAL = 65
 
 

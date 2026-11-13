@@ -99,6 +99,7 @@ api_base() { echo "https://127.0.0.1:$EMULATOR_PORT/_aws/execute-api/$1"; }
 call() {
   local m="$1" u="$2"
   shift 2
+  case "$u" in https://127.0.0.1:* | http://127.0.0.1:*) ;; *) echo "call: 루프백(127.0.0.1)이 아닌 주소는 호출하지 않는다: $u" >&2; return 1 ;; esac
   curl -s --cacert "$AWS_CA_BUNDLE" -X "$m" -w '\n[HTTP %{http_code}]\n' "$@" "$u"
 }
 

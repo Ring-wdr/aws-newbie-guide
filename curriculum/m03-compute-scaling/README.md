@@ -54,40 +54,40 @@ curriculum/m03-compute-scaling/labs/verify.sh
 
 ## 에뮬레이터 제약
 
-에뮬레이터 1.0.322에서 이 모듈의 저자가 직접 확인한 것이다([FIDELITY.md](../../docs/FIDELITY.md)에 없던 것은 ★).
+에뮬레이터 1.0.322에서 이 모듈의 저자가 직접 확인한 것이다. 대부분은 재생성된 [FIDELITY.md](../../docs/FIDELITY.md)의 M03 사실 표·저자 관찰 표에도 있다. ★는 그 보고서에 아직 없는 관찰(이 행의 일부 오퍼레이션 포함)이다.
 
 | 오퍼레이션 / 동작 | 증상 | 대응 |
 |---|---|---|
 | 인스턴스 부팅·사용자 데이터 실행·SSH | 상태만 바뀌고 부팅하지 않는다. 사용자 데이터는 저장만 된다 | 상태 전이와 저장된 값을 관찰. 실행 결과는 "실제 AWS에서는" |
 | `DescribeInstanceStatus` | 501 | 레슨 1에서 501을 그대로 보여 줌 |
 | `ModifyInstanceAttribute`(인스턴스 유형 변경) | 501 | 시작 템플릿 새 버전으로 표현(lab08) |
-| ★ `DeleteKeyPair` | 501. 키 페어를 지울 수 없다 | lab01은 두 번째 실행부터 기존 키 페어 재사용(`InvalidKeyPair.Duplicate`를 보여 줌) |
-| ★ 종료된 인스턴스의 루트 볼륨 | `DeleteOnTermination=true`인데 삭제되지 않고 `in-use`로 남는다. 다른 데이터 볼륨도 종료 시 분리되지 않는다 | lab03은 볼륨을 먼저 떼고 인스턴스를 종료. 태그 감사(sdk)는 이 "유령 루트 볼륨"을 제외 |
-| `CreateImage`, `RegisterImage`, ★ `CopyImage` | 501 | 기존 AMI 읽기 실습(lab04) |
+| `DeleteKeyPair` | 501. 키 페어를 지울 수 없다 | lab01은 두 번째 실행부터 기존 키 페어 재사용(`InvalidKeyPair.Duplicate`를 보여 줌) |
+| 종료된 인스턴스의 루트 볼륨 | `DeleteOnTermination=true`인데 삭제되지 않고 `in-use`로 남는다. 다른 데이터 볼륨도 종료 시 분리되지 않는다 | lab03은 볼륨을 먼저 떼고 인스턴스를 종료. 태그 감사(sdk)는 이 "유령 루트 볼륨"을 제외 |
+| `CreateImage`, `RegisterImage`, `CopyImage` | 501 | 기존 AMI 읽기 실습(lab04) |
 | 스냅샷에서 볼륨 복원(`CreateVolume --snapshot-id`) | `InvalidSnapshot.NotFound` (방금 `completed`인 스냅샷인데도) | 🔴. 개념·"실제 AWS에서 해 보려면" |
 | ★ `ModifySnapshotTier`(아카이브), `GetEbsDefaultKmsKeyId` | 501 | 개념으로 |
-| ★ EBS IOPS:GiB 비율 | 검사하지 않음(gp3 10 GiB에 20,000 IOPS, io2 10 GiB에 100,000 IOPS 허용) | 레슨 3 표로 실제 한도를 설명 |
-| ★ `run-instances --block-device-mappings`(루트 볼륨 크기·암호화) | 무시되고 AMI 기본값(8 GiB, 비암호화)으로 생성 | 레슨 4에 명시 |
-| ★ 최대 절전 | 루트 볼륨 암호화 조건을 검사하지 않음. 상태 사유가 `Client.UserInitiatedShutdown` | 설정·거부 동작만 실습 |
-| ★ 배치 그룹 | 분산 그룹의 AZ당 7대 제한, 클러스터 그룹의 T 유형 금지를 검사하지 않음(파티션 8개 거부는 재현) | 레슨 4 표로 설명 |
-| ★ EIP | IGW 없는 VPC에서도 연결됨. 이미 연결된 EIP를 `--allow-reassociation` 없이 재연결해도 허용 | lab은 실제 AWS와 같은 방식(`--allow-reassociation`)으로 작성 |
-| ★ 스팟·RI·용량 예약 | 스팟 중단 없음. RI 가격표가 결제 방식별 할인을 반영하지 않음(선결제 ÷ 8760 = No Upfront 시간당). 용량 예약을 지정해 띄워도 `AvailableInstanceCount`가 줄지 않음 | 🟡. 가격 숫자는 실제가 아님을 명시 |
+| EBS IOPS:GiB 비율 | 검사하지 않음(gp3 10 GiB에 20,000 IOPS, io2 10 GiB에 100,000 IOPS 허용) | 레슨 3 표로 실제 한도를 설명 |
+| `run-instances --block-device-mappings`(루트 볼륨 크기·암호화) | 무시되고 AMI 기본값(8 GiB, 비암호화)으로 생성 | 레슨 4에 명시 |
+| 최대 절전 | 루트 볼륨 암호화 조건을 검사하지 않음. 상태 사유가 `Client.UserInitiatedShutdown` | 설정·거부 동작만 실습 |
+| 배치 그룹 | 분산 그룹의 AZ당 7대 제한, 클러스터 그룹의 T 유형 금지를 검사하지 않음(파티션 8개 거부는 재현) | 레슨 4 표로 설명 |
+| EIP | IGW 없는 VPC에서도 연결됨. 이미 연결된 EIP를 `--allow-reassociation` 없이 재연결해도 허용 | lab은 실제 AWS와 같은 방식(`--allow-reassociation`)으로 작성 |
+| 스팟·RI·용량 예약 | 스팟 중단 없음. RI 가격표가 결제 방식별 할인을 반영하지 않음(선결제 ÷ 8760 = No Upfront 시간당). 용량 예약을 지정해 띄워도 `AvailableInstanceCount`가 줄지 않음 | 🟡. 가격 숫자는 실제가 아님을 명시 |
 | ALB 엔드포인트 | 컨테이너 안(`127.0.0.1:<포트>`)에만 열림. 호스트에서 연결 불가 | `docker exec` 선택 과제(lab07) |
 | 대상 헬스 체크 | 실제 HTTP 검사 없음. 인스턴스가 running이면 healthy, 중지하면 `unhealthy/Target.Timeout` | 레슨 5에 명시 |
-| ★ ALB host-header 조건 | 규칙은 저장되지만 요청에 매칭되지 않음(default로 전달). path·http-header·query-string 조건은 동작 | lab07에서 그대로 보여 주고 단언 |
-| ★ ALB 리디렉션 | `Location` 호스트가 원래 호스트가 아니라 `elasticloadbalancingv2.amazonaws.com` | 상태 코드(301)만 단언 |
-| ★ NLB `--subnet-mappings`의 EIP | 주소가 응답에 표시되지 않음 | 개념으로 |
+| ALB host-header 조건 | 규칙은 저장되지만 요청에 매칭되지 않음(default로 전달). path·http-header·query-string 조건은 동작 | lab07에서 그대로 보여 주고 단언 |
+| ALB 리디렉션 | `Location` 호스트가 원래 호스트가 아니라 `elasticloadbalancingv2.amazonaws.com` | 상태 코드(301)만 단언 |
+| NLB `--subnet-mappings`의 EIP | 주소가 응답에 표시되지 않음 | 개념으로 |
 | Auto Scaling `PutScalingPolicy`(전 유형), `PutScheduledUpdateGroupAction`, `PutLifecycleHook`, `DescribeScalingActivities` | 501 | 정책 JSON 작성 + CLI 파라미터 검증 + 워크시트(lab09, sdk) |
 | ★ Auto Scaling `DescribePolicies`, `DescribeScheduledActions`, `DescribeLifecycleHooks`, `SetInstanceHealth`, `TerminateInstanceInAutoScalingGroup`, `EnterStandby`, `PutWarmPool`, `CreateOrUpdateTags` | 501 | 개념으로 |
 | 자가 치유 | 인스턴스를 종료해도 ASG가 `InService/Healthy`로 들고 있고 교체하지 않음 | lab09에서 관찰·단언 |
-| ★ ASG ↔ 대상 그룹 | `--target-group-arns`를 줘도 인스턴스가 대상 그룹에 등록되지 않음 | lab08에서 관찰 |
-| ★ ASG 축소 시 종료 대상 | 기본 종료 정책(오래된 템플릿 버전 우선)과 달리 새로 뜬 인스턴스를 종료 | 워크시트 12번으로 실제 규칙을 학습 |
-| ★ ASG 혼합 인스턴스 정책 | 저장되지만 첫 번째 유형의 온디맨드로만 띄움 | 개념으로 |
-| ★ 시작 템플릿 → ASG 인스턴스 | 템플릿의 `TagSpecifications`·`MetadataOptions`가 ASG 인스턴스에 반영되지 않음(ASG 태그의 `PropagateAtLaunch`는 반영) | 레슨 6에 명시 |
-| ★ 인스턴스 새로 고침 | **동작한다**(전체 교체, `Successful`) | 🟢 실습으로 추가(lab08) |
-| ★ Elastic Beanstalk 환경 | `Ready/Green`까지 가고 리소스 이름이 기록되지만 실제 ASG·ELB는 없음. 카탈로그에 없는 솔루션 스택 이름도 허용 | 🟡 |
+| ASG ↔ 대상 그룹 | `--target-group-arns`를 줘도 인스턴스가 대상 그룹에 등록되지 않음 | lab08에서 관찰 |
+| ASG 축소 시 종료 대상 | 기본 종료 정책(오래된 템플릿 버전 우선)과 달리 새로 뜬 인스턴스를 종료 | 워크시트 12번으로 실제 규칙을 학습 |
+| ASG 혼합 인스턴스 정책 | 저장되지만 첫 번째 유형의 온디맨드로만 띄움 | 개념으로 |
+| 시작 템플릿 → ASG 인스턴스 | 템플릿의 `TagSpecifications`·`MetadataOptions`가 ASG 인스턴스에 반영되지 않음(ASG 태그의 `PropagateAtLaunch`는 반영) | 레슨 6에 명시 |
+| 인스턴스 새로 고침 | **동작한다**(전체 교체, `Successful`) | 🟢 실습으로 추가(lab08) |
+| Elastic Beanstalk 환경 | `Ready/Green`까지 가고 리소스 이름이 기록되지만 실제 ASG·ELB는 없음. 카탈로그에 없는 솔루션 스택 이름도 허용 | 🟡 |
 | EC2 `DescribeTags`, Tagging API `GetResources` | 501 / EC2 리소스를 못 찾음 | sdk는 서비스별 describe/list 응답의 `Tags` 사용 |
-| ★ 일시적 SigV4 오류 | 호스트(Mac)가 잠자기에서 깨어난 직후 한동안 `SignatureDoesNotMatch` / env.sh 안전 장치 실패가 났다(시계 차이로 추정). 잠시 후 저절로 회복 | 실패하면 `scripts/emulator-status.sh` 확인 후 다시 실행 |
+| 일시적 SigV4 오류 | 호스트(Mac)가 잠자기에서 깨어난 직후 한동안 `SignatureDoesNotMatch` / env.sh 안전 장치 실패가 났다(시계 차이로 추정). 잠시 후 저절로 회복 | 실패하면 `scripts/emulator-status.sh` 확인 후 다시 실행 |
 
 ## 설계 대비 대체 사유
 

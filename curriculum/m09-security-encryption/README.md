@@ -82,7 +82,7 @@ lab03은 셸 실습이지만 로컬 암호화만 짧은 파이썬으로 한다. 
 CURRICULUM.md의 M09 실습을 모두 구현했고, 확인 결과에 따라 등급을 다음과 같이 확정·보강했다.
 
 - **"키 비활성화 시 Decrypt 실패"(저자 확인)**: 🟢로 확정 — `DisabledException`.
-- **Secrets Manager 🟢 + 자동 교체 추가**: FIDELITY는 `RotateSecret`을 오류로 기록했지만, 그것은 Lambda 리소스 정책이 없을 때의 정상 동작이었다. `add-permission` 후 에뮬레이터가 교체 Lambda를 실제로 4단계 호출해 비밀번호를 바꾸는 것을 확인해 lab04에 넣었다.
+- **Secrets Manager 🟢 + 자동 교체 추가**: 처음 탐침 보고서는 `RotateSecret`을 오류로 기록했지만, 그것은 Lambda 리소스 정책이 없을 때의 정상 동작이었다(재생성된 FIDELITY.md의 `security-better` 탐침은 교체 실행을 확인한다). `add-permission` 후 에뮬레이터가 교체 Lambda를 실제로 4단계 호출해 비밀번호를 바꾸는 것을 확인해 lab04에 넣었다.
 - **Config 🟢 + 자동 수정 추가**: 자동 수정(SSM Automation)이 실제로 실행되어 lab08에 넣었다.
 - **CloudTrail 🟡, GuardDuty 🟡, ACM DNS 검증 🟡/🔴**: 그대로.
 - 추가: 레슨 6용 lab10(Network Firewall, 🟡). CURRICULUM의 레슨 6에는 실습이 지정되지 않았지만 심층 방어의 빠진 계층을 손으로 만들어 보게 했다.

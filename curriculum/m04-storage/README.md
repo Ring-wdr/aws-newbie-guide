@@ -58,28 +58,28 @@ curriculum/m04-storage/labs/verify.sh
 
 ## 에뮬레이터 제약
 
-에뮬레이터 1.0.322에서 직접 확인한 것이다. FIDELITY.md와 다르거나 FIDELITY.md에 없던 항목은 **(신규)** 로 표시했다.
+에뮬레이터 1.0.322에서 직접 확인한 것이다. 재생성된 [FIDELITY.md](../../docs/FIDELITY.md)의 "M04 스토리지" 사실 표에도 같은 내용이 있다(Storage Gateway·DataSync의 일부 501 오퍼레이션처럼 표에 없는 세부는 이 모듈의 관찰).
 
 | 오퍼레이션 / 동작 | 증상 | 실습 대응 |
 |---|---|---|
 | S3에 대한 IAM 사용자 정책 **(M01과 같은 관찰)** | 객체·버킷 단위 데이터 요청(`GetObject`·`PutObject`·`ListObjectsV2`)은 정책이 없으면 암묵적 Deny, 명시적 Deny도 집행한다. 계정 수준·버킷 설정 요청(`ListBuckets`·`CreateBucket`·`DeleteBucket`·`PutBucketVersioning`)은 정책 없이도 통과 | 레슨 4 "실제 AWS에서는" |
 | 수명 주기 전환 | 규칙은 저장되지만 시간이 지나도 클래스가 바뀌지 않음 | lab02는 구성까지, 비용은 워크시트 |
-| `PutBucketLifecycleConfiguration` 검증 | **AWS 현재 규칙과 같게 동작한다.** STANDARD_IA·ONEZONE_IA를 30일 전에 전환하는 규칙(IA 10일, One Zone-IA 7일, IA 0일)과 이전 버전 IA 10일 전환을 받아 준다. 2026-07-16 AWS 발표로 현재 버전의 30일 최소 제한이 없어졌으므로 이것은 차이가 아니다(이전 버전은 발표가 언급하지 않아 미확인). 한 규칙 안에서 최소 보관 기간보다 빠른 연쇄 전환(Glacier IR 4일 → Deep Archive 20일, Glacier IR 0일 → Deep Archive 30일, 이전 버전 Glacier IR 5일 → Deep Archive 20일), 거꾸로 된 전환, 없는 클래스, 중복 규칙 ID, 0일 만료는 거부한다. **(신규)** FIDELITY의 "STANDARD_IA 30일 미만 → InvalidArgument 기대, 실제로는 성공(⚠️ 다름)"은 2026-07 이후 기준으로는 다름이 아니다 | lab02 10~12단계, `sdk/lifecycle_lint.py` |
-| Glacier 복원 | 수 초 만에 완료(실제 Standard 3–5시간) | 폴링으로 기다리고, 시간은 단언하지 않음 |
-| MFA Delete **(신규)** | 아무 MFA 코드나 받아 저장하고, 켠 뒤에도 MFA 없이 버전 영구 삭제가 통과함 | lab03에서 🟡로 관찰만 |
-| 객체 잠금 버킷의 버전 관리 일시 중지 **(신규)** | `Suspended`로 바뀜(AWS는 거부) | 레슨 3 "실제 AWS에서는" |
-| `PutBucketReplication` 검증 **(신규)** | 존재하지 않는 역할, 버전 관리 없는 대상, 없는 대상 버킷도 받아 줌. 버전 관리 없는 **원본**만 거부 | lab04는 실제처럼 역할·버전 관리를 만듦 |
+| `PutBucketLifecycleConfiguration` 검증 | **AWS 현재 규칙과 같게 동작한다.** STANDARD_IA·ONEZONE_IA를 30일 전에 전환하는 규칙(IA 10일·0일, One Zone-IA 7일 — FIDELITY 탐침과 같은 값. 편집자가 One Zone-IA 0·1일도 받아 주는 것을 확인)과 이전 버전 IA 10일 전환을 받아 준다. 2026-07-16 AWS 발표로 현재 버전의 "Standard에 30일 머문 뒤 전환" 제한이 없어졌으므로 이것은 차이가 아니다(이전 버전은 발표가 언급하지 않아 미확인). 없어진 것은 전환 전 대기뿐이고 **최소 보관 기간 요금은 남아 있다** — IA·One Zone-IA에 들어간 객체를 30일이 되기 전에 삭제·덮어쓰기·전환하면 30일을 채운 만큼 청구된다. 또 2024-09부터 수명 주기 전환은 기본적으로 **128 KB 미만 객체를 옮기지 않는다**(`TransitionDefaultMinimumObjectSize: all_storage_classes_128K`. 에뮬레이터에서는 전환이 일어나지 않아 확인 불가). 한 규칙 안에서 최소 보관 기간보다 빠른 연쇄 전환(Glacier IR 4일 → Deep Archive 20일, Glacier IR 0일 → Deep Archive 30일, 이전 버전 Glacier IR 5일 → Deep Archive 20일), 거꾸로 된 전환, 없는 클래스, 중복 규칙 ID, 0일 만료는 거부한다 | lab02 10~12단계, `sdk/lifecycle_lint.py` |
+| Glacier 복원 | Standard 복원이 1초 안팎에 완료(FIDELITY `s3`. 실제 Standard는 3–5시간). 복원 전 `GetObject`는 `InvalidObjectState`로 AWS와 같다 | 폴링으로 기다리고, 시간은 단언하지 않음 |
+| MFA Delete | 아무 MFA 코드나 받아 저장하고, 켠 뒤에도 MFA 없이 버전 영구 삭제가 통과함 | lab03에서 🟡로 관찰만 |
+| 객체 잠금 버킷의 버전 관리 일시 중지 | `Suspended`로 바뀜(AWS는 거부) | 레슨 3 "실제 AWS에서는" |
+| `PutBucketReplication` 검증 | 존재하지 않는 역할, 버전 관리 없는 대상, 없는 대상 버킷도 받아 줌. 버전 관리 없는 **원본**만 거부 | lab04는 실제처럼 역할·버전 관리를 만듦 |
 | SSE-KMS + 키 비활성화 | 키가 `Disabled`여도 객체가 읽힘 | 키 의존성 시연은 M09 |
-| SSE-KMS 응답의 `SSEKMSKeyId` **(신규)** | 요청에 쓴 별칭(`alias/...`)을 그대로 돌려줌(AWS는 키 ARN) | lab05 단언에서 둘 다 허용 |
-| SSE-C 차단 **(신규)** | 새 버킷 기본 암호화 설정에 `BlockedEncryptionTypes: SSE-C`가 보이지만(AWS 2026-04 기본값과 같음) **집행하지 않아** SSE-C 업로드가 통과함(AWS는 403) | lab05는 차단 목록을 먼저 비움 |
-| 퍼블릭 정책 + BPA 해제 **(신규)** | `IsPublic: true`가 되어도 익명 GET은 403 | 실습하지 않음, 레슨 4에 기록 |
+| SSE-KMS 응답의 `SSEKMSKeyId` | 요청에 쓴 별칭(`alias/...`)을 그대로 돌려줌(AWS는 키 ARN) | lab05 단언에서 둘 다 허용 |
+| SSE-C 차단 | 새 버킷 기본 암호화 설정에 `BlockedEncryptionTypes: SSE-C`가 보이지만(AWS 2026-04 기본값과 같음) **집행하지 않아** SSE-C 업로드가 통과함(AWS는 403) | lab05는 차단 목록을 먼저 비움 |
+| 퍼블릭 정책 + BPA 해제 | `IsPublic: true`가 되어도 익명 GET은 403 | 실습하지 않음, 레슨 4에 기록 |
 | S3 Control (`s3control`) | SDK가 `000000000000.127.0.0.1`로 보내 **도달 불가** | lab07 🔴 + 버킷 수준 BPA·정책 JSON 대체 실습 |
 | 웹 사이트·가속 엔드포인트 | 설정은 저장되지만 엔드포인트 없음 | lab09는 설정 확인만 |
-| EFS 마운트 타깃 **(신규 상세)** | 같은 AZ의 **다른 서브넷**에 두 번째 마운트 타깃을 만들면 충돌 없이 만들어진다(AWS는 `MountTargetConflict`). `MountTargetConflict`는 **같은 서브넷**으로 다시 만들 때만 난다. 마운트 타깃의 AZ 표시(`AvailabilityZoneName`, 오류 메시지의 AZ)와 IP가 서브넷의 AZ·CIDR과 다를 수 있다 | lab10은 AZ를 출력하지 않고 같은 서브넷으로 충돌 재현 |
+| EFS 마운트 타깃 | 같은 AZ의 **다른 서브넷**에 두 번째 마운트 타깃을 만들면 충돌 없이 만들어진다(AWS는 `MountTargetConflict`). `MountTargetConflict`는 **같은 서브넷**으로 다시 만들 때만 난다. 마운트 타깃의 AZ 표시(`AvailabilityZoneName`, 오류 메시지의 AZ)와 IP가 서브넷의 AZ·CIDR과 다를 수 있다 | lab10은 AZ를 출력하지 않고 같은 서브넷으로 충돌 재현 |
 | EFS 마운트 | NFS 서버가 없어 마운트 불가 | 🟡, "실제 AWS에서 해 보려면" |
-| Storage Gateway **(신규)** | 임의 활성화 키로 게이트웨이가 생기고 NFS 파일 공유는 AVAILABLE. `CreateSMBFileShare`·`CreateCachediSCSIVolume`·`CreateTapes`·`ListTapes`·`ListVolumes`는 **501** | lab11 🟡/🔴 |
-| DataSync **(신규)** | S3→S3 작업 실행이 `SUCCESS`인데 **0개 전송**(실제 복사 없음). `CreateLocationNfs`·`ListTaskExecutions`는 **501** | lab11은 "복사 안 됨"까지 단언 |
-| FSx **(신규)** | Lustre 파일 시스템이 AVAILABLE까지 생성되지만 `ImportPath`(S3 연결)가 저장되지 않음 | 실습하지 않음(레슨 6은 개념) |
+| Storage Gateway | 임의 활성화 키로 게이트웨이가 생기고 NFS 파일 공유는 AVAILABLE. `CreateSMBFileShare`·`CreateCachediSCSIVolume`·`CreateTapes`·`ListTapes`·`ListVolumes`는 **501** | lab11 🟡/🔴 |
+| DataSync | S3→S3 작업 실행이 `SUCCESS`인데 **0개 전송**(실제 복사 없음). `CreateLocationNfs`·`ListTaskExecutions`는 **501** | lab11은 "복사 안 됨"까지 단언 |
+| FSx | Lustre 파일 시스템이 AVAILABLE까지 생성되지만 `ImportPath`(S3 연결)가 저장되지 않음 | 실습하지 않음(레슨 6은 개념) |
 
 ## 설계 대비 대체 사유
 
