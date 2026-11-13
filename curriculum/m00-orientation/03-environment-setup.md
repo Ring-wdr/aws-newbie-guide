@@ -236,6 +236,8 @@ scripts/emulator-down.sh && EMULATOR_TELEMETRY=on scripts/emulator-up.sh
 | 증상 | 원인 | 해결 |
 |---|---|---|
 | `failed to connect to the docker API at unix:///var/run/docker.sock ... no such file or directory` | Colima가 꺼져 있거나 docker 컨텍스트가 Colima가 아님 | `colima start`, 그래도 안 되면 `docker context use colima`. 이 저장소 스크립트는 "Colima가 꺼져 있는 것 같습니다"라고 알려 준다 |
+| `install.sh`가 `Homebrew(/opt/homebrew/bin/brew)는 설치돼 있지만 PATH 에 없습니다` | Homebrew를 막 설치하고, 설치 프로그램이 마지막에 안내하는 `shellenv` 단계를 건너뛰었다 | 안내된 `eval "$(/opt/homebrew/bin/brew shellenv)"`를 실행하거나 새 터미널을 연 뒤 다시 `scripts/install.sh` |
+| `install.sh`가 `Docker Desktop 이 설치돼 있지만 실행 중이 아닙니다` | Docker Desktop이 있는 맥에서는 Colima를 따로 설치하지 않는다(런타임이 둘이면 docker 컨텍스트가 엇갈린다) | Docker Desktop을 실행하고 다시 `scripts/install.sh`. Colima를 쓰고 싶으면 `brew install colima` 후 다시 실행 |
 | 빌드 중 `DEPRECATED: The legacy builder is deprecated ... Install the buildx component` | Homebrew의 docker CLI에 buildx 플러그인이 없다 | 경고일 뿐 빌드는 성공한다. 없애려면 `brew install docker-buildx` 후 안내대로 설정 |
 | `docker: unknown command: docker buildx` | 위와 같음 | 이 저장소는 buildx 없이 빌드하도록 되어 있다. 무시해도 된다 |
 | `Bind for 127.0.0.1:9297 failed: port is already allocated` | 그 포트를 다른 컨테이너·프로그램이 쓰는 중 | `scripts/emulator-status.sh`, `lsof -i :9297`로 확인. 다른 포트를 쓰거나 기존 것을 내린다 |

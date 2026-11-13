@@ -17,6 +17,7 @@ REBUILD=0
 [ "${1:-}" = "--rebuild" ] && REBUILD=1
 
 OS="$(uname -s)"
+DOCKER_DESKTOP_APP="${DOCKER_DESKTOP_APP:-/Applications/Docker.app}"
 missing=()
 step() { printf '\n\033[1m▶ %s\033[0m\n' "$*"; }
 have() { command -v "$1" >/dev/null 2>&1; }
@@ -29,14 +30,21 @@ done
 
 if [ "$OS" = "Darwin" ]; then
   if ! have brew; then
+    # Homebrew 를 막 설치하면 brew 는 있지만 PATH 에 없다(설치 프로그램이 마지막에 안내하는 shellenv 단계를 건너뛴 경우).
+    for b in /opt/homebrew/bin/brew /usr/local/bin/brew; do
+      if [ -x "$b" ]; then
+        die "Homebrew($b)는 설치돼 있지만 PATH 에 없습니다. 다음을 실행한 뒤(또는 새 터미널에서) 다시 실행하세요: eval \"\$($b shellenv)\""
+      fi
+    done
     die "Homebrew가 필요합니다. https://brew.sh 의 안내대로 설치한 뒤 다시 실행하세요."  # external-host-ok: 설치 안내 문구(호출하지 않음)
   fi
   want=()
   have aws || want+=(awscli)
   have uv || want+=(uv)
   have docker || want+=(docker)
-  # Docker Desktop 등 다른 런타임이 이미 동작 중이면 Colima를 설치하지 않는다.
-  if ! have colima && ! { have docker && docker info >/dev/null 2>&1; }; then
+  # Docker Desktop 등 다른 런타임이 이미 동작 중이거나, Docker Desktop 이 설치돼 있으면(꺼져 있어도)
+  # Colima를 설치하지 않는다 — 런타임을 두 개 두면 docker 컨텍스트가 엇갈린다.
+  if ! have colima && ! { have docker && docker info >/dev/null 2>&1; } && [ ! -d "$DOCKER_DESKTOP_APP" ]; then
     want+=(colima)
   fi
   if [ ${#want[@]} -gt 0 ]; then
@@ -85,6 +93,10 @@ elif [ "$OS" = "Darwin" ] && have colima; then
   fi
   docker info >/dev/null 2>&1 || die "Colima를 켰지만 docker가 접속하지 못합니다. 'docker context use colima' 를 실행해 보세요."
   c_grn "Colima 실행 중"
+elif [ "$OS" = "Darwin" ] && [ -d "$DOCKER_DESKTOP_APP" ]; then
+  die "Docker Desktop 이 설치돼 있지만 실행 중이 아닙니다. Docker Desktop 을 실행한 뒤 다시 실행하세요. (Colima를 쓰려면: brew install colima 후 다시 실행)"
+elif case "$(docker info 2>&1 || true)" in *"permission denied"* | *"Permission denied"*) true ;; *) false ;; esac; then
+  die "Docker 데몬에 접속할 권한이 없습니다. 'sudo usermod -aG docker \$USER' 후 로그아웃했다가 다시 로그인하세요."
 else
   die "Docker 데몬에 접속할 수 없습니다. Docker를 실행한 뒤 다시 시도하세요 (Linux: 'sudo systemctl start docker')."
 fi
