@@ -70,6 +70,7 @@ def demo_records(cidr_collection_id: str) -> list[dict[str, Any]]:
         {
             "Name": ZONE,
             "Type": "A",
+            # external-host-ok: Route 53 별칭 값(AWS 문서의 예시 배포 이름). 에뮬레이터는 저장만 하고 해석·접속하지 않는다
             "AliasTarget": {"HostedZoneId": "Z2FDTNDATAQYW2", "DNSName": "d111111abcdef8.cloudfront.net", "EvaluateTargetHealth": False},
         },
     ]

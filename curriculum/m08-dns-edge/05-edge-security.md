@@ -113,7 +113,7 @@ awsCommon       BLOCK  x1   /search?q=%3Cscript%3Ealert(1)%3C/script%3E   AWS#AW
 awsSqli         BLOCK  x1   /orders?id=1%27%20OR%20%271%27=%271           AWS#AWSManagedRulesSQLiRuleSet#SQLi_QUERYARGUMENTS
 ```
 
-방금 본 것: 이 에뮬레이터 버전의 WAF는 규칙을 **저장만 하는 것이 아니라 ALB에서 실제로 평가해 403으로 차단**한다(탐침 FIDELITY.md에는 "차단 동작은 시험 안 함"으로 남아 있던 부분을 이 레슨에서 확인했다).
+방금 본 것: 이 에뮬레이터 버전의 WAF는 규칙을 **저장만 하는 것이 아니라 ALB에서 실제로 평가해 403으로 차단**한다(재생성된 FIDELITY.md의 `edge-better` 탐침도 같은 결과를 기록한다).
 - 관리형 규칙 그룹 안의 **어느 하위 규칙**이 걸렸는지(`SQLi_QUERYARGUMENTS`, `CrossSiteScripting_QUERYARGUMENTS`, `NoUserAgent_HEADER`)가 `get-sampled-requests`에 나온다. 정상 트래픽이 막혔을 때(오탐) 이 이름으로 그 하위 규칙만 Count로 바꾸는 식으로 튜닝한다.
 - 속도 기반 규칙: 20번까지 통과, 이후 10번 차단. 에뮬레이터는 숫자를 정확히 지키지만 **실제 WAF는 "한도 근처에서" 막고 정확한 일치를 보장하지 않으며 감지에 약간의 지연이 있다.** 한도의 최솟값은 10, 평가 창은 60/120/300/600초다.
 - 차단 목록 IP는 `X-Forwarded-For` 헤더로 흉내 냈다. 그래서 규칙에 `IPSetForwardedIPConfig`(XFF의 첫 IP를 본다)를 넣었다. 이 설정이 없으면 실제 WAF는 **요청을 보낸 연결의 IP**를 본다(XFF는 위조가 쉬우므로, 앞에 신뢰할 수 있는 프록시가 있을 때만 쓴다). 에뮬레이터는 이 설정이 없어도 XFF를 클라이언트 IP로 취급했다(탐색 중 관찰 — AWS와 다름).
