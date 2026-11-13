@@ -91,7 +91,7 @@ aws: [ERROR]: An error occurred (AccessDeniedException) when calling the RotateS
 ```
 
 방금 본 것:
-- `lambda add-permission --principal secretsmanager.amazonaws.com` 없이는 교체 설정 자체가 거부된다(FIDELITY의 "RotateSecret 오류"는 이 권한이 없을 때의 정상 동작이었다).
+- `lambda add-permission --principal secretsmanager.amazonaws.com` 없이는 교체 설정 자체가 거부된다(처음 탐침 보고서의 "RotateSecret 오류"는 이 권한이 없을 때의 정상 동작이었다. 재생성된 FIDELITY.md는 교체 실행을 확인한다).
 - 권한을 주자 에뮬레이터가 **Lambda를 실제로 4단계 호출**했고, 비밀번호가 무작위 값으로 바뀌었다. `RotateSecret`은 기본적으로 설정 즉시 한 번 교체한다.
 - 새 버전에 `AWSCURRENT`와 `AWSPENDING`이 함께 붙어 있다. AWS 문서에 따르면 성공한 교체 후 `AWSPENDING`은 `AWSCURRENT`와 같은 버전에 붙어 있거나 아무 버전에도 없을 수 있다 — 정상이다.
 
