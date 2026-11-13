@@ -50,6 +50,13 @@ export function transformCode(tree, ctx) {
       while (j < kids.length && isComment(kids[j])) skipped.push(kids[j++]);
       const next = kids[j];
       if (next && next.type === 'code' && !next.lang) {
+        // 명령과 그 출력 사이에는 위젯 표시를 둘 수 없다(GUIDE-SITE 4장). 주석 표시(external-host-ok)만 허용한다.
+        const misplaced = skipped.find((c) => /^<!--\s*widget:/.test(c.value.trim()));
+        if (misplaced) {
+          const msg = `위젯 표시 "${misplaced.value.trim()}"가 bash 명령과 그 출력 블록 사이에 있다 — 출력 블록 뒤(빈 줄로 둘러싼 독립된 줄)로 옮긴다`;
+          if (ctx.report) rep.unrecognised('markers', msg, misplaced);
+          else throw new Error(`${ctx.rel}:${misplaced.position?.start?.line}: ${msg}`);
+        }
         rep.handled('cmd');
         rep.note('cmd', 'bash+output');
         if (skipped.length) rep.note('cmd', 'paired-across-comment');
