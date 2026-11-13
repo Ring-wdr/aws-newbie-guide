@@ -89,7 +89,7 @@ aws ec2 wait nat-gateway-available --nat-gateway-ids $NAT_A $NAT_B     # pending
 aws ec2 create-route --route-table-id $APP_RT_A --destination-cidr-block 0.0.0.0/0 --nat-gateway-id $NAT_A
 ```
 
-NAT 게이트웨이는 만든 직후 `pending`이고, waiter가 `available`이 될 때까지 기다린다. lab02 실행 뒤 `aws ec2 describe-nat-gateways --filter Name=tag:Name,Values=todayorder-nat-a`의 결과:
+NAT 게이트웨이는 만든 직후 `pending`이고, waiter가 `available`이 될 때까지 기다린다(waiter는 `failed`·`deleting`·`deleted`를 보면 기다림을 멈추고 실패한다). lab 스크립트는 같은 조건을 15초 대신 1초 간격으로 확인하는 `wait_ec2_nat_available`([`scripts/lab-wait.sh`](../../scripts/lab-wait.sh))을 쓴다. lab02 실행 뒤 `aws ec2 describe-nat-gateways --filter Name=tag:Name,Values=todayorder-nat-a`의 결과:
 
 ```
 {

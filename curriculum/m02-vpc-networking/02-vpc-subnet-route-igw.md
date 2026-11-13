@@ -93,6 +93,8 @@ aws ec2 associate-route-table --route-table-id $PUB_RT --subnet-id $PUBLIC_A    
 # NAT 게이트웨이·앱/DB 라우팅 테이블은 레슨 3
 ```
 
+손으로 칠 때(그리고 실제 AWS에서)는 `aws ec2 wait vpc-available`이 맞는 도구다. lab 스크립트만 같은 조건(`State`가 `available`)을 1초 간격으로 확인하는 `wait_ec2_vpc_available`([`scripts/lab-wait.sh`](../../scripts/lab-wait.sh))을 쓴다. CLI waiter는 15초 간격으로 조회하는데, 에뮬레이터의 `create-vpc` 응답은 `pending`이라 첫 조회가 거의 늘 `pending`을 보고 15초를 통째로 기다리기 때문이다.
+
 ```bash
 bash curriculum/m02-vpc-networking/labs/lab02-three-tier-vpc.sh
 ```

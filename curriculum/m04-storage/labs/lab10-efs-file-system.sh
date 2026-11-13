@@ -5,6 +5,7 @@
 # 5) 마운트 타깃이 있으면 삭제 불가(FileSystemInUse) → 정리
 set -euo pipefail
 source "$(git rev-parse --show-toplevel)/scripts/env.sh"
+source "$(git rev-parse --show-toplevel)/scripts/lab-wait.sh"   # CLI waiter 대신 1초 간격 대기 (wait_ec2_vpc_available)
 
 TOKEN="todayorder-m04-shared-uploads"
 TAG="todayorder-m04-efs"
@@ -59,7 +60,8 @@ echo "== 1. 네트워크: VPC 10.40.0.0/16, 프라이빗 서브넷 2개(us-east-
 VPC="$(aws ec2 create-vpc --cidr-block 10.40.0.0/16 \
   --tag-specifications "ResourceType=vpc,Tags=[{Key=Name,Value=$TAG}]" --query Vpc.VpcId --output text)"
 # CreateVpc 응답은 pending 이다. 서브넷을 만들기 전에 available 을 기다린다.
-aws ec2 wait vpc-available --vpc-ids "$VPC"
+# (aws ec2 wait vpc-available 과 같은 조건. waiter 는 15초 간격이라 첫 조회가 pending 을 보면 15초를 통째로 잔다)
+wait_ec2_vpc_available "$VPC"
 SN_A="$(aws ec2 create-subnet --vpc-id "$VPC" --cidr-block 10.40.1.0/24 --availability-zone us-east-1a --query Subnet.SubnetId --output text)"
 SN_B="$(aws ec2 create-subnet --vpc-id "$VPC" --cidr-block 10.40.2.0/24 --availability-zone us-east-1b --query Subnet.SubnetId --output text)"
 APP_SG="$(aws ec2 create-security-group --group-name todayorder-m04-app --description 'app servers' --vpc-id "$VPC" --query GroupId --output text)"

@@ -29,7 +29,7 @@ cleanup() {
 cleanup
 
 VPC="$(aws ec2 create-vpc --cidr-block 10.98.0.0/16 --tag-specifications "$(tags vpc "$NAME")" --query Vpc.VpcId --output text)"
-aws ec2 wait vpc-available --vpc-ids "$VPC"
+wait_ec2_vpc_available "$VPC"
 RT="$(aws ec2 create-route-table --vpc-id "$VPC" --query RouteTable.RouteTableId --output text)"
 IGW="$(aws ec2 create-internet-gateway --query InternetGateway.InternetGatewayId --output text)"
 aws ec2 attach-internet-gateway --internet-gateway-id "$IGW" --vpc-id "$VPC"

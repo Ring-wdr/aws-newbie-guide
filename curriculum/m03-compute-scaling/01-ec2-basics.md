@@ -231,7 +231,7 @@ running	shutting-down
 상태 전이: shutting-down → terminated
 ```
 
-방금 본 것: 수명 주기 다이어그램의 전이가 그대로 관찰된다(🟢). 인스턴스 유형 변경(`ModifyInstanceAttribute`)은 에뮬레이터 미구현이다. 이 모듈은 대신 **시작 템플릿 새 버전**으로 "유형 변경"을 표현한다(레슨 6, [lab08](./labs/lab08-launch-template-asg.sh)).
+방금 본 것: 수명 주기 다이어그램의 전이가 그대로 관찰된다(🟢). `aws ec2 wait instance-running`은 15초 간격으로 상태를 조회하고, 도중에 `terminated`·`stopping` 등이 보이면 기다림을 멈추고 실패한다. lab 스크립트는 같은 조건을 1초 간격으로 확인하는 함수([`scripts/lab-wait.sh`](../../scripts/lab-wait.sh))를 써서 `waiter: running (lab 은 1초 간격 확인)`을 출력한다 — 에뮬레이터는 1초도 안 돼 `running`이 되지만 waiter의 첫 조회가 `pending`을 보면 15초를 통째로 기다리기 때문이다. 손으로 칠 때(그리고 실제 AWS에서)는 waiter가 맞는 도구다. 인스턴스 유형 변경(`ModifyInstanceAttribute`)은 에뮬레이터 미구현이다. 이 모듈은 대신 **시작 템플릿 새 버전**으로 "유형 변경"을 표현한다(레슨 6, [lab08](./labs/lab08-launch-template-asg.sh)).
 
 ## 실제 AWS에서는
 

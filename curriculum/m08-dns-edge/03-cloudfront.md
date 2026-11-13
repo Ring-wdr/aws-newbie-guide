@@ -99,7 +99,7 @@ make_bucket: todayorder-m08-static
 ```
 
 방금 본 것:
-- 상태가 `InProgress` → `Deployed`로 바뀐다(`aws cloudfront wait distribution-deployed`). 실제 AWS에서는 전 세계 엣지에 퍼지는 데 몇 분이 걸린다.
+- 상태가 `InProgress` → `Deployed`로 바뀐다(`aws cloudfront wait distribution-deployed`). 실제 AWS에서는 전 세계 엣지에 퍼지는 데 몇 분이 걸린다. 이 waiter는 60초 간격(무효화 waiter `invalidation-completed`는 20초)으로 조회하므로, lab 스크립트는 같은 조건을 1초 간격으로 확인하는 `wait_cloudfront_distribution_deployed`·`wait_cloudfront_invalidation_completed`([`scripts/lab-wait.sh`](../../scripts/lab-wait.sh))를 쓴다. 손으로 칠 때는 waiter가 맞다.
 - **`DomainName`이 `*.cloudfront.net`이 아니라 `127.0.0.1:44093`** 이다. 에뮬레이터는 배포마다 **컨테이너 안의** 임의 포트에 작은 HTTP 서버를 띄운다. 이 주소는 학습자 PC에서 열리지 않는다(호스트에서 `curl http://127.0.0.1:<그 포트>/`를 하면 연결이 거부되어 `000`이 나온다). Route 53 Alias의 대상으로도 쓸 수 없다.
 - 캐시 정책 ID `658327ea-…`는 AWS 관리형 정책 **Managed-CachingOptimized**의 고정 ID다(실제 AWS에서도 같다).
 

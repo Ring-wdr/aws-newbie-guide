@@ -12,11 +12,11 @@ S=todayorder-order-stream
 echo "== 1. 샤드 2개짜리 스트림 (프로비저닝 모드)"
 if aws kinesis describe-stream-summary --stream-name "$S" >/dev/null 2>&1; then
   aws kinesis delete-stream --stream-name "$S"
-  aws kinesis wait stream-not-exists --stream-name "$S"
+  wait_kinesis_stream_gone "$S"
 fi
 aws kinesis create-stream --stream-name "$S" --shard-count 2
 aws kinesis describe-stream-summary --stream-name "$S" --query StreamDescriptionSummary.StreamStatus --output text
-aws kinesis wait stream-exists --stream-name "$S"
+wait_kinesis_stream_active "$S"   # = aws kinesis wait stream-exists (10초 간격) 를 1초 간격으로
 aws kinesis describe-stream-summary --stream-name "$S" \
   --query 'StreamDescriptionSummary.{Status: StreamStatus, OpenShards: OpenShardCount, RetentionHours: RetentionPeriodHours, Mode: StreamModeDetails.StreamMode}'
 

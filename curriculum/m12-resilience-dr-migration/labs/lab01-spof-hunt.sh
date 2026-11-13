@@ -10,6 +10,8 @@
 set -euo pipefail
 ROOT="$(git rev-parse --show-toplevel)"
 source "$ROOT/scripts/env.sh"
+# CLI waiter(EC2 15초, RDS 30초 간격) 대신 같은 성공·실패 조건을 1초 간격으로 확인한다 (scripts/lab-wait.sh 머리말)
+source "$ROOT/scripts/lab-wait.sh"
 AUDIT="$ROOT/curriculum/m12-resilience-dr-migration/sdk/spof_audit.py"
 cd "$ROOT"
 
@@ -41,7 +43,7 @@ teardown() {
   [ -n "$tg" ] && [ "$tg" != "None" ] && aws elbv2 delete-target-group --target-group-arn "$tg"
   if ! rds_gone; then
     aws rds delete-db-instance --db-instance-identifier "$P-db" --skip-final-snapshot >/dev/null
-    wait_until "RDS 삭제" 120 rds_gone
+    wait_rds_instance_deleted "$P-db"
   fi
   aws rds delete-db-subnet-group --db-subnet-group-name "$P-db-subnets" >/dev/null 2>&1 || true
   for vpc in $(aws ec2 describe-vpcs --filters "Name=tag:Name,Values=$VPC_NAME" --query 'Vpcs[].VpcId' --output text); do
@@ -51,7 +53,7 @@ teardown() {
       # shellcheck disable=SC2086
       aws ec2 terminate-instances --instance-ids $ids >/dev/null
       # shellcheck disable=SC2086
-      aws ec2 wait instance-terminated --instance-ids $ids
+      wait_ec2_instance_terminated $ids
     fi
     for id in $(aws ec2 describe-nat-gateways --filter "Name=vpc-id,Values=$vpc" "Name=state,Values=pending,available" --query 'NatGateways[].NatGatewayId' --output text); do
       aws ec2 delete-nat-gateway --nat-gateway-id "$id" >/dev/null
@@ -98,7 +100,7 @@ for s in "$PUB_A" "$PUB_B"; do aws ec2 associate-route-table --route-table-id "$
 # v1 의 NAT: AZ-a 에 하나만. 프라이빗 서브넷 4개가 라우팅 테이블 하나로 전부 이 NAT 을 쓴다.
 EIP_A="$(aws ec2 allocate-address --domain vpc --tag-specifications "$(tag elastic-ip "$P-nat-a")" --query AllocationId --output text)"
 NAT_A="$(aws ec2 create-nat-gateway --subnet-id "$PUB_A" --allocation-id "$EIP_A" --tag-specifications "$(tag natgateway "$P-nat-a")" --query NatGateway.NatGatewayId --output text)"
-aws ec2 wait nat-gateway-available --nat-gateway-ids "$NAT_A"
+wait_ec2_nat_available "$NAT_A"
 RT_PRIV="$(aws ec2 create-route-table --vpc-id "$VPC" --tag-specifications "$(tag route-table "$P-private")" --query RouteTable.RouteTableId --output text)"
 aws ec2 create-route --route-table-id "$RT_PRIV" --destination-cidr-block 0.0.0.0/0 --nat-gateway-id "$NAT_A" >/dev/null
 for s in "$APP_A" "$APP_B" "$DB_A" "$DB_B"; do aws ec2 associate-route-table --route-table-id "$RT_PRIV" --subnet-id "$s" >/dev/null; done
@@ -108,7 +110,7 @@ AMI="$(aws ec2 describe-images --owners amazon --query 'Images[0].ImageId' --out
 SG_APP="$(aws ec2 create-security-group --vpc-id "$VPC" --group-name "$P-app" --description "api" --query GroupId --output text)"
 API_1="$(aws ec2 run-instances --image-id "$AMI" --instance-type t3.small --subnet-id "$APP_A" --security-group-ids "$SG_APP" \
   --tag-specifications "$(tag instance "$P-api-1")" --query 'Instances[0].InstanceId' --output text)"
-aws ec2 wait instance-running --instance-ids "$API_1"
+wait_ec2_instance_running "$API_1"
 
 # ALB 는 2-AZ 에 걸쳐 있지만 대상은 한 대.
 ALB="$(aws elbv2 create-load-balancer --name "$P-alb" --subnets "$PUB_A" "$PUB_B" --query 'LoadBalancers[0].LoadBalancerArn' --output text)"
@@ -121,7 +123,7 @@ aws rds create-db-subnet-group --db-subnet-group-name "$P-db-subnets" --db-subne
 aws rds create-db-instance --db-instance-identifier "$P-db" --engine postgres --db-instance-class db.t3.micro \
   --allocated-storage 20 --master-username app --master-user-password 'Passw0rd!x' \
   --db-subnet-group-name "$P-db-subnets" --no-multi-az --availability-zone "$AZ_A" >/dev/null
-aws rds wait db-instance-available --db-instance-identifier "$P-db"
+wait_rds_instance_available "$P-db"
 echo "v1 완성: VPC $VPC · NAT 1개 · API 1대 · ALB · RDS(단일 AZ)"
 
 echo "== 2. SPOF 감사 (v1)"
@@ -132,7 +134,7 @@ echo "== 3. 고치기"
 echo "-- 3a. AZ-b 에 NAT 게이트웨이를 하나 더, 프라이빗 라우팅을 AZ 별로 나눈다"
 EIP_B="$(aws ec2 allocate-address --domain vpc --tag-specifications "$(tag elastic-ip "$P-nat-b")" --query AllocationId --output text)"
 NAT_B="$(aws ec2 create-nat-gateway --subnet-id "$PUB_B" --allocation-id "$EIP_B" --tag-specifications "$(tag natgateway "$P-nat-b")" --query NatGateway.NatGatewayId --output text)"
-aws ec2 wait nat-gateway-available --nat-gateway-ids "$NAT_B"
+wait_ec2_nat_available "$NAT_B"
 RT_PRIV_B="$(aws ec2 create-route-table --vpc-id "$VPC" --tag-specifications "$(tag route-table "$P-private-b")" --query RouteTable.RouteTableId --output text)"
 aws ec2 create-route --route-table-id "$RT_PRIV_B" --destination-cidr-block 0.0.0.0/0 --nat-gateway-id "$NAT_B" >/dev/null
 for s in "$APP_B" "$DB_B"; do
@@ -162,7 +164,7 @@ ASG_IDS="$(aws autoscaling describe-auto-scaling-groups --auto-scaling-group-nam
 aws elbv2 register-targets --target-group-arn "$TG" --targets $(printf 'Id=%s ' $ASG_IDS)
 aws elbv2 deregister-targets --target-group-arn "$TG" --targets "Id=$API_1"
 aws ec2 terminate-instances --instance-ids "$API_1" >/dev/null
-aws ec2 wait instance-terminated --instance-ids "$API_1"
+wait_ec2_instance_terminated "$API_1"
 
 echo "-- 3c. RDS 를 Multi-AZ 로"
 aws rds modify-db-instance --db-instance-identifier "$P-db" --multi-az --apply-immediately \

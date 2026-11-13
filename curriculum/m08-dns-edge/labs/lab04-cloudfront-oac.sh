@@ -26,7 +26,7 @@ for d in (json.loads(sys.stdin.read() or "{}").get("DistributionList", {}).get("
     py 'c = json.load(sys.stdin)["DistributionConfig"]; c["Enabled"] = False; print(json.dumps(c))' <"$WORK/old.json" >"$WORK/disabled.json"
     etag="$(aws cloudfront update-distribution --id "$id" --if-match "$etag" --distribution-config "file://$WORK/disabled.json" --query ETag --output text)"
   fi
-  aws cloudfront wait distribution-deployed --id "$id"
+  wait_cloudfront_distribution_deployed "$id"
   aws cloudfront delete-distribution --id "$id" --if-match "$etag"
 done
 for id in $(aws cloudfront list-origin-access-controls --output json | py '
@@ -82,7 +82,7 @@ aws cloudfront create-distribution --distribution-config "file://$WORK/dist.json
 DIST="$(py 'print(json.load(sys.stdin)["Id"])' <"$WORK/created.json")"
 DOMAIN="$(py 'print(json.load(sys.stdin)["DomainName"])' <"$WORK/created.json")"
 DIST_ARN="arn:aws:cloudfront::000000000000:distribution/$DIST"
-aws cloudfront wait distribution-deployed --id "$DIST"
+wait_cloudfront_distribution_deployed "$DIST"
 status="$(aws cloudfront get-distribution --id "$DIST" --query Distribution.Status --output text)"
 echo "대기 후 상태: $status  ·  DomainName: $DOMAIN  (실제 AWS라면 dxxxxxxxxxxxxx.cloudfront.net)"
 aws cloudfront get-distribution-config --id "$DIST" \
@@ -129,7 +129,7 @@ echo "HTTP $direct"
 
 echo "== 6. 무효화(invalidation) — 엣지 캐시에서 /index.html 을 지운다"
 INV="$(aws cloudfront create-invalidation --distribution-id "$DIST" --paths /index.html --query Invalidation.Id --output text)"
-aws cloudfront wait invalidation-completed --distribution-id "$DIST" --id "$INV"
+wait_cloudfront_invalidation_completed "$DIST" "$INV"
 inv_status="$(aws cloudfront get-invalidation --distribution-id "$DIST" --id "$INV" --query Invalidation.Status --output text)"
 echo "무효화 $INV: $inv_status"
 

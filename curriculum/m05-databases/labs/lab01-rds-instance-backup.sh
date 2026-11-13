@@ -53,7 +53,7 @@ aws rds create-db-instance --db-instance-identifier "$DB" \
   --db-parameter-group-name "$PG" --backup-retention-period 7 \
   --no-publicly-accessible --deletion-protection \
   --query 'DBInstance.{Status: DBInstanceStatus, Engine: Engine, Version: EngineVersion, Class: DBInstanceClass}'
-rds_wait_instance_available "$DB"
+wait_rds_instance_available "$DB"
 aws rds describe-db-instances --db-instance-identifier "$DB" --query 'DBInstances[0].{
   Status: DBInstanceStatus, AZ: AvailabilityZone, Endpoint: Endpoint.Address, Port: Endpoint.Port,
   Encrypted: StorageEncrypted, Public: PubliclyAccessible, BackupRetention: BackupRetentionPeriod,
@@ -66,7 +66,7 @@ echo "LatestRestorableTime=$restorable  (자동 백업이 켜져 있으면 '여�
 echo "== 5. 수동 스냅샷 (자동 백업과 달리 직접 지울 때까지 남는다)"
 aws rds create-db-snapshot --db-instance-identifier "$DB" --db-snapshot-identifier "$SNAP" \
   --query 'DBSnapshot.{Id: DBSnapshotIdentifier, Type: SnapshotType, Status: Status}'
-rds_wait_snapshot_available "$SNAP"
+wait_rds_snapshot_available "$SNAP"
 aws rds describe-db-snapshots --db-snapshot-identifier "$SNAP" \
   --query 'DBSnapshots[0].{Id: DBSnapshotIdentifier, Type: SnapshotType, Status: Status, Encrypted: Encrypted, Engine: EngineVersion}'
 
@@ -75,7 +75,7 @@ aws rds restore-db-instance-from-db-snapshot --db-instance-identifier "$RESTORED
   --db-snapshot-identifier "$SNAP" --db-subnet-group-name "$SNG" --vpc-security-group-ids "$DB_SG" \
   --db-parameter-group-name "$PG" \
   --query 'DBInstance.{Id: DBInstanceIdentifier, Status: DBInstanceStatus, Version: EngineVersion}'
-rds_wait_instance_available "$RESTORED"
+wait_rds_instance_available "$RESTORED"
 aws rds describe-db-instances --query "DBInstances[?starts_with(DBInstanceIdentifier, 'todayorder-m05-db')].[DBInstanceIdentifier, DBInstanceStatus, Endpoint.Port]" --output table
 
 echo "== 7. 시점 복원(PITR) 시도 — 에뮬레이터 미구현"
@@ -89,12 +89,12 @@ expect_error InvalidParameterCombination aws rds delete-db-instance --db-instanc
 echo "-- 삭제 방지를 끄고, 최종 스냅샷을 남기며 삭제"
 aws rds modify-db-instance --db-instance-identifier "$DB" --no-deletion-protection --apply-immediately \
   --query 'DBInstance.DeletionProtection'
-rds_wait_instance_available "$DB"
+wait_rds_instance_available "$DB"
 echo "-- 최종 스냅샷 이름도, --skip-final-snapshot 도 주지 않으면?"
 expect_error InvalidParameterCombination aws rds delete-db-instance --db-instance-identifier "$DB"
 aws rds delete-db-instance --db-instance-identifier "$DB" --final-db-snapshot-identifier "$FINAL" \
   --query 'DBInstance.DBInstanceStatus'
-rds_wait_instance_deleted "$DB"
+wait_rds_instance_deleted "$DB"
 aws rds describe-db-snapshots --query "DBSnapshots[?starts_with(DBSnapshotIdentifier, 'todayorder-m05-db')].[DBSnapshotIdentifier, SnapshotType, Status, DBInstanceIdentifier]" --output table
 final_status="$(aws rds describe-db-snapshots --db-snapshot-identifier "$FINAL" --query 'DBSnapshots[0].Status' --output text)"
 

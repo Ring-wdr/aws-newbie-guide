@@ -19,7 +19,7 @@ SVPC="$(vpc_id todayorder-settlement-vpc)"
 if [ -z "$SVPC" ] || [ -z "$(rtb_id todayorder-settlement-rt)" ] || [ -z "$(subnet_id todayorder-settlement-a)" ] || [ -z "$(subnet_id todayorder-settlement-b)" ]; then
   teardown_vpc todayorder-settlement-vpc
   SVPC="$(aws ec2 create-vpc --cidr-block 10.20.0.0/16 --tag-specifications "$(tags vpc todayorder-settlement-vpc)" --query Vpc.VpcId --output text)"
-  aws ec2 wait vpc-available --vpc-ids "$SVPC"
+  wait_ec2_vpc_available "$SVPC"
   SA="$(aws ec2 create-subnet --vpc-id "$SVPC" --cidr-block 10.20.0.0/24 --availability-zone us-east-1a --tag-specifications "$(tags subnet todayorder-settlement-a)" --query Subnet.SubnetId --output text)"
   SB="$(aws ec2 create-subnet --vpc-id "$SVPC" --cidr-block 10.20.1.0/24 --availability-zone us-east-1b --tag-specifications "$(tags subnet todayorder-settlement-b)" --query Subnet.SubnetId --output text)"
   SRT="$(aws ec2 create-route-table --vpc-id "$SVPC" --tag-specifications "$(tags route-table todayorder-settlement-rt)" --query RouteTable.RouteTableId --output text)"

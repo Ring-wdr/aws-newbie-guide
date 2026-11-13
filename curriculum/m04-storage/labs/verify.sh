@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # M04 모듈 검증: $EMULATOR_PORT 의 에뮬레이터를 재시작(깨끗한 상태)한 뒤
-# 모든 lab 과 sdk 예제를 순서대로 실행하고, lab 은 한 번 더 실행해 멱등성을 확인한다.
+# 모든 lab 과 sdk 예제를 실행한다. lab 은 번호 순서로 한 번, 역순으로 한 번 더 실행해 멱등성·순서 무관성을 확인한다.
 #
 #   export EMULATOR_PORT=9297     # 학습자는 생략 가능(대화형 터미널이면 9297)
 #   curriculum/m04-storage/labs/verify.sh
