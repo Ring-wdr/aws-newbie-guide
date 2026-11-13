@@ -30,15 +30,17 @@
 
 aws-emulator는 **컨트롤 플레인(리소스 생성·조회·수정·삭제)** 충실도가 가장 높고, 데이터 플레인과 서비스 간 연동은 서비스마다 다르다. 알려진 주요 제약:
 
-- IAM 정책 평가는 **서비스마다 다르다**. IAM 사용자에게 붙인 정책을 IAM·EC2·KMS는 평가해 거부하고(명시적 Deny 우선도 재현), S3·SQS·DynamoDB는 무시한다. 단 Step Functions 실행 역할처럼 서비스가 역할을 맡아 호출할 때는 SQS도 그 역할의 권한을 평가했다. STS는 역할의 신뢰 정책을, S3는 버킷 정책의 명시적 Deny를, KMS는 키 정책을 집행하며, 서비스 역할의 신뢰 정책(Step Functions·Pipes·Glue·Backup)도 검사한다. `iam simulate-*-policy`는 올바르게 판정한다. 공식 문서는 "보안 테스트에 쓰지 말라"고 하며, 이 동작은 버전에 따라 바뀔 수 있다.
+- IAM 정책 평가는 **부분적이다**. IAM·EC2·KMS·Secrets Manager와 S3·SQS·DynamoDB의 **리소스 단위 데이터 요청**(GetObject·PutObject·ListObjectsV2, SendMessage·ReceiveMessage, PutItem·Scan 등)은 사용자 정책의 암묵적·명시적 Deny를 집행한다. 그러나 S3·SQS·DynamoDB의 **계정·관리 요청**(ListBuckets·CreateBucket·DeleteBucket·PutBucketVersioning, ListQueues·CreateQueue, ListTables·CreateTable·DescribeTable·DeleteTable)은 평가하지 않는다. AssumeRole은 역할의 신뢰 정책만 보고 호출자 정책은 보지 않는다(명시적 Deny도 무시). 세션 정책은 IAM에는 적용되고 EC2에는 적용되지 않는다. `iam:PassRole`은 검사하지 않는다. 비활성 액세스 키는 IAM API만 거부한다. 자격 증명 정책의 전역 조건 키는 서비스·키마다 다르게 평가된다: S3·SQS 데이터 요청은 `aws:SecureTransport`·`aws:PrincipalAccount` 조건을 AWS처럼 판정하지만 `aws:RequestedRegion` 조건이 붙은 문장은 Allow가 결코·Deny가 항상 적용되고, DynamoDB·EC2·IAM은 세 키 모두 Allow가 결코·Deny가 항상 적용된다. 따라서 조건이 있는 정책은 `iam simulate-*-policy`(`--context-entries`)로 판정한다. `iam simulate-*-policy`와 신뢰 정책 조건은 올바르게 판정하고, 버킷 정책 Deny·KMS 키 정책·서비스 역할 신뢰 정책·Lambda 실행 역할·Glue 작업 역할 정책은 집행된다. 공식 문서는 "보안 테스트에 쓰지 말라"고 하며, 이 동작은 버전에 따라 바뀔 수 있다.
 - 리전·계정을 **분리하지 않는다**. 어떤 리전·계정 ID로 요청해도 받아 주지만 리소스를 나눠 보관하지 않는다. 계정은 `000000000000`으로 보이며, 이 커리큘럼은 리전을 `us-east-1` 하나로 고정한다.
 - S3 Control API(액세스 포인트, 계정 수준 퍼블릭 액세스 차단 등)는 SDK가 호스트명에 계정 ID를 붙이기 때문에 에뮬레이터에 **도달하지 않는다** → 🔴.
 - 엔드포인트는 반드시 `127.0.0.1` (`localhost`를 쓰면 일부 SDK(JS·Java·Go)가 S3 버킷명을 호스트명에 넣어 실패한다). `AWS_DISABLE_HOST_PREFIX_INJECTION=true`는 에뮬레이터 전용 설정이다.
 - 모든 상태는 **메모리**에 있고 에뮬레이터를 끄면 사라진다.
-- EC2 인스턴스는 상태만 바뀌고 **부팅되지 않는다**. 반대로 Lambda `Invoke`는 함수 코드를 **실제로 실행**하고, SNS→SQS·S3 이벤트·EventBridge·Step Functions 같은 서비스 간 전달도 실제로 일어난다.
-- RDS·ALB·CloudFront 같은 **리소스 자체의 엔드포인트는 컨테이너 안에만** 열린다. 학습자 PC에서 접속할 수 없다.
-- 조정·관리 계열에 501이 몰려 있다: Auto Scaling 조정 정책·수명 주기 후크, Organizations SCP·계정, VPC 피어링 수락·Egress-only IGW·VPN, AMI 생성, Glue 크롤러, Session Manager, Cost Explorer.
-- 시간 기반 동작은 빠르거나 없다 (TTL 삭제는 수 초, S3 수명 주기 전환은 일어나지 않음, Route 53 상태 확인은 항상 성공).
+- EC2 인스턴스는 상태만 바뀌고 **부팅되지 않는다**. 반대로 Lambda `Invoke`는 함수 코드를 **실제로 실행**한다(CPython이 아니라 RustPython과 축소된 boto3). SNS→SQS·S3 이벤트·EventBridge·Pipes·Step Functions(Retry/Catch 포함)·CloudWatch 경보→SNS 같은 서비스 간 전달, Glue Python shell 작업, Athena SQL(SQLite 계열 — 파티션 열·Trino 함수 없음), Secrets Manager 교체, Config 자동 수정, ALB 앞의 WAF 차단도 실제로 일어난다. Lambda 리소스 정책은 REST API·SNS·S3 경로에서 집행되고 HTTP API만 예외다.
+- RDS 인스턴스·Aurora 쓰기 엔드포인트·ALB·NLB·CloudFront의 **엔드포인트는 `127.0.0.1:<임의 포트>`로 컨테이너 안에만** 열린다. 학습자 PC에서 접속할 수 없다(API Gateway 실행 URL만 예외). ElastiCache·Aurora 리더 엔드포인트는 실제 AWS 형식 이름이라 어디서도 접속할 수 없고, 접속을 시도하면 바깥 DNS에 묻게 되므로 실습에서 접속하지 않는다.
+- 조정·관리·삭제 계열에 501이 몰려 있다: Auto Scaling 조정 정책·수명 주기 후크·조회, Organizations SCP·계정, IAM MFA 장치, VPC 피어링 수락·거절·삭제·`ReplaceRoute`·TGW 정적 경로·연결 삭제·Egress-only IGW·리전 NAT·VPN·Client VPN, AMI 생성, RDS PITR·복제본 승격, ElastiCache 복제 그룹 삭제, Glue 크롤러, Athena 작업 그룹 목록·삭제, SSM Session Manager·패치, Backup·DMS 목록·삭제 계열, Cost Explorer.
+- 시간 기반 동작은 빠르거나 없다: TTL 삭제·Firehose 버퍼·Glacier 복원은 수 초, EventBridge Scheduler `at()`은 지정 시각 전에 발화, S3 수명 주기 전환·Lambda 비동기 실패 대상·Route 53 상태 확인 실패는 일어나지 않는다. CloudFormation은 `DescribeStacks`가 올 때만 진행하고 대기 리소스에 약 10초 마감이 있어, NAT 경로가 있는 스택은 CLI `wait`로는 롤백되고 2초 간격 폴링으로는 성공한다.
+- 동기 Lambda 호출은 회당 약 7 MiB의 에뮬레이터 메모리를 회수하지 않는다(기본 상한 2g, 반복 실습 시 `scripts/emulator-reset.sh`). 노트북이 잠든 뒤에는 VM 시계가 어긋나 서명 오류가 날 수 있다(M00 레슨 3).
+- 일부 리소스는 **외부 호스트에 접속을 시도**할 수 있다: ECS 작업 정의에 실제 레지스트리 URI를 넣으면 에뮬레이터 컨테이너가 이미지를 받으려 한다. 실습은 `.invalid` 레지스트리와 예약 이름만 쓴다(AUTHORING 규칙 11). 탐침 시작과 M00 `verify.sh`가 `tools/probe/no_external_hosts.py`로 `tools`·`scripts`·`src`·M00 소스 텍스트를 정적 검사한다(API 응답으로 얻은 주소, 변수로 조립한 이름은 보지 못한다).
 - 미구현 오퍼레이션은 `501 NotImplemented`를 반환한다.
 
 따라서 모든 실습에 아래 등급 중 하나를 붙인다. 등급은 추측이 아니라 **M00에서 만든 탐침(probe) 결과와 저자의 실제 실행**으로 정한다.
@@ -49,7 +51,7 @@ aws-emulator는 **컨트롤 플레인(리소스 생성·조회·수정·삭제)*
 | 🟡 부분 | 리소스는 만들어지지만 동작(실행·전달·차단)의 일부 또는 전부가 일어나지 않는다 | 구성까지 실습하고, 동작은 다이어그램과 "실제 AWS에서는" 박스로 보충 |
 | 🔴 개념 | 에뮬레이터로 볼 수 없다 (501이거나 의미 없음) | 개념 + 다이어그램 + 시나리오 문제. 가능하면 "설정값을 읽는" 실습으로 대체 |
 
-[`docs/FIDELITY.md`](./FIDELITY.md)(M00 산출물)에 서비스·오퍼레이션별 탐침 결과를 표로 유지한다. 아래 5장의 등급은 에뮬레이터 1.0.322 탐침 결과를 반영한 것이다.
+[`docs/FIDELITY.md`](./FIDELITY.md)(M00 산출물)에 서비스·오퍼레이션별 탐침 결과를 표로 유지한다. 아래 5장의 등급은 에뮬레이터 1.0.322에서 모듈 저자가 실행하고 검증자가 재현한 **확정 결과**다. 실습별 세부 등급과 근거는 각 모듈 README의 "에뮬레이터 제약" 절에 있다.
 
 ## 4. 러닝 시나리오 — "오늘의 주문(TodayOrder)"
 
@@ -76,7 +78,7 @@ aws-emulator는 **컨트롤 플레인(리소스 생성·조회·수정·삭제)*
 
 ## 5. 모듈 상세
 
-각 모듈은 `curriculum/mNN-<slug>/` 에 위치한다. 레슨 수와 실습 목록은 **최소 요구**이며, 저자는 탐침 결과에 따라 실습 등급을 확정하고 필요한 경우 실습을 대체할 수 있다(대체 시 모듈 README에 사유 기록). 아래 "실습"의 등급은 M00 탐침(에뮬레이터 1.0.322) 결과를 반영했으며, 저자가 자기 포트에서 다시 확인해 확정한다.
+각 모듈은 `curriculum/mNN-<slug>/` 에 위치한다. 레슨 수와 실습 목록은 **최소 요구**이며, 저자는 탐침 결과에 따라 실습 등급을 확정하고 필요한 경우 실습을 대체할 수 있다(대체 시 모듈 README에 사유 기록). 아래 "실습"은 실제로 작성·검증되어 병합된 내용을 요약한 것이다(에뮬레이터 1.0.322). 정확한 실습 파일 목록은 각 모듈 README를 따른다.
 
 ### M00. 오리엔테이션과 실습 환경 — `m00-orientation`
 - 목표: 에뮬레이터를 띄우고, CLI·boto3가 AWS가 아니라 에뮬레이터를 향하는지 확인할 수 있다. 클라우드/리전/AZ/공동 책임 모델을 설명할 수 있다.
@@ -86,7 +88,7 @@ aws-emulator는 **컨트롤 플레인(리소스 생성·조회·수정·삭제)*
   3. 환경 설치 (Colima, Docker, 에뮬레이터 이미지 로컬 빌드 — 배포된 이미지는 없다, AWS CLI, uv/boto3)
   4. 첫 요청 해부: `aws sts get-caller-identity`, SigV4 서명, 엔드포인트, `--debug`로 HTTP 들여다보기
   5. AWS CLI 생존 기술 (`--query`, `--output`, 페이지네이션, `help`) 과 boto3 client/resource/paginator/waiter
-- 실습: 🟢 에뮬레이터 기동·헬스체크 · 🟢 S3 버킷 왕복 · 🟢 같은 작업을 boto3로 · 🟢 검증 오류 관찰(DynamoDB 테이블명 2글자)
+- 실습: 🟢 에뮬레이터 기동·헬스체크 · 🟢 S3 버킷 왕복 · 🟢 검증 오류 관찰(DynamoDB 테이블명 2글자) · 🟢 CLI 생존 기술(`--query`·`--output`·페이지네이션·`wait`) · 🟢 에뮬레이터가 AWS와 다른 곳(501, IAM 부분 평가) · 🟢 boto3: S3 왕복, client·resource·paginator·waiter
 - 산출물(환경): `scripts/`, `docs/FIDELITY.md`, `tools/probe/`
 
 ### M01. IAM과 계정 관리 — `m01-iam-identity` · D1
@@ -98,7 +100,7 @@ aws-emulator는 **컨트롤 플레인(리소스 생성·조회·수정·삭제)*
   4. 역할과 STS (AssumeRole, 신뢰 정책, 임시 자격 증명, 교차 계정, 인스턴스 프로파일)
   5. 조직 단위 관리 (Organizations, OU, SCP, 통합 결제, IAM Identity Center, Control Tower 개요, AWS RAM으로 리소스 공유)
   6. 자격 증명 연동 (SAML/OIDC, Cognito와의 구분, AWS Directory Service: Managed Microsoft AD / AD Connector / Simple AD)
-- 실습: 🟢 사용자·그룹·정책 생성과 연결 · 🟢 역할 + 신뢰 정책, `assume-role`로 임시 자격 증명 받기, 신뢰 정책에 없는 주체의 AssumeRole 거부 · 🟢 권한 거부 재현(IAM·EC2 API에서 암묵적 Deny, 명시적 Deny 우선) → 🟡 같은 사용자가 S3에서는 통과하는 에뮬레이터 한계 대비 · 🟢 정책 평가 워크시트를 손으로 풀고 `iam simulate-principal-policy`로 채점 · 🟢 Organizations OU 구성 / 🔴 SCP(501) — SCP JSON을 쓰고 "SCP ∩ IAM"을 손으로 판정 · 🟢 boto3: 최소 권한 정책 생성기
+- 실습: 🟢 사용자·그룹·정책 · 🟢 역할·신뢰 정책·`assume-role`·세션 정책·ExternalId·인스턴스 프로파일 · 🟢 권한 거부 재현(IAM·EC2, S3 `GetObject`) / 🟡 계정 수준 요청(`CreateBucket`·`ListBuckets`)은 통과 · 🟢 정책 평가 워크시트 10문항을 `simulate-principal-policy`로 채점 · 🟢 Organizations OU / 🔴 SCP(501) — SCP JSON을 쓰고 "SCP ∩ IAM"을 `simulate-custom-policy`로 판정 · 🟡 GitHub Actions용 OIDC 연동 역할 구성 · 🔴 MFA 활성화(501) · 🟢 boto3: 최소 권한 정책 생성기, AssumeRole 세션
 - 시험 포인트: 역할 vs 사용자, 교차 계정 접근, SCP는 권한을 주지 않는다, 권한 경계
 
 ### M02. VPC 네트워킹 — `m02-vpc-networking` · D1, D2
@@ -111,7 +113,7 @@ aws-emulator는 **컨트롤 플레인(리소스 생성·조회·수정·삭제)*
   5. VPC 엔드포인트 (게이트웨이 vs 인터페이스), PrivateLink
   6. VPC 간·온프레미스 연결 (Peering, Transit Gateway, Site-to-Site VPN, Client VPN, Direct Connect, 조합 패턴)
   7. 관측과 방어 (VPC Flow Logs, Network Firewall, Bastion vs Session Manager)
-- 실습: 🟢 3-티어 VPC 구축(서브넷 6개, 라우팅, IGW, NAT) · 🟢 SG 체이닝(웹→앱→DB 참조) · 🟢 NACL 규칙 · 🟢 S3 게이트웨이 엔드포인트(prefix-list 경로 확인) · 🟢 Transit Gateway로 VPC 2개 연결 · 🟡 Peering은 요청(pending-acceptance)까지 / 🔴 수락·Egress-only IGW·Site-to-Site VPN(501) · 🔴 Session Manager(501) · 🟢 boto3: VPC 토폴로지를 읽어 Mermaid로 출력
+- 실습: 🟢 CIDR 계산을 에뮬레이터로 확인 · 🟢 3-티어 VPC(서브넷 6개, 라우팅, IGW, NAT) · 🟢 `describe-*` 출력으로 경로 추적 워크시트 · 🟢 SG 체이닝 · 🟢 NACL · 🟢 S3 게이트웨이 엔드포인트 + SQS 인터페이스 엔드포인트 · 🟢 Transit Gateway로 VPC 2개 연결(연결·전파를 명시적으로 설정, 정적 경로는 🔴) · 🟡 Peering 요청까지 · 🟡 Flow Logs·Network Firewall 구성 · 🔴 피어링 수락·Egress-only IGW·VPN·Client VPN·Session Manager(501 확인) · 🟢 boto3: VPC 토폴로지 → Mermaid
 - 시험 포인트: SG vs NACL, NAT GW AZ별 배치, 게이트웨이 엔드포인트는 S3·DynamoDB, DX+VPN 조합
 
 ### M03. 컴퓨트와 확장 — `m03-compute-scaling` · D2, D3, D4
@@ -124,7 +126,7 @@ aws-emulator는 **컨트롤 플레인(리소스 생성·조회·수정·삭제)*
   5. 로드 밸런서 (ALB/NLB/GWLB, 대상 그룹, 헬스체크, 스티키 세션, 교차 영역)
   6. Auto Scaling (시작 템플릿, 조정 정책: 대상 추적·단계·단순·예약 + 예측 조정, 쿨다운, 수명 주기 후크), EC2 Auto Scaling vs AWS Auto Scaling(여러 서비스의 조정 계획) vs Application Auto Scaling(ECS·DynamoDB·Aurora 등의 조정)
   7. 그 밖의 컴퓨트 한눈에 (Elastic Beanstalk, Lightsail, Batch, Outposts, VMware Cloud on AWS, Serverless Application Repository)
-- 실습: 🟢 인스턴스 시작·상태 전이 관찰(`describe-instances`의 State로 확인. 부팅·사용자 데이터 실행은 없음) · 🟢 EBS 볼륨·스냅샷 / 🔴 AMI 생성·스냅샷에서 볼륨 복원 — `describe-images` 읽기로 대체 · 🟡 ALB + 대상 그룹 + 리스너 규칙(규칙 동작 확인은 `docker exec`를 쓰는 선택 과제) · 🟢 시작 템플릿(버전) + ASG 생성·희망 용량 변경 / 🔴 조정 정책·예약 작업·수명 주기 후크(501)와 자가 치유(종료해도 대체 인스턴스가 안 뜸) — 정책 JSON 작성과 "이 지표면 몇 대?" 워크시트 · 🟢 boto3: 태그 없는 리소스 찾기(서비스별 describe/list 응답의 태그 사용 — `DescribeTags`·Tagging API는 쓰지 않는다)
+- 실습: 🟢 인스턴스 시작·상태 전이 · 🟡 구매 옵션 API 읽기 · 🟢 EBS 볼륨·스냅샷 / 🔴 스냅샷 복원·AMI 생성 — AMI 읽기로 대체 · 🟡 배치 그룹·ENI·EIP·최대 절전 · 🟡 ALB·NLB + 대상 그룹 + 리스너 규칙(규칙 동작 확인은 `docker exec` 선택 과제) · 🟢 시작 템플릿 + ASG + 희망 용량 + 인스턴스 새로 고침 / 🔴 조정 정책·예약 작업·수명 주기 후크(501), 자가 치유, 대상 그룹 자동 등록 — 정책 JSON 7개와 "이 지표면 몇 대?" 워크시트 12문항 · 🟡 Beanstalk·Lightsail·Batch · 🟢 boto3: 워크시트 채점기, 태그 없는 리소스 찾기
 - 시험 포인트: 스팟 적합 워크로드, ALB vs NLB, 조정 정책 선택, EBS 유형 선택
 
 ### M04. 스토리지 — `m04-storage` · D1, D3, D4
@@ -137,7 +139,7 @@ aws-emulator는 **컨트롤 플레인(리소스 생성·조회·수정·삭제)*
   5. S3 성능·기능 (멀티파트, Transfer Acceleration, 이벤트 알림, 정적 웹 호스팅, 요청자 지불(Requester Pays)) — S3 Select는 신규 고객에게 제공되지 않으므로 Athena로 대체됨을 한 줄로만 언급
   6. 파일 스토리지 (EFS, FSx 4종) 와 블록과의 선택 기준
   7. 하이브리드·이전 (Storage Gateway: S3 File / Volume / Tape Gateway, DataSync, Snow 패밀리, Transfer Family)
-- 실습: 🟢 객체 CRUD·버전 관리·삭제 마커 · 🟢 수명 주기 규칙 구성(전환은 일어나지 않고 잘못된 규칙도 받아 줌 — 비용 계산은 워크시트) · 🟢 미리 서명된 URL(curl로 검증) · 🟢 멀티파트 업로드 · 🟢 버킷 정책 명시적 Deny·퍼블릭 액세스 차단·SSE 설정(KMS 키를 꺼도 객체가 읽힘 — 키 의존성 시연은 M09) · 🟢 복제(대상 버킷에 실제 복사)·이벤트 알림(SQS에 실제 도착) · 🔴 액세스 포인트·계정 수준 퍼블릭 액세스 차단(S3 Control 도달 불가) · 🟡 EFS 파일 시스템·마운트 타깃 · 🟢 boto3: 영수증 업로드 서비스
+- 실습: 🟢 객체 CRUD · 🟢 스토리지 클래스·수명 주기 규칙 구성(검증은 2026-07 이후 AWS 규칙과 일치, 전환 자체는 일어나지 않음 — 비용은 워크시트) · 🟢 버전 관리·객체 잠금 / 🟡 MFA Delete(집행 안 됨) · 🟢 복제 · 🟢 버킷 정책 Deny·퍼블릭 액세스 차단·SSE · 🟢 미리 서명된 URL · 🔴 액세스 포인트·계정 수준 차단(S3 Control 도달 불가) · 🟢 멀티파트 · 🟢 이벤트 알림 → SQS · 🟡 EFS · 🟡 Storage Gateway·DataSync·Transfer Family · 🟢 boto3: 영수증 업로드 서비스, 수명 주기 점검기
 - 시험 포인트: 클래스 선택(검색 시간·최소 보관 기간), SSE 종류, EFS vs EBS vs S3, Snow vs DataSync vs DX
 
 ### M05. 데이터베이스 — `m05-databases` · D2, D3
@@ -150,7 +152,7 @@ aws-emulator는 **컨트롤 플레인(리소스 생성·조회·수정·삭제)*
   5. DynamoDB 심화 (GSI/LSI, Streams, TTL, DAX, Global Tables, 트랜잭션)
   6. 캐시 (ElastiCache Valkey/Redis OSS vs Memcached, 캐싱 전략)
   7. 목적별 DB 한눈에 (Redshift, DocumentDB, Neptune, Keyspaces, Timestream, OpenSearch) — QLDB는 2025년 지원 종료되어 다루지 않는다
-- 실습: 🟡 RDS 인스턴스·Multi-AZ·읽기 복제본·스냅샷·Aurora 클러스터 구성(장애 조치는 재현 안 됨, 엔드포인트 접속 불가) · 🟢 DynamoDB 주문 테이블 설계와 Query/Scan 비교 · 🟢 GSI 추가와 접근 패턴 · 🟢 조건부 쓰기로 재고 차감(동시성)·트랜잭션 · 🟢 TTL/Streams · 🟡 ElastiCache 클러스터 구성 · 🟢 boto3: 주문 저장소(repository) 구현
+- 실습: 🟡 RDS 서브넷·파라미터 그룹·스냅샷 복원 · 🟡 Multi-AZ·읽기 복제본 · 🟡 Aurora 엔드포인트·장애 조치·Global Database·RDS Proxy · 🟢 DynamoDB Query vs Scan 소비 용량 · 🟢 GSI·LSI · 🟢 조건부 쓰기·트랜잭션·멱등 토큰 · 🟢 TTL·Streams · 🟢 용량 모드·백업 / 🟡 PITR 특정 시점 복원·글로벌 테이블 · 🟡 ElastiCache·DAX · 🟡 DocumentDB·Keyspaces·Neptune · 🟢 boto3: 재고 동시성 데모, 주문 저장소
 - 시험 포인트: Multi-AZ vs Read Replica, Aurora 기능, DynamoDB 용량 모드, DAX vs ElastiCache
 
 ### M06. 애플리케이션 통합과 디커플링 — `m06-integration-messaging` · D2
@@ -162,7 +164,7 @@ aws-emulator는 **컨트롤 플레인(리소스 생성·조회·수정·삭제)*
   4. EventBridge (버스, 규칙, 패턴, 스케줄러, Pipes)
   5. Step Functions (표준 vs 익스프레스, 상태 유형, 오류 처리)
   6. 스트리밍 (Kinesis Data Streams vs Amazon Data Firehose vs SQS, MSK), Amazon MQ는 언제, SaaS 연동은 AppFlow
-- 실습: 🟢 SQS 송수신·가시성 타임아웃 관찰 · 🟢 DLQ와 재처리(redrive) · 🟢 FIFO 순서·중복 제거 · 🟢 SNS→SQS 팬아웃과 필터 정책(큐 정책이 없으면 조용히 전달 안 됨을 먼저 관찰) · 🟢 EventBridge 규칙·패턴·SQS 대상 · 🟢 Step Functions 주문 워크플로 실행(Choice/Fail, SQS 서비스 통합. Retry/Catch는 탐침 미검증 — 저자 확인) · 🟢 Kinesis 스트림 put/get, 파티션 키와 샤드 · 🟢 boto3: 주문 워커(컨슈머) 구현
+- 실습: 🟢 SQS 기본(가시성 타임아웃·롱 폴링·지연) · 🟢 DLQ와 재처리 · 🟢 FIFO · 🟢 SNS→SQS 팬아웃·필터 정책(큐 정책 없을 때의 조용한 실패부터) · 🟢 EventBridge 규칙·패턴 → SQS / 🟡 Scheduler(구성만) · 🟢 Step Functions 주문 워크플로(Choice, Retry/Catch, SQS·Lambda 통합) · 🟢 Kinesis 파티션 키와 샤드 · 🟢 boto3: 주문 워커
 - 시험 포인트: SQS vs SNS vs EventBridge vs Kinesis 선택, FIFO 처리량, DLQ, 정확히 한 번
 
 ### M07. 서버리스와 컨테이너 — `m07-serverless-containers` · D2, D3
@@ -174,9 +176,9 @@ aws-emulator는 **컨트롤 플레인(리소스 생성·조회·수정·삭제)*
   4. Cognito (사용자 풀 vs 자격 증명 풀)
   5. 컨테이너 (ECR, ECS 작업 정의/서비스, EC2 vs Fargate 시작 유형, EKS 개요, App Runner, 온프레미스용 ECS Anywhere·EKS Anywhere·EKS Distro)
   6. 서버리스 아키텍처 패턴 (API+Lambda+DynamoDB, S3 이벤트 처리), 프런트엔드·모바일 한눈에 (Amplify, Device Farm)
-- 실습: 🟢 Lambda 함수 생성·구성·버전·별칭과 Invoke(동기/비동기/DryRun, 오류 응답) · 🟢 이벤트 소스 매핑(SQS→Lambda)이 메시지를 실제 소비 · 🟢 API Gateway REST(MOCK)·HTTP API→Lambda 프록시를 `https://127.0.0.1:$EMULATOR_PORT/_aws/execute-api/...`로 호출 · 🟢 서버리스 주문 API(HTTP API + Lambda + DynamoDB — Lambda 안에서의 DynamoDB 호출은 탐침 미검증, 저자 확인 후 확정) · 🟡 ECR 저장소·ECS 클러스터·작업 정의·서비스(태스크는 이미지 풀 실패로 STOPPED) · 🟢 Cognito 사용자 풀 가입·로그인으로 JWT 받기
+- 실습: 🟢 Lambda 구성·버전·별칭과 Invoke(동기/비동기/DryRun, 오류·타임아웃) · 🟢 이벤트 소스 매핑(SQS→Lambda, 부분 배치 실패) / 🟡 비동기 호출의 실패·성공 대상·함수 DLQ(전달 안 됨)·재시도 · 🟢 API Gateway REST(MOCK·Lambda 프록시)·HTTP API 호출 · 🟢 서버리스 주문 API(HTTP API + Lambda + DynamoDB, 실행 역할 정책 집행) · 🟢 S3 이벤트 → Lambda → DynamoDB · 🟡 ECR·ECS(태스크는 STOPPED) · 🟢 Cognito 가입·로그인·JWT 권한 부여자·자격 증명 풀 · 🟢 boto3: Lambda 호출, Cognito 로그인
 - 시험 포인트: Lambda 한계값, Fargate vs EC2, API 유형 선택, 사용자 풀 vs 자격 증명 풀
-- 주의: 에뮬레이터는 Lambda 리소스 정책(`AddPermission`) 없이도 API Gateway 호출을 통과시킨다. 실습 스크립트에는 실제 AWS에 필요한 권한 설정을 빠짐없이 넣는다.
+- 주의: 에뮬레이터는 HTTP API에서만 Lambda 리소스 정책(`AddPermission`) 없이 호출을 통과시킨다(REST API는 500). 실습 스크립트에는 실제 AWS에 필요한 권한 설정을 빠짐없이 넣는다. Lambda 호출이 많은 모듈이므로 시작할 때 `scripts/emulator-reset.sh`를 권한다.
 
 ### M08. DNS와 엣지 — `m08-dns-edge` · D2, D3
 - 목표: Route 53 라우팅 정책과 CloudFront 구성을 요구 사항에 맞게 고를 수 있다.
@@ -186,7 +188,7 @@ aws-emulator는 **컨트롤 플레인(리소스 생성·조회·수정·삭제)*
   3. CloudFront (오리진, 동작, 캐시 정책, OAC, 서명된 URL/쿠키, Lambda@Edge vs Functions)
   4. Global Accelerator vs CloudFront
   5. 엣지 보안 (WAF, Shield, Firewall Manager) — M09와 연결
-- 실습: 🟢 호스팅 영역·레코드 CRUD · 🟢 가중치·장애 조치·지연 시간 레코드와 `test-dns-answer` / 🔴 상태 확인·장애 조치 동작(상태 확인이 항상 성공) · 🟡 CloudFront 배포(S3 오리진 + OAC, 도메인 이름이 실제와 다름) · 🟡 Global Accelerator · 🟡 WAF Web ACL
+- 실습: 🟢 호스팅 영역·레코드, Alias vs CNAME, 프라이빗 영역 · 🟢 라우팅 정책 8종 레코드와 `test-dns-answer`(단순·가중치·다중값) / 🟡 지연 시간·지리·IP 기반 응답 선택(호출자 위치 무시) · 🔴 상태 확인·장애 조치 동작 — 워크시트 · 🟡 CloudFront + OAC · 🟡 Global Accelerator · 🟢 WAF Web ACL 구성과 차단(차단 관찰은 `docker exec` 선택 과제) / 🔴 Shield Advanced·Firewall Manager · 🟢 boto3: 가중치 카나리, 라우팅 정책 인벤토리
 - 시험 포인트: Alias, 라우팅 정책 선택, CloudFront vs GA, OAC
 
 ### M09. 보안 서비스와 암호화 — `m09-security-encryption` · D1
@@ -198,7 +200,7 @@ aws-emulator는 **컨트롤 플레인(리소스 생성·조회·수정·삭제)*
   4. 감사와 규정 준수 (CloudTrail, Config, Audit Manager, Artifact)
   5. 위협 탐지 (GuardDuty, Inspector, Macie, Security Hub, Detective) — 한 줄 구분법
   6. 네트워크·앱 방어 (WAF, Shield, Network Firewall) 복습과 심층 방어
-- 실습: 🟢 KMS 키 생성·Encrypt/Decrypt·데이터 키로 봉투 암호화(boto3)·삭제 예약된 키 사용 실패(`KMSInvalidStateException`)·키 정책 Deny (키 비활성화 시 Decrypt 실패는 탐침 미검증 — 저자 확인 후 확정) · 🟢 Secrets Manager 비밀·버전 스테이지 · 🟢 Parameter Store 계층·SecureString · 🟢 ACM 자체 서명 인증서 import(ISSUED) · 🟡 DNS 검증 요청과 검증 레코드 확인 / 🔴 발급 · 🟡 CloudTrail 추적(IAM 이벤트로 확인) · 🟢 Config 관리형 규칙의 NON_COMPLIANT 판정 · 🟡 GuardDuty 탐지기·샘플 결과 · 🟢 boto3: 앱 설정 로더(Parameter Store + Secrets Manager)
+- 실습: 🟢 KMS 기본·키 정책·봉투 암호화(AES-256-GCM), 비활성 키 Decrypt 실패 · 🟢 Secrets Manager 버전 스테이지와 Lambda 교체 · 🟢 Parameter Store · 🟢 ACM 인증서 import / 🟡 DNS 검증 요청 / 🔴 발급 · 🟡 CloudTrail · 🟢 Config 관리형 규칙과 자동 수정 · 🟡 GuardDuty 샘플 결과 · 🟡 Network Firewall 구성 · 🟢 boto3: 봉투 암호화, 앱 설정 로더
 - 시험 포인트: SSE-KMS vs SSE-S3, Secrets Manager vs Parameter Store, GuardDuty vs Inspector vs Macie, CloudTrail vs Config
 
 ### M10. 모니터링·운영·IaC — `m10-monitoring-iac` · D2
@@ -209,7 +211,7 @@ aws-emulator는 **컨트롤 플레인(리소스 생성·조회·수정·삭제)*
   3. CloudFormation (템플릿 구조, 파라미터·출력, 변경 세트, 스택 세트, 드리프트)
   4. Systems Manager (Session Manager, Run Command, Patch Manager, 파라미터)
   5. 운영 지원 (Trusted Advisor, Health Dashboard, Service Quotas, Compute Optimizer, License Manager, Service Catalog, Proton, Managed Grafana, Managed Service for Prometheus, Well-Architected Tool)
-- 실습: 🟢 사용자 지정 지표 게시·조회 · 🟢 알람이 데이터로 스스로 ALARM 전이 → SNS → SQS 도착, `set-alarm-state`, 복합 알람 · 🟢 로그 그룹·이벤트·지표 필터·Logs Insights · 🟢 CloudFormation으로 M02 VPC 재현(Outputs, 드리프트, 롤백) · 🟢 변경 세트는 IGW 연결이 없는 앱 스택(S3·SQS·DynamoDB)으로 실습 · 🔴 Session Manager(501) · 🟢 boto3: 구조화 로그 전송기
+- 실습: 🟢 사용자 지정 지표 · 🟢 알람 ALARM 전이 → SNS → SQS, `set-alarm-state`, 복합 알람 · 🟢 로그 그룹·지표 필터·Logs Insights · 🟢 CloudFormation으로 2-AZ 3-티어 VPC(Outputs, 롤백, 삭제 — 2초 간격 폴링) / 🟡 드리프트 / 🔴 VPC 스택 변경 세트 · 🟢 앱 스택(S3·SQS·DynamoDB) 변경 세트·종료 방지 · 🔴/🟡/🟢 Systems Manager(Session Manager 501, Run Command 구성만, Parameter Store) · 🟡 운영 지원 서비스 설정 읽기 · 🟢 boto3: 구조화 로그 전송기(EMF)
 - 시험 포인트: 기본 지표에 없는 것(메모리), 알람→ASG/SNS, CloudFormation 기능 구분
 
 ### M11. 데이터 분석 — `m11-analytics` · D3
@@ -220,7 +222,7 @@ aws-emulator는 **컨트롤 플레인(리소스 생성·조회·수정·삭제)*
   3. 카탈로그·변환 (Glue 크롤러/ETL/Data Catalog)
   4. 조회 (Athena, Redshift/Spectrum, EMR, OpenSearch, QuickSight — 시험 가이드 표기는 Amazon Quick)
   5. AI/ML 서비스 한눈에 🔴 (Comprehend, Lex, Polly, Rekognition, SageMaker AI, Textract, Transcribe, Translate) — "요구 사항 → 서비스" 한 줄 매칭
-- 실습: 🟢 Data Firehose 전송 스트림 → S3 객체 생성(버퍼 시간은 무시됨) · 🟢 Glue 데이터베이스·테이블 직접 정의 / 🔴 크롤러(501) · 🟢 Athena로 S3의 주문 JSON에 SQL 실행(파티션은 `BatchCreatePartition`으로 등록, 결과는 `GetQueryResults`로 확인) · 🟢 boto3: 주문 이벤트를 S3 파티션 경로로 적재
+- 실습: 🟢 데이터 레이크 버킷 구조 / 🟡 Lake Formation 설정 읽기 · 🟢 Data Firehose → S3(버퍼 시간은 무시됨) · 🟢 Glue 테이블 직접 정의·`BatchCreatePartition` / 🔴 크롤러(501) · 🟢 Glue Python shell ETL 작업 · 🟢 파이프라인 전체: Firehose → 파티션된 S3 → Glue → Athena 매출 쿼리 / 🟡 파티션 프루닝·Trino 함수(에뮬레이터 SQL 엔진 한계) · 🟢 boto3: 주문 이벤트 적재, Athena 매출 리포트
 - 시험 포인트: Athena vs Redshift vs EMR, Firehose는 거의 실시간, Glue 역할
 
 ### M12. 고가용성·DR·마이그레이션 — `m12-resilience-dr-migration` · D2
@@ -230,7 +232,7 @@ aws-emulator는 **컨트롤 플레인(리소스 생성·조회·수정·삭제)*
   2. RTO/RPO와 DR 4전략 (백업·복원, 파일럿 라이트, 웜 스탠바이, 다중 사이트)
   3. AWS Backup, 스냅샷 교차 리전 복사, Elastic Disaster Recovery
   4. 마이그레이션 (7R, Application Discovery Service, DMS/SCT, MGN, Migration Hub, Snow/DataSync 복습)
-- 실습: 🟢 AWS Backup 볼트·계획·선택, 온디맨드 백업과 복구 지점 · 🟢 앞 모듈 아키텍처에서 단일 장애점 찾기(워크시트) · 🟡 DMS 복제 인스턴스·엔드포인트·작업 구성 · 🟡 다중 리전 DR은 두 개의 에뮬레이터(포트 분리)로 "리전 2개" 흉내 내기
+- 실습: 🟢 단일 장애점 찾기(TodayOrder v1 구축 → boto3 감사 → 수정 → 재감사) · 🟡 다중 리전 DR: 에뮬레이터 두 개(`scripts/dr-env.sh`, `emulator_site`)로 파일럿 라이트 동기화·장애·장애 조치·RPO 확인 · 🟢 AWS Backup 볼트·계획·선택·온디맨드 백업·Vault Lock / 🟡 복원(빈 테이블) · 🟡 DMS 구성 · 🟢 boto3: SPOF 감사, 주문 앱, 태그 기반 백업 / 🟡 DR 복제
 - 시험 포인트: DR 전략별 RTO/RPO·비용, DMS 지속 복제, Backup 교차 리전/계정
 
 ### M13. 비용 최적화 — `m13-cost-optimization` · D4
@@ -241,14 +243,14 @@ aws-emulator는 **컨트롤 플레인(리소스 생성·조회·수정·삭제)*
   3. 스토리지·DB 비용 (클래스 전환, gp2→gp3, 예약 용량, 서버리스 옵션)
   4. 네트워크 비용 (NAT GW vs 엔드포인트, CloudFront, 같은 AZ)
   5. 비용 도구 (Cost Explorer, Budgets, CUR, 비용 할당 태그, Compute Optimizer), Organizations 통합 결제와 볼륨 할인·예약 공유
-- 실습: 🟡 Budgets 예산·알림(지출은 항상 0) / 🔴 Cost Explorer(501) · 🟢 비용 할당 태그 정책과 태그 누락 감사(boto3, 서비스별 태그 API 사용) · 🟢 수명 주기 규칙으로 스토리지 비용 계산 워크시트 · 🔴 시나리오별 월 비용 추정 워크시트
+- 실습: 🟢 EC2 인벤토리로 구매 옵션 비용 추정 / 🔴 실제 청구 · 🟢 수명 주기 계획별 스토리지 비용 계산 · 🟢 NAT 게이트웨이 vs 게이트웨이 엔드포인트 비용 비교 · 🟡 Budgets(지출은 항상 0) / 🔴 Cost Explorer(501) · 🟢 태그 정책 JSON 기준 태그 누락 감사(서비스별 태그 API) / 🔴 Organizations 태그 정책 API · 🔴 데이터 전송·구매 옵션 조합 워크시트 (모든 단가는 예시 숫자)
 - 시험 포인트: "가장 비용 효율적인" 문제 풀이 패턴
 
 ### M14. 종합 — `m14-capstone-exam` · D1~D4
 - 목표: 요구 사항만 보고 전체 아키텍처를 설계·구축하고, 시험형 문제를 근거와 함께 풀 수 있다.
 - 구성
   1. Well-Architected 6대 원칙으로 TodayOrder 리뷰
-  2. 캡스톤: 요구 사항서 → 설계 → 에뮬레이터에 한 번에 구축하는 스크립트(M02~M10 재료 조합) → 자기 점검표
+  2. 캡스톤: 요구 사항서 → 설계 → 에뮬레이터에 한 번에 구축하는 스크립트(M02~M10과 M13 Budgets 재료 조합) → 자기 점검표
   3. 서비스 선택 치트시트 (전 모듈 비교표 통합)
   4. 모의고사 65문항(도메인 비중 반영) + 해설 — 자체 제작 문제만 수록
   5. 시험 접수·당일 가이드, 오답 노트 템플릿
@@ -269,8 +271,8 @@ aws-emulator는 **컨트롤 플레인(리소스 생성·조회·수정·삭제)*
 ## 7. 완료 기준
 
 - 모듈: 모든 실습 스크립트가 깨끗한 에뮬레이터에서 통과하고, 퀴즈 80% 이상.
-- 커리큘럼: 캡스톤 자기 점검표 완료, 모의고사 정답률 72% 이상 (자체 기준. 실제 합격선 720점은 환산 점수라 정답률과 1:1로 대응하지 않는다).
+- 커리큘럼: 캡스톤 자기 점검표 완료, 모의고사(65문항, 130분) 정답률 72% 이상 — 47문항 이상. 채점 스크립트(`curriculum/m14-capstone-exam`의 `grade.py`)가 도메인별 점수를 내고 65% 미만 도메인을 약점으로 표시한다 (자체 기준. 실제 합격선 720점은 환산 점수라 정답률과 1:1로 대응하지 않는다).
 
 ## 8. 한계에 대한 솔직한 안내
 
-에뮬레이터 실습만으로는 SAA-C03의 모든 것을 "체험"할 수 없다. 실제 트래픽 흐름, 장애 조치, 자동 조정, 성능·비용은 에뮬레이터에 존재하지 않고, 권한 거부는 일부 서비스에서만 재현된다. 이 커리큘럼은 그 부분을 개념 설명·다이어그램·손으로 푸는 워크시트·시나리오 문제로 채운다. 여유가 있다면 프리 티어 계정에서 🟡/🔴 실습 몇 개를 실제로 해 보기를 권한다(각 실습에 "실제 AWS에서 해 보려면" 메모 제공).
+에뮬레이터 실습만으로는 SAA-C03의 모든 것을 "체험"할 수 없다. 실제 트래픽 흐름, 장애 조치, 자동 조정, 성능·비용은 에뮬레이터에 존재하지 않고, 권한 평가는 부분적으로만 재현된다. 이 커리큘럼은 그 부분을 개념 설명·다이어그램·손으로 푸는 워크시트·시나리오 문제로 채운다. 여유가 있다면 프리 티어 계정에서 🟡/🔴 실습 몇 개를 실제로 해 보기를 권한다(각 실습에 "실제 AWS에서 해 보려면" 메모 제공).

@@ -48,13 +48,19 @@ curriculum/mNN-<slug>/
 3. **미구현을 만나면** 우회 실습으로 대체하고(예: 설정값 조회, 정책·설정 JSON 작성, 워크시트), 모듈 README의 "에뮬레이터 제약" 절에 오퍼레이션명과 증상을 기록한다.
 4. **스크립트는 멱등·자급자족.** 각 `labNN-*.sh`는 `set -euo pipefail`, `source "$(git rev-parse --show-toplevel)/scripts/env.sh"`로 시작하고, 깨끗한 에뮬레이터에서 단독 실행 가능해야 한다(앞 lab에 의존하면 스크립트 안에서 선행 리소스를 직접 만든다). 같은 에뮬레이터에서 **두 번 연속 실행해도, 다른 lab 뒤에 실행해도** 통과해야 한다 — 시작할 때 자신이 만들 리소스가 남아 있으면 지우고 시작하거나, 끝날 때 정리한다. 끝에 핵심 결과를 단언(assert)한다.
 5. **`verify.sh`** 는 `$EMULATOR_PORT`의 에뮬레이터를 재시작해(`scripts/emulator-reset.sh`) 깨끗한 상태로 만든 뒤, 그 하나의 에뮬레이터에서 모듈의 모든 lab과 sdk 예제를 순서대로 실행한다. 전부 통과하면 `MODULE mNN OK`를 출력하며 0으로 종료한다. 🔴 등 실행 불가 항목은 `SKIP(사유)`로 표시한다.
+   - **순서**: 두 번째 실행은 첫 번째와 **다른 순서(역순)** 로 돌려, lab 사이의 숨은 의존을 잡는다. (현재 M02~M05만 이 방식이다. M00·M01·M06~M13은 같은 순서로 두 번 돌리고, M14는 단계별 시나리오로 검증한다. 해당 모듈을 다음에 고칠 때 역순으로 바꾼다.)
+   - **두 번째 에뮬레이터**가 필요한 모듈은 `DR_EMULATOR_PORT`가 지정되지 않은 비대화형 실행을 **아무것도 리셋하기 전에** 거부하고, 지정된 포트의 에뮬레이터도 `emulator-reset.sh`로 재시작한 뒤 `scripts/dr-env.sh`를 source한다.
    - **포트**: `scripts/env.sh`는 `EMULATOR_PORT`를 읽는다(학습자 기본값 9297). 에이전트는 반드시 [AGENTS.md](./AGENTS.md)에 배정된 포트를 `export EMULATOR_PORT=<port>`로 지정하고 작업한다. 스크립트 안에 포트를 하드코딩하지 않는다.
 6. **리소스 이름**은 `todayorder-` 접두사. 리전은 `us-east-1` 고정. 계정 ID는 `000000000000`.
-7. **boto3 예제**는 타입 힌트와 `if __name__ == "__main__":`을 갖춘 실행 가능한 단일 파일. 엔드포인트·자격 증명을 코드에 하드코딩하지 않는다(환경 변수로 주입 — 실제 AWS에서도 그대로 동작하는 코드여야 한다). 모든 예제는 boto3 클라이언트를 만들기 **전에** `from emulator_guard import require_emulator` 의 `require_emulator()`를 호출한다(엔드포인트가 에뮬레이터가 아니면 종료. 학습자가 의도적으로 실제 AWS에서 돌릴 때만 `TODAYORDER_ALLOW_REAL_AWS=1`). 모듈 `verify.sh`는 M00의 가드 거부 테스트(`guard_refuses`)를 자기 sdk 예제에도 적용한다.
+7. **boto3 예제**는 타입 힌트와 `if __name__ == "__main__":`을 갖춘 실행 가능한 단일 파일. 엔드포인트·자격 증명을 코드에 하드코딩하지 않는다(환경 변수로 주입 — 실제 AWS에서도 그대로 동작하는 코드여야 한다). 모든 예제는 boto3 클라이언트를 만들기 **전에** `from emulator_guard import require_emulator` 의 `require_emulator()`를 호출한다(엔드포인트가 에뮬레이터가 아니면 종료. 학습자가 의도적으로 실제 AWS에서 돌릴 때만 `TODAYORDER_ALLOW_REAL_AWS=1`). 모듈 `verify.sh`는 M00 `labs/verify.sh`의 `guard_refuses` 함수를 그대로 복사해 자기 `sdk/*.py`마다 실행한다. 에뮬레이터 두 개(다중 리전 흉내)를 쓰는 예제는 셸에서 `source scripts/env.sh && source scripts/dr-env.sh`, 코드에서 `emulator_site()` / `emulator_site("DR_")`가 돌려준 사이트의 `.client()`만 쓴다. `endpoint_url=`을 코드에 쓰거나 `AWS_*` 환경 변수를 바꿔 끼우지 않는다.
 8. **정책을 실제처럼 쓴다.** SNS→SQS·S3→SQS(큐 정책), Step Functions·Pipes·Glue·Backup(역할 신뢰 정책·권한), CloudFront OAC·Config(버킷 정책)는 정책이 없으면 실패하거나 조용히 아무 일도 일어나지 않는다. 반대로 에뮬레이터가 검사하지 않는 권한(예: API Gateway→Lambda의 `AddPermission`)도 실제 AWS에 필요하면 스크립트에 넣는다.
 9. **리소스 엔드포인트(RDS·ALB·CloudFront)는 컨테이너 안에만 있다.** 호스트에서 접속하는 실습을 설계하지 않는다. 꼭 필요하면 `docker exec aws-emulator-$EMULATOR_PORT ...`로 보여 주되 선택 과제로 둔다.
 10. **시간에 기대지 않는다.** 비동기 상태는 waiter/폴링으로 기다리고(넉넉한 상한 시간을 두고, 실패하면 마지막으로 관찰한 상태를 출력) "몇 초 뒤"를 단언하지 않는다. 에뮬레이터의 타이밍(TTL 수 초, Firehose 버퍼 무시 등)을 실제 AWS의 특성처럼 설명하지 않는다.
-11. 실제 AWS 자격 증명·계정을 절대 사용하지 않는다. 모든 실행 전 `aws sts get-caller-identity`의 Account가 `000000000000`인지 env 스크립트가 보장한다.
+11. **외부 호스트에 닿지 않는다.** 이미지 URI·URL·엔드포인트·발급자 등 호스트 자리에는 예약 이름(`.invalid`·`.test`·`.example`·`.localhost`, RFC 2606의 `example.com`·`example.net`·`example.org`)이나 루프백만 쓴다(메일 주소는 `example.com`). 에뮬레이터가 실제로 접속을 시도할 수 있는 값(컨테이너 이미지 URI, JWT/OIDC 발급자, 웹훅 URL)에는 실제 호스트명을 넣지 않는다. AWS가 정한 예시값이나 가드가 거부해야 하는 주소처럼 의도적인 예외는 그 줄이나 윗줄에 `# external-host-ok: <이유>`를 단다. 정적 검사(`tools/probe/no_external_hosts.py`)는 현재 `tools`·`scripts`·`src`·M00만 검사하므로, M01~M14는 PR 검증자가 `--report curriculum`으로 확인한다. 에뮬레이터가 돌려준 주소에 접속할 때는 루프백 IP인지 먼저 확인한다(ElastiCache·Aurora 리더 엔드포인트는 실제 AWS 형식 이름이다).
+12. **만든 직후 쓰지 않는다.** 생성 API가 `CREATING`/`pending`을 돌려주는 리소스(DataSync 작업, VPC, 마운트 타깃, DynamoDB 테이블 등)는 준비 상태를 폴링한 뒤 다음 호출을 한다. VM에 부하가 걸리면 "보통은 즉시"가 깨진다.
+13. **CloudFormation은 `aws cloudformation wait` 대신 `describe-stacks`를 2초 간격으로 폴링**한다(에뮬레이터는 조회가 올 때만 스택을 진행시킨다). 레슨에는 실제 AWS에서는 `wait`가 정상 도구임을 밝힌다.
+14. **Lambda 호출 수를 아낀다.** 동기 호출마다 에뮬레이터 메모리가 약 7 MiB 늘고 회수되지 않는다.
+15. 실제 AWS 자격 증명·계정을 절대 사용하지 않는다. 모든 실행 전 `aws sts get-caller-identity`의 Account가 `000000000000`인지 env 스크립트가 보장한다.
 
 ## 4. 내용 정확성
 
@@ -73,12 +79,14 @@ curriculum/mNN-<slug>/
 ## 6. 검증 통과 기준 (검증 에이전트 체크리스트)
 
 - [ ] 깨끗한 에뮬레이터에서 `verify.sh`가 0으로 종료한다.
-- [ ] 모든 sdk 예제가 클라이언트 생성 전에 `require_emulator()`를 호출하고, 셸 스크립트는 `scripts/env.sh`를 source한다(실제 AWS로 나갈 경로가 없다).
+- [ ] 모든 sdk 예제가 클라이언트 생성 전에 `require_emulator()`(두 번째 에뮬레이터를 쓰면 `emulator_site()` / `emulator_site("DR_")`)를 호출하고, 셸 스크립트는 `scripts/env.sh`를 source한다(실제 AWS로 나갈 경로가 없다). `verify.sh`는 sdk 예제마다 `guard_refuses`를 돌린다.
 - [ ] 문서에 실린 출력이 실제 실행 결과와 일치한다(표본 3개 이상 대조). 실행마다 바뀌는 값(무작위 ID, ARN 접미사, 타임스탬프, 액세스 키 ID)은 비교에서 제외하고 구조·필드·상태 값·오류 코드와 메시지를 대조한다.
 - [ ] 🟡/🔴 실습에 "실제 AWS에서 해 보려면" 메모가 있다.
 - [ ] CURRICULUM.md가 요구한 레슨·실습이 모두 있거나, 대체 사유가 README에 있다.
 - [ ] 개념 설명에 사실 오류가 없다(시험 포인트·한계값 중심으로 점검).
-- [ ] 퀴즈 10문항 이상, 해설 포함, 정답이 맞다.
+- [ ] 퀴즈 10문항 이상, 해설 포함, 정답이 맞다. 정답 보기 글자가 고르게 분포한다(한 글자가 40%를 넘지 않는다).
+- [ ] 모든 Mermaid 블록이 실제 파서로 파싱된다(저장소에 파서가 없으므로 검증자가 mermaid-cli로 확인한다). 예약되지 않은 도메인·실제 계정 ID가 없다.
+- [ ] 에뮬레이터 특이 동작을 AWS의 동작처럼 서술한 곳이 없다.
 - [ ] 이 문서의 형식·Git 규칙을 지켰고, 역할 밖 파일을 수정하지 않았다.
 - [ ] 모든 상대 링크가 유효하다.
 
