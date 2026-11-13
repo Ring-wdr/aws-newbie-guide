@@ -104,7 +104,7 @@ aws s3 cp "s3://$BUCKET/$FIRST_KEY" - | head -5
 
 echo "== 6. (B) Kinesis Data Streams 를 소스로 쓰는 전송 스트림"
 aws kinesis create-stream --stream-name "$KDS" --shard-count 1
-aws kinesis wait stream-exists --stream-name "$KDS"
+wait_kinesis_stream_active "$KDS"
 KDS_ARN="$(aws kinesis describe-stream-summary --stream-name "$KDS" --query StreamDescriptionSummary.StreamARN --output text)"
 aws firehose create-delivery-stream --delivery-stream-name "$KDS_FH" --delivery-stream-type KinesisStreamAsSource \
   --kinesis-stream-source-configuration "KinesisStreamARN=$KDS_ARN,RoleARN=$ROLE_ARN" \

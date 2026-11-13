@@ -2,6 +2,10 @@
 # M11 실습 공용 도우미. 각 lab 이 scripts/env.sh 다음에 source 한다.
 #   source "$(dirname "$0")/_lib.sh"
 
+# CLI waiter(`aws kinesis wait stream-exists`, 10초 간격) 대신 같은 조건을 1초 간격으로 확인하는 함수
+# (wait_kinesis_stream_active). 이유는 scripts/lab-wait.sh 머리말.
+source "$(git rev-parse --show-toplevel)/scripts/lab-wait.sh"
+
 # fail "메시지" — 단언 실패
 fail() {
   echo "FAIL: $*" >&2
