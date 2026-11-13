@@ -13,13 +13,19 @@
 # source 하므로, 안전 장치가 실패하면 실습은 실제 AWS에 요청을 보내기 전에 멈춘다.
 #
 # 순서: 맨 먼저 이 셸을 AWS에서 끊고(_emu_env_neutralize), 계정 확인이 통과한 **뒤에만** 에뮬레이터 변수를
-# export 한다. 그래서 거부하든, 도중에 Ctrl-C 로 끊든, 셸은 "끊긴 상태"로 남는다:
-#   - 실제 자격 증명·프로필·엔드포인트 변수를 지우고, 옛 방식 자격 증명(AWS_CREDENTIAL_FILE, ~/.boto·/etc/boto.cfg)도 끈다
-#   - AWS_CONFIG_FILE·AWS_SHARED_CREDENTIALS_FILE·BOTO_CONFIG 는 /dev/null/ 아래 — 만들 수 없는 경로라
-#     aws configure 도 거기에 쓰지 못한다(“File exists: '/dev/null'” 오류)
-#   - AWS_ENDPOINT_URL 은 닫힌 루프백 포트(https://127.0.0.1:9), 인스턴스 메타데이터·호스트 접두사 끔
-# 그래서 거부 뒤에 친 aws·boto3 요청은 이 컴퓨터(127.0.0.1) 밖으로 나가지 않는다. ~/.aws 의 실제 파일은
-# 읽지도 고치지도 않는다. 실제 AWS를 쓰려면 새 셸을 연다.
+# export 한다. 그래서 거부하든, 도중에 Ctrl-C 로 끊든, 셸은 "끊긴 상태"로 남는다. 끊긴 상태:
+#   - AWS_CONFIG_FILE·AWS_SHARED_CREDENTIALS_FILE·BOTO_CONFIG·AWS_CA_BUNDLE 이 /dev/null/ 아래(만들 수 없는 경로)를
+#     가리킨다. 설정·자격 증명이 항상 "없음"이고, aws configure 도 거기에 쓰지 못한다([Errno 20] Not a directory).
+#   - 실제 자격 증명·프로필·엔드포인트 변수를 지우고, 옛 방식 자격 증명(AWS_CREDENTIAL_FILE, ~/.boto·/etc/boto.cfg)도 끈다.
+#   - AWS_ENDPOINT_URL 은 닫힌 루프백 포트(https://127.0.0.1:9). 인스턴스 메타데이터·호스트 접두사·S3 다중 리전
+#     액세스 포인트(MRAP) ARN 을 끈다.
+# 보장하는 것: 서명이 필요한 요청은 자격 증명이 없어 보내기 전에 실패한다. 나머지는 닫힌 로컬 포트로 간다.
+# 예외(남은 것): SDK 가 엔드포인트 설정을 무시하고 호스트명을 직접 만드는 기능 — 예: Kinesis --stream-id
+# (*.control-kinesis.<리전>.amazonaws.com) — 의 서명 없는 요청(--no-sign-request)은 실제 AWS 호스트에 DNS 조회와
+# TCP·TLS 연결을 시도한다. 신뢰하는 인증서 묶음이 없어(AWS_CA_BUNDLE=/dev/null/...) TLS 단계에서 끊기므로 HTTP 요청은
+# 보내지 않는다(--no-verify-ssl 을 붙이면 이 마지막 단계도 꺼진다).
+# 연결된 상태에서도 MRAP 은 끄고, 같은 기능은 에뮬레이터 인증서(ca.pem)만 믿으므로 TLS 단계에서 끊긴다.
+# env.sh 는 ~/.aws 의 config·credentials 를 읽지도 고치지도 않는다(aws CLI 자체는 ~/.aws/cli/cache 에 캐시를 쓴다).
 # (boto3 예제의 TODAYORDER_ALLOW_REAL_AWS=1 같은 해제 스위치는 env.sh 에 없다 — env.sh 는 에뮬레이터 전용이다.)
 
 # 이 파일이 있는 scripts/ 디렉터리 (bash·zsh 공통. zsh 문법은 bash 가 파싱하지 않도록 eval 로 감싼다)
@@ -36,34 +42,41 @@ _emu_env_fail() {
 }
 
 # 이 셸을 AWS에서 끊는다 (조용히). env.sh 가 맨 먼저 부르고, 성공했을 때만 에뮬레이터 값으로 덮어쓴다.
+# Ctrl-C 대비 순서: (1) 지울 서비스별 변수 목록을 먼저 구한다(상태를 바꾸지 않음) (2) export **한 번**으로
+# 설정·자격 증명·CA·엔드포인트를 끊긴 값으로 바꾼다 (3) 그다음에 지운다. (1) 도중에 멈추면 원래 상태 그대로이고,
+# (2) 뒤 어디서 멈추든 설정·자격 증명 파일과 CA 가 /dev/null 이라 실제 AWS에 요청이 전달되지 않는다.
 _emu_env_neutralize() {
-  # 실제 AWS 자격 증명·프로필·엔드포인트를 줄 수 있는 변수를 모두 지운다.
-  # (환경 변수 자격 증명은 파일보다 우선하므로, 남겨 두면 실제 키로 서명된다)
+  local v per_service
+  per_service="$(env | sed -n 's/^\(AWS_ENDPOINT_URL_[A-Za-z0-9_]*\)=.*/\1/p')"
+  # /dev/null 은 파일이라 그 아래 경로는 어떤 프로그램도 만들 수 없다 → 설정·자격 증명·CA 가 항상 "없음".
+  export AWS_CONFIG_FILE=/dev/null/aws-emulator-disconnected/config \
+    AWS_SHARED_CREDENTIALS_FILE=/dev/null/aws-emulator-disconnected/credentials \
+    AWS_CA_BUNDLE=/dev/null/aws-emulator-disconnected/ca.pem \
+    BOTO_CONFIG=/dev/null/aws-emulator-disconnected/boto \
+    AWS_ENDPOINT_URL=https://127.0.0.1:9 \
+    AWS_S3_DISABLE_MULTIREGION_ACCESS_POINTS=true \
+    AWS_EC2_METADATA_DISABLED=true \
+    AWS_DISABLE_HOST_PREFIX_INJECTION=true \
+    AWS_REGION=us-east-1 AWS_DEFAULT_REGION=us-east-1 \
+    AWS_PAGER=""
+  #  - BOTO_CONFIG: botocore 의 옛 방식 공급자가 기본값 ~/.boto·/etc/boto.cfg 대신 이 경로만 본다
+  #  - AWS_CA_BUNDLE: 어떤 서버 인증서도 믿지 않는다 → SDK 가 직접 만든 AWS 호스트로 가도 TLS 에서 끊긴다
+  #  - AWS_ENDPOINT_URL: discard 포트(닫혀 있음). 리전은 정해 둬 리전 오류 대신 자격 증명·연결 단계에서 실패하게
+  #  - AWS_S3_DISABLE_MULTIREGION_ACCESS_POINTS: MRAP ARN 은 엔드포인트를 무시하고 *.s3-global.amazonaws.com 으로 간다
+  # 실제 AWS 자격 증명·프로필을 줄 수 있는 변수를 지운다 (환경 변수 자격 증명은 파일보다 우선한다).
   unset AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN AWS_SECURITY_TOKEN \
     AWS_PROFILE AWS_DEFAULT_PROFILE AWS_ROLE_ARN AWS_ROLE_SESSION_NAME AWS_WEB_IDENTITY_TOKEN_FILE \
     AWS_CONTAINER_CREDENTIALS_RELATIVE_URI AWS_CONTAINER_CREDENTIALS_FULL_URI \
     AWS_CONTAINER_AUTHORIZATION_TOKEN AWS_IGNORE_CONFIGURED_ENDPOINT_URLS \
-    AWS_USE_FIPS_ENDPOINT AWS_USE_DUALSTACK_ENDPOINT AWS_ENDPOINT_URL AWS_CA_BUNDLE \
-    AWS_CREDENTIAL_FILE
+    AWS_USE_FIPS_ENDPOINT AWS_USE_DUALSTACK_ENDPOINT AWS_CREDENTIAL_FILE
   # 서비스별 엔드포인트 덮어쓰기(AWS_ENDPOINT_URL_S3 등)도 지운다.
-  local v
-  for v in $(env | sed -n 's/^\(AWS_ENDPOINT_URL_[A-Za-z0-9_]*\)=.*/\1/p'); do
+  for v in $(printf '%s\n' "$per_service"); do   # 명령 치환은 bash·zsh 모두 단어로 나눈다
     unset "$v"
   done
-  # /dev/null 은 파일이라 그 아래 경로는 어떤 프로그램도 만들 수 없다 → 설정·자격 증명이 항상 "없음".
-  local off=/dev/null/aws-emulator-disconnected
-  export AWS_CONFIG_FILE="$off/config"
-  export AWS_SHARED_CREDENTIALS_FILE="$off/credentials"
-  export BOTO_CONFIG="$off/boto"                    # botocore 의 옛 방식 공급자: 기본값 ~/.boto·/etc/boto.cfg 대신 이 경로만 본다
-  export AWS_ENDPOINT_URL="https://127.0.0.1:9"     # discard 포트(닫혀 있음): 서명 없는 요청도 밖으로 나가지 않는다
-  export AWS_EC2_METADATA_DISABLED=true             # 인스턴스 메타데이터에서도 자격 증명을 찾지 않는다
-  export AWS_DISABLE_HOST_PREFIX_INJECTION=true     # 'data-127.0.0.1' 같은 호스트명을 만들어 DNS 를 묻지 않게
-  export AWS_REGION=us-east-1 AWS_DEFAULT_REGION=us-east-1   # 리전을 정해 둬 리전 오류 대신 자격 증명·연결 단계에서 실패하게
-  export AWS_PAGER=""
 }
 
 _emu_env_disconnected_notice() {
-  printf '\033[31m[env.sh] 이 셸은 AWS에서 끊겼습니다: 실제 자격 증명·프로필 변수와 ~/.boto 같은 옛 방식 자격 증명을 끄고, 엔드포인트를 닫힌 로컬 포트(127.0.0.1:9)로 돌렸습니다 — aws 요청은 이 컴퓨터 밖으로 나가지 않습니다. 에뮬레이터는 원인을 고친 뒤 다시 source scripts/env.sh, 실제 AWS는 새 셸을 여세요.\033[0m\n' >&2
+  printf '\033[31m[env.sh] 이 셸은 AWS에서 끊겼습니다: 실제 자격 증명·프로필 변수와 ~/.boto 같은 옛 방식 자격 증명을 끄고, 엔드포인트를 닫힌 로컬 포트(127.0.0.1:9)로, 인증서 묶음을 빈 경로로 돌렸습니다 — 서명이 필요한 aws 요청은 보내기 전에 실패하고, 실제 AWS에는 요청이 전달되지 않습니다(예외·자세히: M00 레슨 3). 에뮬레이터는 원인을 고친 뒤 다시 source scripts/env.sh, 실제 AWS는 새 셸을 여세요.\033[0m\n' >&2
 }
 
 _emu_env_main() {
@@ -140,13 +153,11 @@ _emu_env_main() {
       "실제 AWS에 요청을 보낼 위험이 있어 중단합니다. 'scripts/emulator-status.sh' 로 포트 $port 의 에뮬레이터가 떠 있는지 확인하세요."
     return 1
   fi
-  # 2) 확인이 통과했다 — 이제서야 에뮬레이터 연결 설정을 export 한다.
-  #    (끊긴 상태의 BOTO_CONFIG·AWS_EC2_METADATA_DISABLED·AWS_DISABLE_HOST_PREFIX_INJECTION·리전·페이저는 그대로 둔다)
-  export EMULATOR_PORT="$port"
-  export AWS_SHARED_CREDENTIALS_FILE="$creds"
-  export AWS_CONFIG_FILE="$conf"
-  export AWS_CA_BUNDLE="$ca"
-  export AWS_ENDPOINT_URL="$ep"
+  # 2) 확인이 통과했다 — 이제서야 에뮬레이터 연결 설정을 export 한다 (export 한 번).
+  #    (끊긴 상태의 BOTO_CONFIG·AWS_S3_DISABLE_MULTIREGION_ACCESS_POINTS·AWS_EC2_METADATA_DISABLED·
+  #     AWS_DISABLE_HOST_PREFIX_INJECTION·리전·페이저는 그대로 둔다)
+  export EMULATOR_PORT="$port" AWS_SHARED_CREDENTIALS_FILE="$creds" AWS_CONFIG_FILE="$conf" \
+    AWS_CA_BUNDLE="$ca" AWS_ENDPOINT_URL="$ep"
   printf '[env.sh] 포트 %s 의 에뮬레이터에 연결됨: %s (Account 000000000000, us-east-1)\n' "$port" "$AWS_ENDPOINT_URL" >&2
   return 0
 }
@@ -156,8 +167,12 @@ _emu_env_main() {
 _emu_env_rc=0
 _emu_env_main || _emu_env_rc=$?
 # 어떤 이유로 거부했든(포트 오류·파일 없음·서명 거부·응답 없음…) 이 셸을 AWS에서 끊는다.
-# (_emu_env_main 이 맨 먼저 끊어 두었으므로 여기서는 알리기만 한다)
-[ "$_emu_env_rc" -eq 0 ] || _emu_env_disconnected_notice
+# (_emu_env_main 이 맨 먼저 끊어 두었으므로 여기서는 알리기만 한다. 주 사이트가 끊겼으니 남아 있던 두 번째
+#  사이트 연결(DR_AWS_*)도 지운다 → dr_aws·emulator_site("DR_") 도 거부된다. 성공 경로는 DR 을 건드리지 않는다.)
+if [ "$_emu_env_rc" -ne 0 ]; then
+  unset DR_AWS_ENDPOINT_URL DR_AWS_CA_BUNDLE DR_AWS_SHARED_CREDENTIALS_FILE DR_AWS_CONFIG_FILE
+  _emu_env_disconnected_notice
+fi
 unset -f _emu_env_main _emu_env_fail _emu_env_neutralize _emu_env_disconnected_notice
 unset _emu_env_dir
 if [ "$_emu_env_rc" -ne 0 ]; then
