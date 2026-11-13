@@ -56,14 +56,14 @@ TodayOrder의 온프레미스 Oracle 주문 DB(약 2 TB)를 Amazon Aurora Postgr
 
 ## 문항 4
 
-TodayOrder는 EC2(현재 c6i 패밀리, 내년에 Graviton 기반 패밀리로 바꿀 계획), AWS Fargate 태스크, AWS Lambda 함수를 함께 쓴다. 세 서비스를 합친 컴퓨트 사용량은 지난 1년간 시간당 약 40달러 수준으로 꾸준했고 앞으로 3년도 비슷할 전망이다. 리전도 바뀔 수 있다.
+TodayOrder는 주문 영수증 PDF(평균 2 MB, 한 번 쓰면 바뀌지 않음)를 S3 Standard에 저장한다. 업로드 후 60일 동안은 고객이 앱에서 자주 연다. 그 뒤 1년이 될 때까지는 고객센터가 분기에 한 번쯤 열어 보며, 열 때는 **즉시(밀리초)** 보여야 한다. 1년이 지나면 세무 규정 때문에 7년까지 보관만 하고, 감사 때 꺼내는 데 12~48시간이 걸려도 된다. 7년이 지나면 지운다.
 
-가장 비용 효율적인 구매 방법은?
+가장 비용 효율적인 방법은?
 
-- A. 현재 c6i 인스턴스에 대해 3년 Standard 예약 인스턴스를 구매한다.
-- B. EC2 Instance Savings Plans를 c6i 패밀리로 3년 약정한다.
-- C. 모든 워크로드를 스팟 인스턴스와 Fargate Spot으로 옮긴다.
-- D. 꾸준한 사용량 수준에 맞춰 Compute Savings Plans를 약정한다.
+- A. 처음부터 S3 Intelligent-Tiering에 올려 접근 패턴에 따라 자동 계층(선택형 아카이브 계층은 켜지 않음)을 쓰고, 7년 뒤 만료한다.
+- B. 처음부터 S3 One Zone-IA에 올리고 7년 뒤 만료하는 수명 주기 규칙 하나만 둔다. 영수증은 언제든 다시 만들 수 있다고 본다.
+- C. 수명 주기로 60일 뒤 S3 Glacier Flexible Retrieval, 1년 뒤 S3 Glacier Deep Archive로 옮기고 7년 뒤 만료한다.
+- D. 수명 주기로 60일 뒤 S3 Glacier Instant Retrieval, 1년 뒤 S3 Glacier Deep Archive로 옮기고 7년 뒤 만료한다.
 
 ## 문항 5
 
@@ -425,14 +425,14 @@ TodayOrder가 출시하는 실시간 대전 게임은 UDP로 통신한다. 전 �
 
 ## 문항 37
 
-온프레미스 VMware에서 돌아가는 주문 관련 서버 30대를 AWS를 DR 사이트로 삼아 보호하려 한다. 요구는 RPO 수 초, RTO 수 분이며, 서버의 OS·애플리케이션을 고치지 않고, DR 사이트의 평상시 비용은 최소여야 한다.
+영수증 버킷에 대한 새 규정이 생겼다. 영수증은 7년 동안 **어떤 사용자도(관리자와 루트 사용자 포함)** 지우거나 덮어쓸 수 없어야 한다. 또 리전 전체 장애에 대비해 다른 리전에 같은 보호가 적용된 사본이 있어야 한다. 새 버킷을 만들어 옮겨도 된다.
 
-가장 적합한 서비스는?
+어떤 구성이 이 요구를 만족하는가?
 
-- A. AWS Elastic Disaster Recovery
-- B. AWS Backup으로 매시간 온프레미스 VM 백업
-- C. AWS DataSync로 서버 디스크를 S3에 주기적으로 복사
-- D. AWS Application Migration Service로 한 번 이전한 뒤 온프레미스 서버를 끈다
+- A. 객체 잠금을 켠 버킷(버전 관리 포함)에 규정 준수 모드·7년 기본 보존을 두고, 객체 잠금을 켠 다른 리전 버킷으로 복제한다.
+- B. 객체 잠금을 켠 버킷에 거버넌스 모드·7년 기본 보존을 두고, 같은 리전의 다른 버킷으로 복제(SRR)해 사본을 하나 더 둔다.
+- C. 버전 관리와 MFA 삭제를 켜고, AWS Backup으로 버킷을 매일 백업해 다른 리전 볼트에 복사한 뒤 7년 뒤 만료하는 수명 주기를 둔다.
+- D. 버킷 정책으로 모든 보안 주체의 `s3:DeleteObject`를 거부하고, S3 Replication Time Control로 다른 리전에 15분 안에 복제한다.
 
 ## 문항 38
 
@@ -442,7 +442,7 @@ TodayOrder가 출시하는 실시간 대전 게임은 UDP로 통신한다. 전 �
 
 - A. Amazon SQS 표준 큐 하나를 세 소비자가 함께 폴링한다.
 - B. Amazon Data Firehose 전송 스트림으로 받아 1분 버퍼로 S3에 적재하고, 세 소비자가 새 객체를 읽는다.
-- C. Amazon Kinesis Data Streams에 게시하고, 소비자마다 따로 읽게 한다.
+- C. Amazon Kinesis Data Streams(보존 7일)에 사용자 ID를 파티션 키로 게시한다.
 - D. Amazon SNS 표준 토픽에 게시하고, 소비자마다 SQS 표준 큐를 구독시킨다.
 
 ## 문항 39
@@ -469,14 +469,14 @@ TodayOrder는 서울 리전(`ap-northeast-2`)의 AWS Certificate Manager에서 `
 
 ## 문항 41
 
-정산 시스템은 온프레미스의 Apache ActiveMQ 브로커와 JMS로 통신하는 Java 애플리케이션 여러 개로 이루어져 있다. 이 시스템을 빠르게 AWS로 옮겨야 하며, 메시징 코드는 거의 고치지 않고, 브로커 패치·장애 조치는 AWS에 맡기고 싶다.
+EC2 워커들이 SQS 표준 큐에서 이미지 처리 요청을 받아 처리한다. 처리는 보통 2분, 큰 이미지는 4분까지 걸린다. 큐의 가시성 타임아웃은 기본값 30초다. 최근 같은 요청이 여러 워커에서 동시에 처리되는 일이 잦고, 손상된 파일이 든 메시지는 계속 실패하며 큐에 남아 다른 요청의 처리를 늦춘다.
 
-가장 적합한 서비스는?
+가장 적합한 조치는?
 
-- A. Amazon SQS
-- B. Amazon Managed Streaming for Apache Kafka(Amazon MSK)
-- C. Amazon EventBridge
-- D. Amazon MQ (ActiveMQ 엔진)
+- A. 큐를 SQS FIFO 큐로 바꾸고 콘텐츠 기반 중복 제거를 켜, 같은 요청이 한 번만 처리되게 한다.
+- B. 롱 폴링(수신 대기 20초)을 켜고 메시지 보존 기간을 5분으로 줄여, 처리되지 않은 메시지가 오래 남지 않게 한다.
+- C. 큐에 전달 지연(DelaySeconds) 15분을 두고 워커 수를 두 배로 늘려, 메시지가 처리 중에 다시 보이지 않게 한다.
+- D. 가시성 타임아웃을 최대 처리 시간보다 길게 늘리고, 수신 횟수가 3회를 넘은 메시지를 보낼 DLQ를 연결한다.
 
 ## 문항 42
 

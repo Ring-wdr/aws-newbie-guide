@@ -152,6 +152,14 @@ def print_stats(key: dict[int, KeyItem], qs: dict[int, dict[str, object]]) -> in
     print("복수 응답 정답 글자: " + " · ".join(f"{k} {mc[k]}" for k in "ABCDEF"))
     share, hits = longest_share(key, qs)
     print(f"정답이 가장 긴 보기인 단일 응답: {len(hits)}/{len(singles)} = {share:.1%} (상한 {MAX_LONGEST_SHARE:.0%}) — {', '.join(map(str, hits))}")
+    # 정답의 길이 순위 = 1 + (정답보다 "엄격히" 긴 오답 보기 수). 같은 길이는 정답에 유리하게(더 높은 순위로) 센다.
+    ranks: Counter[int] = Counter()
+    for i in singles:
+        texts = qs.get(i.number, {}).get("texts", {})
+        if texts:
+            mine = len(texts[next(iter(i.answer))])  # type: ignore[index]
+            ranks[1 + sum(len(t) > mine for t in texts.values())] += 1  # type: ignore[union-attr,arg-type]
+    print("정답의 길이 순위(4지 중): " + " · ".join(f"{r}위 {ranks[r]}" for r in (1, 2, 3, 4)))
     tasks = Counter(i.task for i in key.values())
     print("과제(Task)별: " + " · ".join(f"{t} {tasks[t]}" for t in sorted(tasks)))
     problems = check_consistency(key, qs)

@@ -242,7 +242,7 @@
 | 전 세계 다운로드 전송비 | **CloudFront**(AWS 오리진 → CloudFront 무료) |
 | 적정 크기 권고 | **Compute Optimizer** / 점검 **Trusted Advisor** |
 | 한도 전 알림 / 지난 비용 분석 / 가장 상세 데이터 / 급증 감지 | **Budgets** / **Cost Explorer** / **CUR(Data Exports)** / **Cost Anomaly Detection** |
-| 부서별 배분 | **비용 할당 태그**(활성화 필요, 소급 ❌) |
+| 부서별 배분 | **비용 할당 태그**(활성화 필요. 과거 비용은 관리 계정이 최대 12개월 소급 적용(backfill) 요청, 2024-03~) |
 | 여러 계정 볼륨 할인·약정 공유 | **Organizations 통합 결제** |
 
 데이터 전송: 인터넷 → AWS 무료 · AWS → 인터넷 가장 비쌈 · 같은 AZ 프라이빗 IP 무료 · AZ 간 양방향 과금 · 리전 간 과금 · AWS 오리진 → CloudFront 무료.
@@ -280,6 +280,8 @@
 | QLDB 지원 종료 | 2025 | 범위 밖 | M05 |
 | Snowball Edge 기존 고객 전용, Migration Hub·Application Discovery Service 신규 불가(후속 AWS Transform) | 2025-11-07 | 옛 문제의 "오프라인 수십 TB" 답은 Snow | M04·M12 |
 | Security Hub의 결과 모으기·표준 준수 점수 → **Security Hub CSPM**으로 이름 변경, 새 Security Hub는 신호 상관 분석 | 2025-12 | 옛 문제의 "Security Hub" = 지금의 CSPM | M09 |
+| 비용 할당 태그 **소급 적용(backfill)** 최대 12개월(관리 계정) | 2024-03 | 옛 자료의 "소급 안 됨"은 이제 틀림 | M13 |
+| CloudFront **Anycast 고정 IP**(방화벽 허용 목록용, HTTP(S) 배포) | 2024-11 | "고정 IP + **UDP**/임의 TCP" → 여전히 Global Accelerator(또는 NLB의 AZ별 EIP). 아래 불일치 6 | M08 |
 | QuickSight → **Amazon Quick** 표기 | | | M11 |
 | S3 Select·Data Pipeline 신규 고객 불가 → Athena / Glue·Step Functions·MWAA | | | M04·M11 |
 
@@ -293,3 +295,5 @@
 | 2 | S3 RTC 수치: M04 레슨 3은 "새 객체의 99.99%를 15분 안에", M12 치트시트는 "99.9% 15분 이내" | [M04-03](../m04-storage/03-versioning-lock-replication.md) ↔ [M12 치트시트](../m12-resilience-dr-migration/cheatsheet.md) | 현재 S3 사용 설명서는 "**99.9%**를 15분 안에"(2026-11 확인). M12가 맞다 |
 | 3 | M02 README는 "M10은 이 VPC(10.0.0.0/24·10.0.10.0/24·10.0.20.0/24…, AZ별 NAT 2개)를 CloudFormation으로 재현한다"고 쓰지만, M10 템플릿은 다른 CIDR(10.0.1·2 / 11·12 / 21·22)과 **NAT 1개**·앱 라우팅 테이블 1개를 쓴다(M10 README가 독립 설계라고 밝힘) | [M02 README](../m02-vpc-networking/README.md) ↔ [M10 vpc-3tier.yaml](../m10-monitoring-iac/labs/templates/vpc-3tier.yaml) | 캡스톤은 M02 계획(NAT 2개)을 따른다. NAT 1개는 비용 절충임을 레슨 01 R1로 다뤘다. M02 README의 "재현" 문장 또는 M10 템플릿 중 하나를 맞추는 것이 좋다 |
 | 4 | 보안 그룹 이름: M02 `todayorder-alb-sg`/`app-sg`/`db-sg`, M10 템플릿 `WebSg`/`AppSg`/`DbSg`(설명 "web tier") | 위와 같음 | 같은 개념. 캡스톤은 M02 이름(`-alb-sg` 등) |
+| 5 | 비용 할당 태그: M13 치트시트·퀴즈 해설은 "소급 안 됨"이라 쓴다 | [M13 치트시트](../m13-cost-optimization/cheatsheet.md) · [M13 퀴즈](../m13-cost-optimization/quiz.md) | 2024-03부터 관리 계정이 **최대 12개월 소급 적용(backfill)**을 요청할 수 있다([Backfill cost allocation tags](https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/cost-allocation-backfill.html)). 활성화가 먼저 필요하다는 점은 그대로 |
+| 6 | CloudFront 고정 IP: M08 레슨 4·퀴즈는 "CloudFront는 고정 IP를 주지 않는다/IP가 수시로 바뀐다"고 쓴다 | [M08-04](../m08-dns-edge/04-global-accelerator-vs-cloudfront.md) · [M08 퀴즈](../m08-dns-edge/quiz.md) | 2024-11부터 CloudFront **Anycast 고정 IP**가 있다(HTTP(S) 배포용). "고정 IP + UDP/임의 TCP·몇 초 리전 전환" → Global Accelerator라는 결론은 그대로 |

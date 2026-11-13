@@ -92,7 +92,7 @@ uv run python curriculum/m14-capstone-exam/mock-exam/grade.py my-answers.txt
 - 놓친 제약: "DR 리전은 평상시 트래픽을 받을 필요가 없다" + "가장 비용이 적게"
 - 내가 한 착각: RPO 5분이면 무조건 상시 실행 스택이 필요하다고 생각함
 - 바로잡은 규칙: RPO는 **데이터 복제**가, RTO는 **컴퓨트 기동 시간**이 결정한다. 두 축을 따로 본다
-- 같은 함정의 다른 문항: 모의고사 37번(DR 서비스), M12 레슨 2 워크시트
+- 같은 함정의 다른 문항: 모의고사 61번(Aurora Global Database — RPO는 복제 방식이 정한다), M12 레슨 2 워크시트
 - 복습한 곳: M12-02 DR 전략 표 · 다시 풀 날짜: D-3
 ```
 
