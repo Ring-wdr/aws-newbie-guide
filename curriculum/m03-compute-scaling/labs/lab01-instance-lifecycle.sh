@@ -88,10 +88,11 @@ echo "상태 전이: $stop_path"
 echo "== 8. 중지 상태에서 인스턴스 유형 변경(ModifyInstanceAttribute) — 에뮬레이터 미구현"
 expect_error NotImplemented aws ec2 modify-instance-attribute --instance-id "$IID" --instance-type Value=t3.small
 
-echo "== 9. 다시 시작 → waiter 로 running 까지 기다리기"
+echo "== 9. 다시 시작 → running 까지 기다리기"
 aws ec2 start-instances --instance-ids "$IID" \
   --query 'StartingInstances[0].[PreviousState.Name,CurrentState.Name]' --output text
-aws ec2 wait instance-running --instance-ids "$IID" && echo "waiter: running"
+# 레슨의 `aws ec2 wait instance-running` 과 같은 조건(running, 도중에 terminated 등이 보이면 실패)을 15초 대신 1초 간격으로 확인한다
+wait_for instance running "$IID" && echo "waiter: running (lab 은 1초 간격 확인)"
 
 echo "== 10. 종료 (되돌릴 수 없다)"
 aws ec2 terminate-instances --instance-ids "$IID" \

@@ -109,21 +109,20 @@ expect_error() {
 
 fail() { echo "FAIL: $*" >&2; exit 1; }
 
-# wait_for <instance|volume|snapshot> <목표 상태> <ID...> : 모든 ID가 목표 상태가 될 때까지 1초 간격으로 확인(최대 120초).
-# `aws ec2 wait ...` 도 같은 일을 하지만 확인 간격이 15초라 실습이 느려진다. 실제 AWS에서는 waiter 를 써도 된다.
-_all_in_state() {
-  local kind="$1" goal="$2" got
-  shift 2
-  case "$kind" in
-    instance) got="$(aws ec2 describe-instances --instance-ids "$@" --query 'Reservations[].Instances[].State.Name' --output text)" ;;
-    volume) got="$(aws ec2 describe-volumes --volume-ids "$@" --query 'Volumes[].State' --output text)" ;;
-    snapshot) got="$(aws ec2 describe-snapshots --snapshot-ids "$@" --query 'Snapshots[].State' --output text)" ;;
-  esac
-  echo "$got"
-  [ -n "$got" ] && [ -z "$(printf '%s\n' $got | grep -vx "$goal")" ]
-}
+# wait_for <instance|volume|snapshot> <목표 상태> <ID...> : 모든 ID가 목표 상태가 될 때까지 1초 간격으로 확인한다.
+# `aws ec2 wait instance-running` 등도 같은 일을 하지만 확인 간격이 15초라 실습이 느려진다. 실제 AWS에서는 waiter 를 써도 된다.
+# 성공·실패 조건은 waiter 와 같다(예: running 을 기다리는데 terminated 가 보이면 바로 실패) — scripts/lab-wait.sh
+source "$(git rev-parse --show-toplevel)/scripts/lab-wait.sh"
 wait_for() {
   local kind="$1" goal="$2"
   shift 2
-  poll 120 "$kind $* → $goal" _all_in_state "$kind" "$goal" "$@"
+  case "$kind $goal" in
+    "instance running") wait_ec2_instance_running "$@" ;;
+    "instance stopped") wait_ec2_instance_stopped "$@" ;;
+    "instance terminated") wait_ec2_instance_terminated "$@" ;;
+    "volume available") wait_ec2_volume_available "$@" ;;
+    "volume in-use") wait_ec2_volume_in_use "$@" ;;
+    "snapshot completed") wait_ec2_snapshot_completed "$@" ;;
+    *) echo "wait_for: 모르는 조합 '$kind $goal'" >&2; return 2 ;;
+  esac
 }
