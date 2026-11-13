@@ -1,0 +1,122 @@
+---
+// M14 모의고사 시험 모드. 문항·정답표·해설·통과 기준·타이머는 모두 원고와 grade.py 에서 빌드 때 읽는다.
+// 채점 규칙은 src/lib/exam-core.mjs(grade.py 를 옮긴 것)이며, tools/sitecheck 가 grade.py 와 같은 결과인지 검사한다.
+import fs from 'node:fs';
+import path from 'node:path';
+import { getEntry } from 'astro:content';
+import { REPO_ROOT } from '../lib/repo.mjs';
+import { parseGradeConstants, parseKey, parseQuestions, parseTimerMinutes } from '../lib/exam-core.mjs';
+import { ko } from '../i18n/ko.mjs';
+
+const dir = path.join(REPO_ROOT, 'curriculum/m14-capstone-exam/mock-exam');
+const read = (f: string) => fs.readFileSync(path.join(dir, f), 'utf8');
+const questionsText = read('questions.md');
+const consts = parseGradeConstants(read('grade.py'));
+const key = parseKey(read('answer-key.md'));
+const qs = parseQuestions(questionsText);
+const minutes = parseTimerMinutes(questionsText);
+const nums = Object.keys(key).map(Number).sort((a, b) => a - b);
+if (nums.length !== consts.total || Object.keys(qs).length !== consts.total) {
+  throw new Error(`모의고사 문항 수가 맞지 않는다: 정답표 ${nums.length}, 문제 ${Object.keys(qs).length}, grade.py TOTAL ${consts.total}`);
+}
+
+// 해설: answer-key.md 를 같은 변환기로 렌더링한 HTML에서 <section data-exam-explain="N"> 을 꺼낸다.
+const keyEntry = await getEntry('docs', 'curriculum/m14-capstone-exam/mock-exam/answer-key');
+const keyHtml = (keyEntry as any)?.rendered?.html ?? '';
+const explain: Record<number, string> = {};
+for (const m of keyHtml.matchAll(/<section class="exam-explain" data-exam-explain="(\d+)">([\s\S]*?)<\/section>/g)) {
+  explain[Number(m[1])] = m[2];
+}
+
+const data = {
+  total: consts.total,
+  passPct: consts.passPct,
+  domains: consts.domains,
+  minutes,
+  key,
+  questions: Object.fromEntries(nums.map((n) => [n, { choose: qs[n].choose, options: qs[n].options }])),
+  keyRoute: '/curriculum/m14-capstone-exam/mock-exam/answer-key/',
+};
+---
+
+<section class="exam-app not-content" aria-labelledby="exam-app-title" data-exam>
+  <h2 id="exam-app-title" class="exam-title">{ko.exam.heading}</h2>
+  <p class="exam-noscript">{ko.exam.noScript}</p>
+
+  <div class="exam-start" hidden>
+    <p>{ko.exam.intro}</p>
+    <dl class="exam-facts">
+      <div><dt>{ko.exam.timeLeft}</dt><dd>{minutes}분</dd></div>
+      <div><dt>{ko.exam.resultTitle}</dt><dd>{`정답률 ${consts.passPct}% 이상 통과`}</dd></div>
+    </dl>
+    <div class="exam-actions">
+      <button type="button" class="exam-primary" data-act="start">{ko.exam.start}</button>
+      <button type="button" data-act="restart" hidden>{ko.exam.restart}</button>
+      <button type="button" data-act="import-sheet">{ko.exam.importSheet}</button>
+    </div>
+    <p class="exam-msg" role="status" aria-live="polite"></p>
+    <div data-guide-storage></div>
+  </div>
+
+  <div class="exam-bar" hidden>
+    <div class="exam-timer">
+      <span class="exam-timer-label">{ko.exam.timeLeft}</span>
+      <span class="exam-clock" role="timer" aria-live="off">--:--</span>
+    </div>
+    <p class="exam-counts" aria-live="polite"></p>
+    <div class="exam-bar-actions">
+      <button type="button" data-act="pause">{ko.exam.pause}</button>
+      <button type="button" class="exam-primary" data-act="submit">{ko.exam.submit}</button>
+    </div>
+  </div>
+
+  <nav class="exam-nav" aria-label={ko.exam.navTitle} hidden>
+    <p class="exam-nav-legend">{ko.exam.navLegend}</p>
+    <ol class="exam-nav-grid"></ol>
+  </nav>
+
+  <section class="exam-result" aria-labelledby="exam-result-title" hidden tabindex="-1">
+    <h2 id="exam-result-title">{ko.exam.resultTitle}</h2>
+    <p class="exam-total"></p>
+    <p class="exam-verdict"></p>
+    <div class="table-scroll" tabindex="0" role="region" aria-label={ko.exam.domainTable}>
+      <table class="exam-domains">
+        <caption>{ko.exam.domainTable}</caption>
+        <thead><tr>{ko.exam.domainCols.map((c) => <th scope="col">{c}</th>)}</tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <p class="exam-weak"></p>
+    <p class="exam-lucky"></p>
+    <div class="exam-actions">
+      <button type="button" data-act="export-sheet">{ko.exam.exportSheet}</button>
+      <button type="button" data-act="restart">{ko.exam.restart}</button>
+    </div>
+    <p class="exam-hint">{ko.exam.exportNote}</p>
+    <h3>{ko.exam.reviewTitle}</h3>
+    <div class="exam-filter" role="group" aria-label={ko.exam.reviewTitle}>
+      <button type="button" data-filter="all" aria-pressed="true">{ko.exam.reviewFilterAll}</button>
+      <button type="button" data-filter="wrong" aria-pressed="false">{ko.exam.reviewFilterWrong}</button>
+      <button type="button" data-filter="flagged" aria-pressed="false">{ko.exam.reviewFilterFlagged}</button>
+    </div>
+    <ol class="exam-review-list"></ol>
+  </section>
+
+  <div class="exam-controls" hidden>
+    <p class="exam-choose-status" aria-live="polite"></p>
+    <div class="exam-explain-slot" hidden></div>
+    <div class="exam-controls-row">
+      <button type="button" data-act="prev">{ko.exam.prev}</button>
+      <button type="button" data-act="flag" aria-pressed="false">{ko.exam.flag}</button>
+      <button type="button" data-act="back-to-result" hidden>{ko.exam.resultTitle}</button>
+      <button type="button" data-act="next">{ko.exam.next}</button>
+    </div>
+  </div>
+
+  <script type="application/json" id="exam-data" set:html={JSON.stringify(data).replace(/</g, '\\u003c')} />
+  {nums.map((n) => <template id={`exam-explain-${n}`} set:html={explain[n] ?? ''} />)}
+</section>
+
+<script>
+  import '../scripts/exam';
+</script>
