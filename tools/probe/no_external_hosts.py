@@ -56,8 +56,10 @@ SKIP_NAMES = {"results.json", "uv.lock"}
 SKIP_DIRS = {".git", ".venv", "__pycache__", "node_modules", ".worktrees"}
 MARKER = "external-host-ok"
 # Markdown 코드 블록 전체 표시: 여는 ``` 바로 윗줄의 HTML 주석 (렌더링되지 않으므로 실제 출력 블록을 고치지 않는다)
-# 이유는 첫 '-->' 앞에 공백 아닌 글자가 있어야 한다('<!-- external-host-ok: -->-->' 처럼 주석 닫힘을 이유로 세지 않는다).
-MD_BLOCK_MARKER = re.compile(r"^\s*<!--\s*" + MARKER + r":\s*(?!-->)\S(?:(?!-->).)*-->\s*$")
+# 이유는 첫 '-->' 앞에 공백·'-'·'<'·'>'·'!' 이외의 글자가 하나 이상 있어야 한다
+# ('<!-- external-host-ok: -->-->', '<!-- external-host-ok: --->' 처럼 주석 기호를 이유로 세지 않는다).
+MD_BLOCK_MARKER = re.compile(
+    r"^\s*<!--\s*" + MARKER + r":(?=(?:(?!-->).)*?[^\s\-<>!])(?:(?!-->).)*-->\s*$")
 
 RESERVED_TLDS = (".invalid", ".test", ".example", ".localhost")
 EMAIL_OK = ("example.com", "example.net", "example.org")
@@ -305,6 +307,8 @@ MD_BAD_SAMPLES = [
     "```\nhttps://sqs.us-east-1.amazonaws.com/000000000000/q\n```",
     "<!-- external-host-ok: -->\n```\nhttps://sqs.us-east-1.amazonaws.com/000000000000/q\n```",
     "<!-- external-host-ok: -->-->\n```\nhttps://sqs.us-east-1.amazonaws.com/000000000000/q\n```",
+    "<!-- external-host-ok: --->\n```\nhttps://sqs.us-east-1.amazonaws.com/000000000000/q\n```",
+    "<!-- external-host-ok: - - -->\n```\nhttps://sqs.us-east-1.amazonaws.com/000000000000/q\n```",
     "<!-- external-host-ok: 이유 -->\n\n```\nhttps://sqs.us-east-1.amazonaws.com/000000000000/q\n```",
     "<!-- external-host-ok: 앞 블록만 -->\n```\nok\n```\n```\nhttps://sqs.us-east-1.amazonaws.com/000000000000/q\n```",
 ]

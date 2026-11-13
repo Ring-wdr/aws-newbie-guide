@@ -44,7 +44,7 @@ flowchart LR
 scripts/install.sh
 ```
 
-처음 실행하면 빠진 프로그램을 `brew install`로 설치하고(Colima, docker, awscli, uv, jq 중 없는 것만. jq는 실습 스크립트가 JSON을 다룰 때 쓰며 macOS 15부터는 기본으로 들어 있다), Colima VM을 켜고(CPU 2개, 메모리 4 GiB, 디스크 30 GiB — `COLIMA_CPU`·`COLIMA_MEMORY`·`COLIMA_DISK`로 바꿀 수 있다), 에뮬레이터 이미지를 빌드한다. 처음에는 VM 생성과 이미지 빌드에 몇 분 걸린다. 빌드 중 마지막 줄은 이렇게 끝난다.
+처음 실행하면 빠진 프로그램을 `brew install`로 설치하고(Colima, docker, awscli, uv, jq, python3 중 없는 것만. jq·python3는 실습 스크립트가 직접 부른다. jq는 macOS 15부터 기본으로 들어 있고, python3는 Xcode 명령줄 도구가 있으면 이미 있다), Colima VM을 켜고(CPU 2개, 메모리 4 GiB, 디스크 30 GiB — `COLIMA_CPU`·`COLIMA_MEMORY`·`COLIMA_DISK`로 바꿀 수 있다), 에뮬레이터 이미지를 빌드한다. 처음에는 VM 생성과 이미지 빌드에 몇 분 걸린다. 빌드 중 마지막 줄은 이렇게 끝난다.
 
 ```
 Successfully built c891f5ea0f36
@@ -231,6 +231,7 @@ scripts/emulator-down.sh && EMULATOR_TELEMETRY=on scripts/emulator-up.sh
 
 <!-- external-host-ok: 사람이 실행하는 설치 명령(apt 패키지 이름 docker.io, uv 설치 스크립트) — 실습 중에는 호출하지 않는다 -->
 ```bash
+sudo apt update
 sudo apt install git curl jq python3 docker.io   # docker 는 공식 안내(docs.docker.com)의 docker-ce 도 된다
 sudo usermod -aG docker $USER                     # 그 뒤 로그아웃했다가 다시 로그인
 curl -LsSf https://astral.sh/uv/install.sh | sh   # uv. 안내대로 새 셸을 열거나 source $HOME/.local/bin/env
