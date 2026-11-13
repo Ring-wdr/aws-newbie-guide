@@ -137,7 +137,8 @@ emulator_dns_validation() {
 # 확인 대상에는 SDK 가 엔드포인트를 무시하고 AWS 호스트명을 직접 만드는 S3 MRAP ARN·Kinesis --stream-id 가 들어 있다.
 # macOS 에서는 sandbox-exec 로 루프백 밖 연결을 막은 채 실행한다 — 시험이 실패해도 실제로 새어 나갈 수 없다.
 envsh_refusal_disconnects() {
-  local sh sc out rc=0 shells="bash" wrap="" sb=""
+  local sh sc out rc=0 shells="bash" wrap="" sb="" sigint_default=""
+  command -v perl >/dev/null 2>&1 && sigint_default="perl -e \$SIG{INT}=q(DEFAULT);exec(@ARGV)or(die)"
   [ -x /bin/bash ] && [ "$(command -v bash)" != /bin/bash ] && shells="$shells /bin/bash"
   command -v zsh >/dev/null 2>&1 && shells="$shells zsh"
   if command -v sandbox-exec >/dev/null 2>&1; then
@@ -149,7 +150,10 @@ envsh_refusal_disconnects() {
   fi
   for sh in $shells; do
     for sc in noport badport nofiles sigfail interrupt connected; do
-      out="$($wrap "$sh" "$MOD_DIR/labs/_envsh_refusal_check.sh" "$ROOT" "$sc" "$EMULATOR_PORT" 2>/dev/null | grep '^RESULT')"
+      # verify.sh 를 백그라운드(&·nohup — 에이전트가 흔히 쓰는 방식)로 띄우면 SIGINT 가 "무시" 상태로 물려받아지고,
+      # bash 는 시작할 때 무시된 신호에 trap 을 걸 수 없어 interrupt 시나리오가 늘 실패한다(zsh 는 걸 수 있다).
+      # perl 이 있으면 이 셸만 SIGINT 를 기본 동작으로 되돌려 실행한다.
+      out="$($wrap $sigint_default "$sh" "$MOD_DIR/labs/_envsh_refusal_check.sh" "$ROOT" "$sc" "$EMULATOR_PORT" 2>/dev/null | grep '^RESULT')"
       echo "$sh $sc: $out"
       [[ "$out" == "RESULT OK"* ]] || rc=1
     done
@@ -239,38 +243,41 @@ clock_stability_summary() {
 }
 
 # colima ssh 가 멈춰도(잠자기 뒤 낡은 ssh 연결 등) clock-check·emulator-up·status 가 같이 멈추지 않는지:
-# TERM 을 무시하고 오래 자는 가짜 colima(자식도 TERM 무시)와 'colima' 컨텍스트를 답하는 가짜 docker 를 앞에 둔다.
-# 제한 시간 2초(EMULATOR_CLOCK_SSH_TIMEOUT) — 세 번 불러도 이 시험은 15초 안에 끝난다.
+# TERM 을 무시하고 자는 가짜 colima(자식도 TERM 무시)와 'colima' 컨텍스트를 답하는 가짜 docker 를 앞에 둔다.
+# 제한 시간 2초(EMULATOR_CLOCK_SSH_TIMEOUT). 가짜는 8초만 자고, 확인 하나가 틀리면 바로 멈춘다 — 제한 시간 처리가
+# 망가져도 이 시험은 약 10초 안에 FAIL 한다. 다른 사람(동시에 도는 다른 verify.sh)의 프로세스를 건드리지 않도록
+# 남은 프로세스는 이번 가짜가 pid 파일에 적은 pid 로만 확인하고 정리한다(이름 패턴으로 찾거나 죽이지 않는다).
 clock_stability_ssh_timeout() {
-  local fake out rc t0 el rc_all=0
+  local fake out rc t0 el q left=""
   fake="$(mktemp -d)"
-  printf '#!/bin/sh
-trap "" TERM
-sleep 619 &
-wait
-sleep 619
-' >"$fake/colima"
-  printf '#!/bin/sh
-echo colima
-' >"$fake/docker"
+  printf '#!/bin/sh\necho $$ >>"%s/pids"\ntrap "" TERM\nsleep 8 &\necho $! >>"%s/pids"\nwait $!\n' "$fake" "$fake" >"$fake/colima"
+  printf '#!/bin/sh\necho colima\n' >"$fake/docker"
   chmod +x "$fake/colima" "$fake/docker"
+  _sst_done() {  # $1=결과. 이번 가짜의 pid 만 확인·정리한다
+    sleep 1
+    if [ -f "$fake/pids" ]; then
+      for q in $(cat "$fake/pids"); do
+        if kill -0 "$q" 2>/dev/null; then left="$left $q"; kill -KILL "$q" 2>/dev/null; fi
+      done
+    fi
+    rm -rf "$fake"
+    if [ -n "$left" ]; then echo "남은 프로세스(이번 가짜의 pid):$left"; return 1; fi
+    return "$1"
+  }
   t0=$SECONDS
   out="$(PATH="$fake:$PATH" EMULATOR_CLOCK_SSH_TIMEOUT=2 bash "$ROOT/scripts/clock-check.sh" --stability 2>&1)"; rc=$?; el=$((SECONDS - t0))
   echo "직접: rc=$rc ${el}초 $out"
-  { [ "$rc" -eq 2 ] && [ "$el" -le 5 ] && grep -q "2초 안에 응답하지 않았습니다" <<<"$out"; } || rc_all=1
+  { [ "$rc" -eq 2 ] && [ "$el" -le 5 ] && grep -q "2초 안에 응답하지 않았습니다" <<<"$out"; } || { _sst_done 1; return 1; }
   t0=$SECONDS
   out="$(PATH="$fake:$PATH" EMULATOR_CLOCK_SSH_TIMEOUT=2 bash "$ROOT/scripts/clock-check.sh" --stability --summary 2>&1)"; rc=$?; el=$((SECONDS - t0))
   echo "--summary: rc=$rc ${el}초 '$out'"
-  { [ "$rc" -eq 0 ] && [ "$el" -le 5 ] && [ -z "$out" ]; } || rc_all=1
+  { [ "$rc" -eq 0 ] && [ "$el" -le 5 ] && [ -z "$out" ]; } || { _sst_done 1; return 1; }
   # emulator-up·status 가 부르는 경고 함수 (docker 없이 시험하려고 함수만 부른다)
   t0=$SECONDS
   out="$(PATH="$fake:$PATH" EMULATOR_CLOCK_SSH_TIMEOUT=2 bash -c ". '$ROOT/scripts/_common.sh'; warn_if_clock_unstable; echo rc=\$?" 2>&1)"; el=$((SECONDS - t0))
   echo "warn_if_clock_unstable: ${el}초 '$out'"
-  { [ "$out" = "rc=0" ] && [ "$el" -le 5 ]; } || rc_all=1
-  sleep 1
-  if pgrep -f "sleep 619" >/dev/null 2>&1; then echo "남은 프로세스: $(pgrep -fl 'sleep 619')"; pkill -KILL -f "sleep 619"; rc_all=1; fi
-  rm -rf "$fake"
-  return "$rc_all"
+  { [ "$out" = "rc=0" ] && [ "$el" -le 5 ]; } || { _sst_done 1; return 1; }
+  _sst_done 0
 }
 
 # 두 번째 사이트(dr-env.sh + emulator_site("DR_")) 실시간 시험은 DR_EMULATOR_PORT 에 에뮬레이터가 떠 있을 때만.
