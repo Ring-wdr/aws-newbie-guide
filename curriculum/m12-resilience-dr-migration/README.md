@@ -41,7 +41,7 @@ export EMULATOR_PORT=9297 DR_EMULATOR_PORT=9298   # 둘 다 명시. 비대화형
 curriculum/m12-resilience-dr-migration/labs/verify.sh
 ```
 
-`verify.sh`는 **에뮬레이터 두 개**를 다룬다. 주 리전 `$EMULATOR_PORT`와 DR 리전 `$DR_EMULATOR_PORT`를 둘 다 재시작해 깨끗하게 만든다. **`DR_EMULATOR_PORT`는 명시해야 한다**: 비대화형(에이전트·CI)에서 없으면 아무것도 지우기 전에 거부하고, 터미널에서 직접 실행할 때만 `EMULATOR_PORT + 1`을 쓴다(연속된 포트는 다른 사람의 에뮬레이터일 수 있어서). 두 포트가 같아도 거부한다. 그다음 sdk 예제의 안전 장치를 확인한다. env.sh 없이 실행하면 네트워크 호출 전에 거부되는지, 그리고 DR 엔드포인트가 실제 AWS 주소면 `dr_replicate.py`가 DR 클라이언트를 만들기 전에 거부되는지 본다. 이어서 모든 lab을 **두 번씩** 실행하고 sdk 예제를 실행한다. 끝나면 성공·실패와 관계없이 **DR 리전 에뮬레이터를 끈다**. 마지막 줄이 `MODULE m12 OK`면 통과.
+`verify.sh`는 **에뮬레이터 두 개**를 다룬다. 주 리전 `$EMULATOR_PORT`와 DR 리전 `$DR_EMULATOR_PORT`를 둘 다 재시작해 깨끗하게 만든다. **`DR_EMULATOR_PORT`는 명시해야 한다**: 비대화형(에이전트·CI)에서 없으면 아무것도 지우기 전에 거부하고, 터미널에서 직접 실행할 때만 `EMULATOR_PORT + 1`을 쓴다(연속된 포트는 다른 사람의 에뮬레이터일 수 있어서). 두 포트가 같아도 거부한다. 그다음 sdk 예제의 안전 장치를 확인한다. env.sh 없이 실행하면 네트워크 호출 전에 거부되는지, 그리고 DR 엔드포인트가 실제 AWS 주소면 `dr_replicate.py`가 DR 클라이언트를 만들기 전에 거부되는지 본다. 이어서 모든 lab을 **두 번**(1회차는 번호 순, 2회차는 역순) 실행하고 sdk 예제를 실행한다. 끝나면 성공·실패와 관계없이 **DR 리전 에뮬레이터를 끈다**. 마지막 줄이 `MODULE m12 OK`면 통과.
 
 ### 두 번째 에뮬레이터("DR 리전")를 쓰는 방법
 
