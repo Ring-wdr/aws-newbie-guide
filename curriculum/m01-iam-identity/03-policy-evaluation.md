@@ -225,7 +225,11 @@ ec2:TerminateInstances	explicitDeny
 - 에뮬레이터는 EC2에 대해 **세션 정책을 적용하지 않았다**(IAM API에는 적용. 세션 정책 안의 명시적 Deny도 EC2에서는 무시됨).
 - **조건(Condition)이 붙은 자격 증명 정책 문장을 실제 호출에서 올바르게 평가하지 않는다.** `Allow *`에 조건 하나짜리 Deny(`ec2:DescribeVpcs`, `iam:ListUsers`)를 더해 `us-east-1`로 호출했더니, `StringEquals aws:RequestedRegion=us-east-1`·`=eu-west-1`, `StringNotEquals ...=us-east-1`, `Null aws:RequestedRegion=true`와 `=false`, `Bool aws:SecureTransport=false`, `StringEquals aws:PrincipalAccount=999999999999` 모두에서 Deny가 적용됐다(서로 모순되는 조건도 전부). 같은 조건을 Allow 쪽에 걸면 한 번도 허용되지 않았다. 유일한 예외는 IAM API의 `aws:username`(자기 이름과 같을 때만 정확히 판정)이고, EC2에서는 `aws:username=nobody` 같은 Deny도 적용됐다. 즉 **이 에뮬레이터 버전에서는 이런 키에 조건을 걸면 Deny는 항상 적용되고 Allow는 절대 적용되지 않는다.** 반대로 정책 시뮬레이터(`simulate-*-policy --context-entries`)는 같은 조건을 올바르게 판정한다. 그래서 이 모듈은 조건이 있는 정책을 실제 호출로 시험하지 않고, 조건 판정은 모두 시뮬레이터로 확인한다(Part D, 레슨 05 SCP 워크시트). 실제 AWS에서는 키가 없을 때 `StringEquals`는 거짓, `StringNotEquals`·`...IfExists`는 참이다.
 - 시뮬레이터(`simulate-principal-policy`)는 정책 변수 `${aws:username}`을 채우지 않았다(실제 호출에서는 동작). 변수 정책은 실제 호출로 확인한다.
-- 실제 계정에서 이 레슨을 해 보려면: IAM 사용자·정책은 무료다. 인턴 사용자에 키를 만들어 시험한 뒤 `aws iam delete-access-key`, `delete-user-policy`, `delete-user-permissions-boundary`, `delete-user`로 정리한다. S3 버킷을 만들었다면 `aws s3 rb --force`.
+
+**실제 AWS에서 해 보려면** (🟡 실습 — Part B의 S3 대비)
+- 프리 티어·요금: IAM 사용자·그룹·정책·권한 경계와 정책 시뮬레이터는 **무료**다. Part B의 S3 버킷과 작은 객체 몇 개는 요금이 거의 없다(프리 티어 적용 여부와 한도는 계정 생성 시기에 따라 다르니 [AWS 프리 티어 페이지](https://aws.amazon.com/free/)에서 확인).
+- 주의: 시험용 인턴 사용자에게 만든 **액세스 키는 유출되면 위험**하다. 실습이 끝나면 바로 지운다(키는 git·채팅에 붙여 넣지 않는다). 실제 AWS에서는 Part B의 `CreateBucket`·`ListBuckets`도 거부되는 것이 정상이다(위 첫 불릿).
+- 정리: `aws iam delete-access-key --user-name <사용자> --access-key-id <키>` → `aws iam delete-user-policy`(인라인 정책마다) → `aws iam delete-user-permissions-boundary` → `aws iam delete-user`. S3 버킷을 만들었다면 `aws s3 rb s3://<버킷> --force`.
 
 ## 시험 포인트
 
