@@ -35,6 +35,71 @@ poll_until() {
   done
 }
 
+# ---- CLI waiter 대신 쓰는 1초 간격 폴링
+# RDS·DocumentDB waiter 는 30초, ElastiCache waiter 는 15초 간격으로 조회한다. 첫 조회는 생성 직후라
+# 에뮬레이터가 아직 creating 을 돌려주는 경우가 많고(1초도 안 돼 available 이 되더라도), 그러면 다음 조회까지
+# 한 간격을 통째로 기다린다. VM 에 부하가 걸리면 이렇게 놓치는 횟수가 는다.
+# 그래서 lab 은 waiter 와 같은 상태(성공 조건)를 1초 간격으로 확인한다. 실제 AWS 에서는 waiter 가 정상 도구다.
+# 상한 600초는 넉넉한 값이다(에뮬레이터에서는 보통 수 초 안에 끝난다).
+
+# wait_status <설명> <기대 값> <조회 명령...>
+#   조회 명령(--output text 로 값 하나를 출력)의 결과가 기대 값이 될 때까지 기다린다.
+wait_status() {
+  local desc="$1" want="$2"
+  shift 2
+  poll_until 600 "$desc" _status_is "$want" "$@"
+}
+_status_is() {
+  local want="$1" got
+  shift
+  got="$("$@")" || return 1
+  echo "$got"
+  [ "$got" = "$want" ]
+}
+
+# wait_gone <설명> <NotFound 오류 코드> <조회 명령...>
+#   조회 명령이 기대한 NotFound 오류로 실패할 때까지 기다린다(다른 오류는 "사라졌다"로 치지 않는다).
+wait_gone() {
+  local desc="$1" code="$2"
+  shift 2
+  poll_until 600 "$desc" _is_gone "$code" "$@"
+}
+_is_gone() {
+  local code="$1" out
+  shift
+  if out="$("$@" 2>&1)"; then
+    echo "아직 있음"
+    return 1
+  fi
+  echo "$out"
+  grep -q "$code" <<<"$out"
+}
+
+rds_wait_instance_available() {
+  wait_status "RDS 인스턴스 $1 available" available \
+    aws rds describe-db-instances --db-instance-identifier "$1" --query 'DBInstances[0].DBInstanceStatus' --output text
+}
+rds_wait_instance_deleted() {
+  wait_gone "RDS 인스턴스 $1 삭제" DBInstanceNotFound \
+    aws rds describe-db-instances --db-instance-identifier "$1" --query 'DBInstances[0].DBInstanceStatus' --output text
+}
+rds_wait_snapshot_available() {
+  wait_status "RDS 스냅샷 $1 available" available \
+    aws rds describe-db-snapshots --db-snapshot-identifier "$1" --query 'DBSnapshots[0].Status' --output text
+}
+rds_wait_snapshot_deleted() {
+  wait_gone "RDS 스냅샷 $1 삭제" DBSnapshotNotFound \
+    aws rds describe-db-snapshots --db-snapshot-identifier "$1" --query 'DBSnapshots[0].Status' --output text
+}
+rds_wait_cluster_available() {
+  wait_status "Aurora 클러스터 $1 available" available \
+    aws rds describe-db-clusters --db-cluster-identifier "$1" --query 'DBClusters[0].Status' --output text
+}
+rds_wait_cluster_deleted() {
+  wait_gone "Aurora 클러스터 $1 삭제" DBClusterNotFoundFault \
+    aws rds describe-db-clusters --db-cluster-identifier "$1" --query 'DBClusters[0].Status' --output text
+}
+
 # expect_error <기대 오류 코드> <명령...>
 #   명령이 실패하고, 출력에 기대한 오류 코드가 있어야 통과한다. 출력은 그대로 보여 준다.
 expect_error() {
@@ -103,13 +168,13 @@ rds_delete_instance() {
     --apply-immediately >/dev/null 2>&1 || true
   aws rds delete-db-instance --db-instance-identifier "$id" --skip-final-snapshot \
     --delete-automated-backups >/dev/null 2>&1 || true
-  aws rds wait db-instance-deleted --db-instance-identifier "$id"
+  rds_wait_instance_deleted "$id"
 }
 
 rds_delete_snapshot() {
   aws rds describe-db-snapshots --db-snapshot-identifier "$1" >/dev/null 2>&1 || return 0
   aws rds delete-db-snapshot --db-snapshot-identifier "$1" >/dev/null
-  aws rds wait db-snapshot-deleted --db-snapshot-identifier "$1"
+  rds_wait_snapshot_deleted "$1"
 }
 
 # ---- DynamoDB 도우미

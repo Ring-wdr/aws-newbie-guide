@@ -60,7 +60,8 @@ else
     --cache-subnet-group-name "$CSG" --at-rest-encryption-enabled --transit-encryption-enabled \
     --query 'ReplicationGroup.{Status: Status, Engine: Engine, AutomaticFailover: AutomaticFailover, MultiAZ: MultiAZ, Members: MemberClusters}'
 fi
-aws elasticache wait replication-group-available --replication-group-id "$RG"
+wait_status "복제 그룹 available" available \
+  aws elasticache describe-replication-groups --replication-group-id "$RG" --query 'ReplicationGroups[0].Status' --output text
 aws elasticache describe-replication-groups --replication-group-id "$RG" --query 'ReplicationGroups[0].{
   Status: Status, ClusterMode: ClusterMode,
   Primary: NodeGroups[0].PrimaryEndpoint, Reader: NodeGroups[0].ReaderEndpoint,
@@ -94,7 +95,8 @@ aws elasticache create-cache-cluster --cache-cluster-id "$MC" --engine memcached
   --cache-node-type cache.t4g.micro --num-cache-nodes 2 --az-mode cross-az \
   --preferred-availability-zones us-east-1a us-east-1b --cache-subnet-group-name "$CSG" \
   --query 'CacheCluster.{Status: CacheClusterStatus, Engine: Engine, Nodes: NumCacheNodes}'
-aws elasticache wait cache-cluster-available --cache-cluster-id "$MC"
+wait_status "Memcached 클러스터 available" available \
+  aws elasticache describe-cache-clusters --cache-cluster-id "$MC" --query 'CacheClusters[0].CacheClusterStatus' --output text
 aws elasticache describe-cache-clusters --cache-cluster-id "$MC" --show-cache-node-info --query 'CacheClusters[0].{
   Status: CacheClusterStatus, ConfigEndpoint: ConfigurationEndpoint,
   Nodes: CacheNodes[].{Id: CacheNodeId, AZ: CustomerAvailabilityZone}}'

@@ -168,6 +168,8 @@ LatestRestorableTime=2026-11-12T12:05:57.016835+00:00  (자동 백업이 켜져 
 
 방금 본 것: 생성 응답은 `creating`, waiter가 `available`까지 기다렸다. **`Endpoint`가 `127.0.0.1:<임의 포트>`** 인 것은 에뮬레이터의 특징이다. 이 포트는 에뮬레이터 컨테이너 안에서만 열려 있어(실제 PostgreSQL 엔진이 컨테이너 안에서 뜬다) 내 PC의 `psql`로는 접속할 수 없다. 실제 AWS의 엔드포인트는 `todayorder-m05-db.xxxx.us-east-1.rds.amazonaws.com:5432` 같은 DNS 이름이다. 이 모듈은 SQL 접속 실습을 하지 않는다.
 
+lab 스크립트는 `aws rds wait` 대신 같은 상태를 1초 간격으로 확인하는 함수(`_common.sh`의 `rds_wait_instance_available` 등)를 쓴다. RDS·DocumentDB의 CLI waiter는 30초 간격으로 조회하므로, 첫 조회가 생성 직후의 `creating`을 보면 에뮬레이터가 1초 안에 `available`이 되어도 30초를 통째로 기다린다. VM에 부하가 걸리면 이렇게 놓치는 횟수가 는다. 손으로 칠 때(그리고 실제 AWS에서)는 waiter가 정상 도구다.
+
 **4) 수동 스냅샷 → 스냅샷에서 "새" 인스턴스로 복원**
 
 ```

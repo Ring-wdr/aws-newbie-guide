@@ -35,7 +35,7 @@ aws rds create-db-instance --db-instance-identifier "$PRIMARY" \
   --db-subnet-group-name "$SNG" --vpc-security-group-ids "$DB_SG" \
   --multi-az --backup-retention-period 7 --no-publicly-accessible \
   --query 'DBInstance.{Status: DBInstanceStatus, MultiAZ: MultiAZ}'
-aws rds wait db-instance-available --db-instance-identifier "$PRIMARY"
+rds_wait_instance_available "$PRIMARY"
 aws rds describe-db-instances --db-instance-identifier "$PRIMARY" --query 'DBInstances[0].{
   Status: DBInstanceStatus, MultiAZ: MultiAZ, AZ: AvailabilityZone, SecondaryAZ: SecondaryAvailabilityZone}'
 az_before="$(aws rds describe-db-instances --db-instance-identifier "$PRIMARY" --query 'DBInstances[0].AvailabilityZone' --output text)"
@@ -44,7 +44,7 @@ maz="$(aws rds describe-db-instances --db-instance-identifier "$PRIMARY" --query
 echo "== 2. 강제 장애 조치 (reboot --force-failover)"
 aws rds reboot-db-instance --db-instance-identifier "$PRIMARY" --force-failover \
   --query 'DBInstance.{Status: DBInstanceStatus, AZ: AvailabilityZone}'
-aws rds wait db-instance-available --db-instance-identifier "$PRIMARY"
+rds_wait_instance_available "$PRIMARY"
 az_after="$(aws rds describe-db-instances --db-instance-identifier "$PRIMARY" --query 'DBInstances[0].AvailabilityZone' --output text)"
 echo "장애 조치 전 AZ=$az_before → 후 AZ=$az_after   (실제 AWS라면 대기 인스턴스의 AZ로 바뀐다)"
 aws rds describe-events --source-type db-instance --source-identifier "$PRIMARY" --start-time "$RUN_START" \
@@ -55,7 +55,7 @@ aws rds create-db-instance-read-replica --db-instance-identifier "$REPLICA" \
   --source-db-instance-identifier "$PRIMARY" --db-instance-class db.t3.micro \
   --availability-zone us-east-1b \
   --query 'DBInstance.{Status: DBInstanceStatus, Source: ReadReplicaSourceDBInstanceIdentifier}'
-aws rds wait db-instance-available --db-instance-identifier "$REPLICA"
+rds_wait_instance_available "$REPLICA"
 aws rds describe-db-instances \
   --query "DBInstances[?starts_with(DBInstanceIdentifier, '$PRIMARY')].{Id: DBInstanceIdentifier, AZ: AvailabilityZone, MultiAZ: MultiAZ, Port: Endpoint.Port, SourceOf: ReadReplicaDBInstanceIdentifiers, ReplicaOf: ReadReplicaSourceDBInstanceIdentifier}"
 replica_src="$(aws rds describe-db-instances --db-instance-identifier "$REPLICA" --query 'DBInstances[0].ReadReplicaSourceDBInstanceIdentifier' --output text)"
@@ -63,7 +63,7 @@ replica_src="$(aws rds describe-db-instances --db-instance-identifier "$REPLICA"
 echo "== 4. 수직 확장: 인스턴스 클래스 변경 (db.t3.micro → db.t3.small)"
 aws rds modify-db-instance --db-instance-identifier "$PRIMARY" --db-instance-class db.t3.small --apply-immediately \
   --query 'DBInstance.{Status: DBInstanceStatus, Class: DBInstanceClass}'
-aws rds wait db-instance-available --db-instance-identifier "$PRIMARY"
+rds_wait_instance_available "$PRIMARY"
 class="$(aws rds describe-db-instances --db-instance-identifier "$PRIMARY" --query 'DBInstances[0].DBInstanceClass' --output text)"
 echo "현재 클래스: $class"
 
@@ -72,7 +72,7 @@ aws rds create-db-instance --db-instance-identifier "$NOBACKUP" \
   --engine postgres --engine-version 16.3 --db-instance-class db.t3.micro --allocated-storage 20 \
   --master-username todayorder --master-user-password 'Lab-only-Passw0rd' \
   --db-subnet-group-name "$SNG" --backup-retention-period 0 --query 'DBInstance.BackupRetentionPeriod'
-aws rds wait db-instance-available --db-instance-identifier "$NOBACKUP"
+rds_wait_instance_available "$NOBACKUP"
 expect_error InvalidDBInstanceState aws rds create-db-instance-read-replica \
   --db-instance-identifier todayorder-m05-nobackup-rr --source-db-instance-identifier "$NOBACKUP"
 
@@ -81,7 +81,7 @@ expect_error NotImplemented aws rds promote-read-replica --db-instance-identifie
 
 echo "== 7. 원본을 지우면? 같은 리전의 복제본은 독립 인스턴스로 승격된다"
 aws rds delete-db-instance --db-instance-identifier "$PRIMARY" --skip-final-snapshot --query 'DBInstance.DBInstanceStatus'
-aws rds wait db-instance-deleted --db-instance-identifier "$PRIMARY"
+rds_wait_instance_deleted "$PRIMARY"
 aws rds describe-db-instances --db-instance-identifier "$REPLICA" \
   --query 'DBInstances[0].{Id: DBInstanceIdentifier, Status: DBInstanceStatus, ReplicaOf: ReadReplicaSourceDBInstanceIdentifier}'
 after_src="$(aws rds describe-db-instances --db-instance-identifier "$REPLICA" --query 'DBInstances[0].ReadReplicaSourceDBInstanceIdentifier' --output text)"
