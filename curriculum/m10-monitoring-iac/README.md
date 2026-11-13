@@ -40,7 +40,7 @@ export EMULATOR_PORT=9297          # 대화형 터미널이면 생략 가능
 curriculum/m10-monitoring-iac/labs/verify.sh
 ```
 
-`verify.sh`는 에뮬레이터를 재시작해 깨끗한 상태로 만든 뒤, sdk 예제의 안전 장치를 확인하고, 모든 lab을 **두 번씩**(멱등성) 실행하고 sdk 예제를 실행한다. 4분쯤 걸린다. 마지막 줄이 `MODULE m10 OK`면 통과. lab 스크립트는 공용 도우미 [labs/_lib.sh](./labs/_lib.sh)(폴링·단언 함수)를 쓴다.
+`verify.sh`는 에뮬레이터를 재시작해 깨끗한 상태로 만든 뒤, sdk 예제의 안전 장치를 확인하고, 모든 lab을 **두 번** — 1회차는 번호 순, 2회차는 역순 — 실행하고(멱등성·순서 무관성) sdk 예제를 실행한다. 4분쯤 걸린다. 마지막 줄이 `MODULE m10 OK`면 통과. lab 스크립트는 공용 도우미 [labs/_lib.sh](./labs/_lib.sh)(폴링·단언 함수)를 쓴다.
 
 정리 자료: [cheatsheet.md](./cheatsheet.md) · [quiz.md](./quiz.md)
 

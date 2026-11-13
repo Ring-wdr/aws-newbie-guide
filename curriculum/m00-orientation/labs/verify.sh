@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # M00 모듈 검증: $EMULATOR_PORT 의 에뮬레이터를 재시작(깨끗한 상태)한 뒤
-# 모든 lab 과 sdk 예제를 순서대로 실행하고, lab 은 한 번 더 실행해 멱등성을 확인한다.
+# 모든 lab 과 sdk 예제를 실행하고, lab 은 역순으로 한 번 더 실행해 멱등성·순서 무관성을 확인한다.
 #
 #   export EMULATOR_PORT=9297     # 학습자는 생략 가능(대화형 터미널이면 9297)
 #   curriculum/m00-orientation/labs/verify.sh
@@ -110,10 +110,13 @@ run "dr-env.sh: 잘못된 포트 → 거부, 이전 DR_AWS_* 지움" drenv_bad_p
 for py in "$MOD_DIR"/sdk/*.py; do
   run "안전 장치: env.sh 없이 sdk/$(basename "$py") 실행 → 네트워크 호출 전 거부" guard_refuses "$py"
 done
-for round in 1 2; do
-  for lab in "$MOD_DIR"/labs/lab*.sh; do
-    run "$(basename "$lab") (실행 $round)" bash "$lab"
-  done
+# 1회차는 번호 순서, 2회차는 역순 — "두 번 연속 실행해도, 다른 lab 뒤에 실행해도" 통과하는지 확인한다.
+labs=("$MOD_DIR"/labs/lab*.sh)
+for lab in "${labs[@]}"; do
+  run "$(basename "$lab") (실행 1)" bash "$lab"
+done
+for ((i = ${#labs[@]} - 1; i >= 0; i--)); do
+  run "$(basename "${labs[$i]}") (실행 2, 역순)" bash "${labs[$i]}"
 done
 for py in "$MOD_DIR"/sdk/*.py; do
   run "sdk/$(basename "$py")" uv run --quiet python "$py"

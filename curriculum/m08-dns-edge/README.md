@@ -41,7 +41,7 @@ export EMULATOR_PORT=9297          # 대화형 터미널이면 생략 가능
 curriculum/m08-dns-edge/labs/verify.sh
 ```
 
-`verify.sh`는 에뮬레이터를 재시작해 깨끗한 상태로 만든 뒤 sdk 예제의 안전 장치를 확인하고, 모든 lab을 **두 번씩**(멱등성) 실행하고 sdk 예제를 실행한다. 마지막 줄이 `MODULE m08 OK`면 통과. lab02는 `test-dns-answer`를 여러 번 호출하므로 1~2분 걸린다. lab04·lab06의 "컨테이너 안에서 GET" 부분은 `docker exec`를 쓰며, docker를 쓸 수 없는 환경에서는 그 부분만 건너뛴다.
+`verify.sh`는 에뮬레이터를 재시작해 깨끗한 상태로 만든 뒤 sdk 예제의 안전 장치를 확인하고, 모든 lab을 **두 번** — 1회차는 번호 순, 2회차는 역순 — 실행하고(멱등성·순서 무관성) sdk 예제를 실행한다. 마지막 줄이 `MODULE m08 OK`면 통과. lab02는 `test-dns-answer`를 여러 번 호출하므로 1~2분 걸린다. lab04·lab06의 "컨테이너 안에서 GET" 부분은 `docker exec`를 쓰며, docker를 쓸 수 없는 환경에서는 그 부분만 건너뛴다.
 
 `labs/_lib.sh`는 lab들이 함께 쓰는 도우미(단언, 폴링, JSON 가공, 영역 정리)다. 단독으로 실행하지 않는다.
 

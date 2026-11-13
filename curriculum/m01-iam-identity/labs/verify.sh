@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # M01 모듈 검증: $EMULATOR_PORT 의 에뮬레이터를 재시작(깨끗한 상태)한 뒤
-# sdk 예제의 안전 장치를 확인하고, 모든 lab 을 두 번씩(멱등성) 실행하고, sdk 예제를 실행한다.
+# sdk 예제의 안전 장치를 확인하고, 모든 lab 을 두 번(1회차 번호 순, 2회차 역순 — 멱등성·순서 무관성) 실행하고, sdk 예제를 실행한다.
 #
 #   export EMULATOR_PORT=9297     # 학습자는 생략 가능(대화형 터미널이면 9297)
 #   curriculum/m01-iam-identity/labs/verify.sh
@@ -53,10 +53,13 @@ cd "$ROOT"
 for py in "$MOD_DIR"/sdk/*.py; do
   run "안전 장치: env.sh 없이 sdk/$(basename "$py") 실행 → 네트워크 호출 전 거부" guard_refuses "$py"
 done
-for round in 1 2; do
-  for lab in "$MOD_DIR"/labs/lab*.sh; do
-    run "$(basename "$lab") (실행 $round)" bash "$lab"
-  done
+# 1회차는 번호 순서, 2회차는 역순 — "두 번 연속 실행해도, 다른 lab 뒤에 실행해도" 통과하는지 확인한다.
+labs=("$MOD_DIR"/labs/lab*.sh)
+for lab in "${labs[@]}"; do
+  run "$(basename "$lab") (실행 1)" bash "$lab"
+done
+for ((i = ${#labs[@]} - 1; i >= 0; i--)); do
+  run "$(basename "${labs[$i]}") (실행 2, 역순)" bash "${labs[$i]}"
 done
 # 학습자 답 채점 모드도 한 번 확인 (정답을 넣으면 만점이어야 한다)
 run "lab04 채점 모드 (MY_ANSWERS = 정답)" env MY_ANSWERS="A D D A D I I I I A" bash "$MOD_DIR/labs/lab04-policy-worksheet.sh"

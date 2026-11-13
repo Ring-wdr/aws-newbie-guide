@@ -3,7 +3,7 @@
 #   주 리전 "서울" = $EMULATOR_PORT            → 재시작(깨끗한 상태)
 #   DR 리전 "도쿄" = $DR_EMULATOR_PORT → 재시작, 끝나면(성공·실패 모두) 끈다
 #     (대화형 터미널에서만 생략 가능: 기본 EMULATOR_PORT+1. 비대화형에서는 반드시 지정 — 아니면 거부)
-# 그다음 sdk 안전 장치 확인 → 모든 lab 을 두 번씩(멱등성) → sdk 예제 순서로 실행한다.
+# 그다음 sdk 안전 장치 확인 → 모든 lab 을 두 번(1회차 번호 순, 2회차 역순 — 멱등성·순서 무관성) → sdk 예제 순서로 실행한다.
 #
 #   export EMULATOR_PORT=9297 DR_EMULATOR_PORT=9298
 #   (학습자가 터미널에서 직접 실행하면 생략 가능: 9297, DR 9298)
@@ -97,13 +97,17 @@ done
 run "안전 장치: DR 엔드포인트가 실제 AWS 이면 sdk/dr_replicate.py 가 DR 클라이언트 생성 전 거부" \
   guard_refuses_dr "$MOD_DIR/sdk/dr_replicate.py"
 
-for round in 1 2; do
-  for lab in "$MOD_DIR"/labs/lab*.sh; do
-    run "$(basename "$lab") (실행 $round)" bash "$lab"
-  done
+# 1회차는 번호 순서, 2회차는 역순 — "두 번 연속 실행해도, 다른 lab 뒤에 실행해도" 통과하는지 확인한다.
+labs=("$MOD_DIR"/labs/lab*.sh)
+for lab in "${labs[@]}"; do
+  run "$(basename "$lab") (실행 1)" bash "$lab"
+done
+for ((i = ${#labs[@]} - 1; i >= 0; i--)); do
+  run "$(basename "${labs[$i]}") (실행 2, 역순)" bash "${labs[$i]}"
 done
 
 # sdk 예제: 의존 순서대로 (주문 앱 → DR 복제 → SPOF 감사(lab01 이 남긴 VPC) → 태그 기반 백업)
+# (역순 2회차는 lab01 로 끝나므로 SPOF 감사가 볼 VPC 는 바로 앞 실행이 남긴 것이다)
 for py in order_app.py dr_replicate.py spof_audit.py backup_tagged_tables.py; do
   run "sdk/$py" uv run --quiet python "$MOD_DIR/sdk/$py"
 done
