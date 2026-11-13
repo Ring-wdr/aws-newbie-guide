@@ -69,6 +69,7 @@ flowchart LR
 bash curriculum/m06-integration-messaging/labs/lab01-sqs-basics.sh
 ```
 
+<!-- external-host-ok: 에뮬레이터가 돌려준 큐 URL을 실행 출력 그대로 실었다. CLI·boto3는 이 호스트가 아니라 AWS_ENDPOINT_URL(127.0.0.1)로 요청한다 -->
 ```
 == 0. 큐 만들기 (가시성 타임아웃 5초 — 관찰용으로 짧게)
 https://sqs.us-east-1.amazonaws.com/000000000000/todayorder-orders

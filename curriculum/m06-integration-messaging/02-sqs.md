@@ -79,6 +79,7 @@ flowchart LR
 bash curriculum/m06-integration-messaging/labs/lab01-sqs-basics.sh
 ```
 
+<!-- external-host-ok: 에뮬레이터가 돌려준 큐 URL을 실행 출력 그대로 실었다. CLI·boto3는 이 호스트가 아니라 AWS_ENDPOINT_URL(127.0.0.1)로 요청한다 -->
 ```
 == 0. 큐 만들기 (가시성 타임아웃 5초 — 관찰용으로 짧게)
 https://sqs.us-east-1.amazonaws.com/000000000000/todayorder-orders
@@ -142,6 +143,7 @@ LAB01 OK
 
 ### 2) DLQ와 재처리 — [lab02-sqs-dlq-redrive.sh](./labs/lab02-sqs-dlq-redrive.sh)
 
+<!-- external-host-ok: 에뮬레이터가 돌려준 큐 URL을 실행 출력 그대로 실었다. CLI·boto3는 이 호스트가 아니라 AWS_ENDPOINT_URL(127.0.0.1)로 요청한다 -->
 ```
 == 1. DLQ 를 먼저 만들고, 원본 큐에 RedrivePolicy(maxReceiveCount=2)를 건다
 {
@@ -238,6 +240,7 @@ LAB03 OK
 uv run python curriculum/m06-integration-messaging/sdk/order_worker.py
 ```
 
+<!-- external-host-ok: 에뮬레이터가 돌려준 큐 URL을 실행 출력 그대로 실었다. CLI·boto3는 이 호스트가 아니라 AWS_ENDPOINT_URL(127.0.0.1)로 요청한다 -->
 ```
 큐: https://sqs.us-east-1.amazonaws.com/000000000000/todayorder-sdk-orders
 보냄: 5건, 실패 0건

@@ -118,6 +118,7 @@ c301da0a-721a-484d-bdad-b3e0574ee52b
 
 **3단계 — 봉투 vs 원문.**
 
+<!-- external-host-ok: 에뮬레이터가 메시지에 넣은 UnsubscribeURL을 실행 출력 그대로 실었다. 실습은 이 URL을 열지 않는다 -->
 ```
 == 5. 같은 이벤트가 큐마다 어떻게 보이나
 -- 알림 큐 (SNS 봉투 JSON):
