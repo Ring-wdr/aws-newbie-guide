@@ -50,9 +50,9 @@ flowchart TB
     S3[(S3 · DynamoDB · SQS · Lambda)]:::regional
   end
   R53[Route 53 · CloudFront · IAM]:::global
-  classDef zonal fill:#fde2e2,stroke:#c0392b
-  classDef regional fill:#e2f0fd,stroke:#2471a3
-  classDef global fill:#e2fde8,stroke:#1e8449
+  classDef zonal fill:#fde2e2,stroke:#c0392b,color:#1a1a1a
+  classDef regional fill:#e2f0fd,stroke:#2471a3,color:#1a1a1a
+  classDef global fill:#e2fde8,stroke:#1e8449,color:#1a1a1a
 ```
 
 | 범위 | 예 | 고가용성을 만드는 책임 |
