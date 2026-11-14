@@ -25,7 +25,7 @@ aws s3api list-objects-v2 --bucket todayorder-m00-cli --query 'Contents[].Key' -
 | `--filters` / `--filter` 등 | **서버 쪽** 필터 (서비스마다 지원 여부·이름이 다르다) | 결과가 많아 전송 자체를 줄이고 싶을 때 |
 | `--output json\|table\|text\|yaml` | 출력 형식 | 사람이 볼 땐 `table`, 셸 변수에 담을 땐 `text` |
 
-JMESPath 기본 문법: `Contents[]`(배열 펼치기), `Contents[0:3]`(슬라이스), `{Key: Key, Size: Size}`(새 객체로), `[Key, Size]`(배열로), `length(Contents)`(함수), `Contents[?Size > \`100\`]`(조건 필터).
+JMESPath 기본 문법: `Contents[]`(배열 펼치기), `Contents[0:3]`(슬라이스), `{Key: Key, Size: Size}`(새 객체로), `[Key, Size]`(배열로), `length(Contents)`(함수), `` Contents[?Size > `100`] ``(조건 필터).
 
 ### 페이지네이션
 
