@@ -6,7 +6,7 @@
 export const ko = {
   site: {
     title: 'AWS SAA-C03 실습 가이드',
-    description: 'aws-emulator로 직접 만져 보며 배우는 AWS SAA-C03 — 저장소의 Markdown 원고로 빌드한 로컬 사이트',
+    description: 'aws-emulator로 직접 만져 보며 배우는 AWS SAA-C03 학습 가이드 — 저장소의 Markdown 원고로 빌드한 정적 사이트(계정·요금 없이 내 컴퓨터에서 실습)',
     homeLabel: '처음 읽기',
     refDocsGroup: '참고 문서',
     sourceGroup: '소스 파일',
