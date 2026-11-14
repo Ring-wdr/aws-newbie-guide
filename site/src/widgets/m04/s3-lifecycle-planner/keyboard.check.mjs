@@ -1,7 +1,7 @@
 // 키보드만으로 M04 수명 주기 규칙 점검기를 끝까지 조작한다(GUIDE-SITE 5장). 공용 tests/keyboard.mjs 와 별개인 위젯 전용 검사.
 // 조작은 전부 키 입력(Tab, Shift+Tab, 화살표, Space, Enter, 글자)이다. 상태를 "읽는" 것만 DOM에서 한다.
 // 사용(site/ 에서, 빌드 뒤): node src/widgets/m04/s3-lifecycle-planner/keyboard.check.mjs --port <포트>
-import { offlineBrowser, portFromArgs, serve } from '../../../../tests/lib/harness.mjs';
+import { baseUrl, offlineBrowser, portFromArgs, serve, widgetOverflow } from '../../../../tests/lib/harness.mjs';
 
 const PAGE = '/curriculum/m04-storage/02-storage-classes-and-lifecycle/';
 const port = portFromArgs(4321);
@@ -30,7 +30,7 @@ const expect = async (what, re) => {
 };
 
 try {
-  await page.goto(`http://127.0.0.1:${port}${PAGE}`, { waitUntil: 'networkidle' }); // sitecheck-allow: 검사용 로컬 서버(루프백)
+  await page.goto(`${baseUrl(port)}${PAGE}`, { waitUntil: 'networkidle' });
   await page.locator('.lc').evaluate((e) => e.scrollIntoView());
   await page.waitForFunction(() => document.querySelector('.guide-widget[data-widget="m04/s3-lifecycle-planner"] astro-island:not([ssr])') !== null);
   await page.evaluate(() => document.activeElement?.blur());
@@ -90,6 +90,8 @@ try {
   const rows = await page.$$eval('.lc .lc-table tbody tr', (r) => r.length);
   if (rows !== 1) problems.push(`128 KB 미만이면 표가 Standard 한 줄이어야 한다: ${rows}줄`);
   if (blocked.length) problems.push(`루프백 밖 요청: ${blocked.join(', ')}`);
+  // 360px 가로 넘침(라이트·다크, 처음 상태와 미리 채우기마다) — --shots 없이도 늘 확인한다
+  problems.push(...(await widgetOverflow({ port, path: PAGE, widget: 'm04/s3-lifecycle-planner' })));
 } catch (e) {
   problems.push(String(e?.stack || e));
 } finally {

@@ -3,12 +3,12 @@
 // 덧붙여 --shots <폴더>를 주면 위젯 상자를 라이트/다크 × 1280/360px로 찍고, 360px에서 가로 넘침이 없는지 확인한다.
 // 사용(site/ 에서, 빌드 뒤): node src/widgets/m07/lambda-concurrency/keyboard.check.mjs --port 4333 [--shots <폴더>]
 import path from 'node:path';
-import { offlineBrowser, portFromArgs, serve } from '../../../../tests/lib/harness.mjs';
+import { baseUrl, offlineBrowser, portFromArgs, serve, widgetOverflow } from '../../../../tests/lib/harness.mjs';
 
 const PAGE = '/curriculum/m07-serverless-containers/01-lambda-execution-model/';
 const ROOT = '.lc';
 const port = portFromArgs(4333);
-const base = `http://127.0.0.1:${port}`; // sitecheck-allow: 검사 스크립트가 여는 루프백 서버 주소(빌드 산출물에 들어가지 않는다)
+const base = baseUrl(port);
 const shotsIdx = process.argv.indexOf('--shots');
 const shots = shotsIdx >= 0 ? path.resolve(process.argv[shotsIdx + 1]) : null;
 const problems = [];
@@ -99,6 +99,8 @@ try {
     }
     console.log(`스크린샷: ${shots}`);
   }
+  // 360px 가로 넘침(라이트·다크, 처음 상태와 미리 채우기마다) — --shots 없이도 늘 확인한다
+  problems.push(...(await widgetOverflow({ port, path: PAGE, widget: 'm07/lambda-concurrency' })));
 } catch (e) {
   problems.push(String(e?.stack || e));
 } finally {

@@ -4,12 +4,12 @@
 // 사용(site/에서, 빌드 뒤): node src/widgets/m13/purchase-mix/keyboard.check.mjs --port 4334 [--shots <폴더>]
 import fs from 'node:fs';
 import path from 'node:path';
-import { offlineBrowser, portFromArgs, serve } from '../../../../tests/lib/harness.mjs';
+import { baseUrl, offlineBrowser, portFromArgs, serve } from '../../../../tests/lib/harness.mjs';
 
 const PAGE = '/curriculum/m13-cost-optimization/02-compute-cost/';
 const ROOT = '.pmx';
 const port = portFromArgs(4334);
-const base = `http://127.0.0.1:${port}`; // sitecheck-allow: 루프백 검사 서버
+const base = baseUrl(port);
 const shotsIdx = process.argv.indexOf('--shots');
 const shots = shotsIdx >= 0 ? path.resolve(process.argv[shotsIdx + 1]) : null;
 const problems = [];

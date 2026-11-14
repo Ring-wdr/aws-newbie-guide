@@ -4,12 +4,12 @@
 // 사용(site/에서, 빌드 뒤): node src/widgets/m12/dr-strategy-picker/keyboard.check.mjs --port 4334 [--shots <폴더>]
 import fs from 'node:fs';
 import path from 'node:path';
-import { offlineBrowser, portFromArgs, serve } from '../../../../tests/lib/harness.mjs';
+import { baseUrl, offlineBrowser, portFromArgs, serve } from '../../../../tests/lib/harness.mjs';
 
 const PAGE = '/curriculum/m12-resilience-dr-migration/02-rto-rpo-dr-strategies/';
 const ROOT = '.drp';
 const port = portFromArgs(4334);
-const base = `http://127.0.0.1:${port}`; // sitecheck-allow: 루프백 검사 서버
+const base = baseUrl(port);
 const shotsIdx = process.argv.indexOf('--shots');
 const shots = shotsIdx >= 0 ? path.resolve(process.argv[shotsIdx + 1]) : null;
 const problems = [];

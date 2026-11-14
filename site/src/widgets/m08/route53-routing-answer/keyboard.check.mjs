@@ -4,12 +4,12 @@
 // 사용(site/ 에서, 빌드 뒤): node src/widgets/m08/route53-routing-answer/keyboard.check.mjs --port 4333 [--shots <폴더>]
 import fs from 'node:fs';
 import path from 'node:path';
-import { offlineBrowser, portFromArgs, serve } from '../../../../tests/lib/harness.mjs';
+import { baseUrl, offlineBrowser, portFromArgs, serve, widgetOverflow } from '../../../../tests/lib/harness.mjs';
 
 const PAGE = '/curriculum/m08-dns-edge/02-routing-policies-and-health-checks/';
 const ROOT = '.rr';
 const port = portFromArgs(4333);
-const base = `http://127.0.0.1:${port}`; // sitecheck-allow: 검사 스크립트가 여는 루프백 서버 주소(빌드 산출물에 들어가지 않는다)
+const base = baseUrl(port);
 const shotsIdx = process.argv.indexOf('--shots');
 const shots = shotsIdx >= 0 ? path.resolve(process.argv[shotsIdx + 1]) : null;
 const problems = [];
@@ -120,6 +120,8 @@ try {
     }
     console.log(`스크린샷: ${shots}`);
   }
+  // 360px 가로 넘침(라이트·다크, 처음 상태와 미리 채우기마다) — --shots 없이도 늘 확인한다
+  problems.push(...(await widgetOverflow({ port, path: PAGE, widget: 'm08/route53-routing-answer' })));
 } catch (e) {
   problems.push(String(e?.stack || e));
 } finally {

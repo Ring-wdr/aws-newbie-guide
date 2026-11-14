@@ -355,3 +355,60 @@ export const PILOT_PAGES = [
   '/curriculum/m14-capstone-exam/mock-exam/questions/',
   '/curriculum/m14-capstone-exam/mock-exam/answer-key/',
 ];
+
+/** 이 검사 스크립트가 연 루프백 서버의 주소. 위젯 keyboard.check.mjs 는 이것을 쓴다(static 관문은 루프백 주소도 허용한다). */
+export const baseUrl = (port) => `http://127.0.0.1:${port}`;
+
+/**
+ * 위젯 하나의 좁은 화면 가로 넘침 검사 — 위젯 keyboard.check.mjs 가 --shots 없이도 늘 부른다(GUIDE-SITE 원칙 6: 360px에서 가로 스크롤 없음).
+ * 라이트·다크 × widths 로 위젯이 놓인 페이지를 열고, 처음 상태와 위젯의 미리 채우기 단추(button[data-preset])를 하나씩 누른 상태마다
+ * ① 문서 전체의 가로 넘침 ② 위젯 안에서 화면 오른쪽 밖으로 나간 요소(자체 가로 스크롤 상자 안은 제외)를 본다.
+ * 조작은 마우스 누르기다(키보드 조작은 각 검사의 본문이 따로 본다).
+ * @returns {Promise<string[]>} 문제 목록(없으면 빈 배열)
+ */
+export async function widgetOverflow({ port, path: pagePath, widget, widths = [360] }) {
+  const problems = [];
+  const root = `.guide-widget[data-widget="${widget}"]`;
+  for (const colorScheme of ['light', 'dark']) {
+    for (const width of widths) {
+      const { browser, context, blocked } = await offlineBrowser({ colorScheme, viewport: { width, height: 800 }, reducedMotion: 'reduce' });
+      try {
+        const page = await context.newPage();
+        await page.goto(`${baseUrl(port)}${pagePath}`, { waitUntil: 'networkidle' });
+        await page.locator(root).scrollIntoViewIfNeeded();
+        await page.waitForFunction((sel) => document.querySelector(`${sel} astro-island:not([ssr])`) !== null, root);
+        const check = async (label) => {
+          const r = await page.evaluate(
+            ({ sel, w }) => {
+              const doc = document.documentElement.scrollWidth - document.documentElement.clientWidth;
+              const inScroller = (e, top) => {
+                for (let a = e.parentElement; a && a !== top; a = a.parentElement) {
+                  if (/(auto|scroll)/.test(getComputedStyle(a).overflowX)) return true;
+                }
+                return false;
+              };
+              const top = document.querySelector(sel);
+              const out = [...top.querySelectorAll('*')]
+                .filter((e) => e.getClientRects().length && e.getBoundingClientRect().right > w + 0.5 && !inScroller(e, top))
+                .map((e) => `${e.tagName.toLowerCase()}${e.className && typeof e.className === 'string' ? '.' + e.className.trim().split(/\s+/)[0] : ''}`);
+              return { doc, out: [...new Set(out)].slice(0, 5) };
+            },
+            { sel: root, w: width },
+          );
+          if (r.doc > 0) problems.push(`${colorScheme} ${width}px ${label}: 문서 가로 넘침 ${r.doc}px`);
+          if (r.out.length) problems.push(`${colorScheme} ${width}px ${label}: 화면 밖으로 나간 요소 ${r.out.join(', ')}`);
+        };
+        await check('처음 상태');
+        const presets = await page.$$eval(`${root} button[data-preset]:not([disabled])`, (bs) => bs.map((b) => b.dataset.preset));
+        for (const id of presets) {
+          await page.locator(`${root} button[data-preset="${id}"]`).first().click();
+          await check(`미리 채우기 ${id}`);
+        }
+        if (blocked.length) problems.push(`${colorScheme} ${width}px: 외부 요청 ${blocked.join(', ')}`);
+      } finally {
+        await browser.close();
+      }
+    }
+  }
+  return problems;
+}
