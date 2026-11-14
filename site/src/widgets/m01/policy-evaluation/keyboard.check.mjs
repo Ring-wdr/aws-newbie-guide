@@ -52,27 +52,40 @@ try {
   await press('ArrowDown');
   await expect('권한 경계 밖', /암묵적 거부.*no permissions boundary allows/);
   if ((await stoppedAt()) !== 'boundary') problems.push(`경계 밖의 끝난 단계: ${await stoppedAt()}`);
-  // 5) 리소스 기반 정책 허용(Space) → 같은 계정이라 허용 *, 경계 단서 표시
+  // 5) 리소스 기반 정책 허용(Space) → 요청자가 IAM 사용자라 사용자 ARN 지정 → 경계 밖이어도 허용 *
   await tabUntil('.pe input[data-field=resource]', { back: true });
   await press('Space');
-  await expect('리소스 정책 허용', /허용 \(allowed\) \*/);
-  if (!(await page.isVisible('.pe-caveat'))) problems.push('경계 밖 + 리소스 허용인데 각주 단서가 보이지 않음');
-  // 6) 교차 계정(ArrowDown) → 양쪽 모두 필요: 경계 밖이므로 거부
+  await expect('리소스 정책이 사용자 ARN 지정', /허용 \(allowed\) \*.*IAM 사용자 ARN/);
+  // 6) 요청하는 주체를 역할 세션으로(ArrowDown) → 리소스 정책은 역할 ARN 지정 → 경계 밖이라 거부
+  await tabUntil('.pe input[name=pe-caller]', { back: true });
+  await press('ArrowDown');
+  await expect('역할 세션 + 역할 ARN 지정 + 경계 밖', /암묵적 거부.*역할 ARN/);
+  if ((await stoppedAt()) !== 'boundary') problems.push(`역할 ARN 지정의 끝난 단계: ${await stoppedAt()}`);
+  // 7) 지정한 것을 역할 세션 ARN으로(ArrowDown) → 허용 *
+  await tabUntil('.pe input[name=pe-resource-to]');
+  await press('ArrowDown');
+  await expect('역할 세션 ARN 지정', /허용 \(allowed\) \*.*역할 세션 ARN/);
+  // 8) 세션 정책 라디오가 역할 세션에서는 고를 수 있다: "세션 정책 밖"(ArrowDown 두 번) → 세션 ARN 지정이라 여전히 허용 *
+  await tabUntil('.pe input[name=pe-session]');
+  await press('ArrowDown');
+  await press('ArrowDown');
+  await expect('역할 세션 ARN 지정 + 세션 정책 밖', /허용 \(allowed\) \*/);
+  // 9) 교차 계정(ArrowDown) → 양쪽 모두 필요: 경계 밖이므로 거부
   await tabUntil('.pe input[name=pe-account]', { back: true });
   await press('ArrowDown');
   await expect('교차 계정 + 경계 밖', /암묵적 거부/);
-  // 7) SCP 끄기(Space) → SCP에서 끝
+  // 10) SCP 끄기(Space) → SCP에서 끝
   await tabUntil('.pe input[data-field=scp]');
   await press('Space');
   await expect('SCP 끔', /암묵적 거부.*SCP가 이 작업을 허용하지 않는다/);
   if ((await stoppedAt()) !== 'org') problems.push(`SCP 끔의 끝난 단계: ${await stoppedAt()}`);
-  // 8) 표 펼치기(summary에서 Enter) → 표에 "여기서 끝"과 같은 행이 표시
+  // 11) 표 펼치기(summary에서 Enter) → 표에 "여기서 끝"과 같은 행이 표시
   await tabUntil('.pe-table-box > summary');
   await press('Enter');
   const open = await page.$eval('.pe-table-box', (d) => d.open);
   const row = await page.textContent('.pe-table tr[aria-current=step]');
   if (!open || !row?.includes('SCP')) problems.push(`표 보기: open=${open}, 현재 행 "${row}"`);
-  // 9) 원고의 예 "세션 정책 밖" — 같은 계정으로 돌아오고 세션 정책에서 끝
+  // 12) 원고의 예 "세션 정책 밖" — 같은 계정으로 돌아오고 세션 정책에서 끝
   await tabUntil('.pe button[data-preset=session]', { back: true });
   await press('Enter');
   await expect('예 "세션 정책 밖"', /암묵적 거부.*no session policy allows/);
@@ -91,4 +104,4 @@ if (problems.length) {
   console.log(`FAIL keyboard(m01/policy-evaluation): ${problems.length}건`);
   process.exit(1);
 }
-console.log('PASS keyboard(m01/policy-evaluation): 예 고르기 → Deny 해제 → 경계 밖 → 리소스 허용 → 교차 계정 → SCP 끔 → 표 펼치기 → 세션 정책 예');
+console.log('PASS keyboard(m01/policy-evaluation): 예 고르기 → Deny 해제 → 경계 밖 → 리소스 허용(사용자 ARN) → 역할 세션(역할 ARN, 경계에서 거부) → 역할 세션 ARN(허용 *) → 세션 정책 밖 → 교차 계정 → SCP 끔 → 표 펼치기 → 세션 정책 예');

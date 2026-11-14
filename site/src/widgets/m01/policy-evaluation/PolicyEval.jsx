@@ -1,16 +1,16 @@
 // IAM 정책 평가 순서 따라가기(설명용 모형). 판정은 model.mjs, 원고의 순서·문구·예의 줄 번호는 facts.mjs가 읽어 props로 준다.
 import { useMemo, useState } from 'preact/hooks';
-import { evaluate, normalize, PRESETS, presetInput, displayOrder, question, describeStep, summarize, REASON_PHRASE, DECISION_LABEL, DECISION_CODE } from './model.mjs';
+import { evaluate, normalize, PRESETS, presetInput, displayOrder, question, describeStep, summarize, REASON_PHRASE, DECISION_LABEL, DECISION_CODE, RESOURCE_TO_LABEL } from './model.mjs';
 
 const MARK = { allowed: '✓', explicitDeny: '✕', implicitDeny: '○' };
 
-function Radios({ legend, name, value, options, onChange, hint }) {
+function Radios({ legend, name, value, options, onChange, hint, disabled = false }) {
   return (
     <fieldset class="pe-field">
       <legend>{legend}</legend>
       {options.map(([v, label]) => (
         <label key={v}>
-          <input type="radio" name={name} value={v} checked={value === v} onChange={() => onChange(v)} /> {label}
+          <input type="radio" name={name} value={v} checked={value === v} disabled={disabled} onChange={() => onChange(v)} /> {label}
         </label>
       ))}
       {hint ? <small>{hint}</small> : null}
@@ -27,7 +27,9 @@ export default function PolicyEval({ facts }) {
   const r = useMemo(() => evaluate(x), [x]);
   const order = displayOrder(x.account);
   const steps = order.map((id) => r.steps.find((s) => s.id === id));
-  const phraseKey = REASON_PHRASE[r.reason];
+  // 역할 ARN을 지정한 리소스 정책 경로의 거부 문구는 원고에 기록이 없어 보여 주지 않는다
+  const viaRole = x.account === 'same' && x.resource && x.resourceTo === 'role';
+  const phraseKey = viaRole ? null : REASON_PHRASE[r.reason];
   const phrase = phraseKey ? facts.phrases[phraseKey] : null;
 
   const set = (patch) => {
@@ -60,7 +62,7 @@ export default function PolicyEval({ facts }) {
             </button>
           ))}
         </div>
-        <p class="pe-hint">{cur ? `출처: ${src(cur.file, facts.examples[cur.where])} — 원고에 기록된 결과는 ${DECISION_LABEL[cur.expect]}` : '직접 바꾼 값이다.'}</p>
+        <p class="pe-hint">{cur ? (cur.where === 'footnote' ? `출처: ${src(cur.file, facts.examples[cur.where])}(각주) — 각주의 규칙대로라면 ${DECISION_LABEL[cur.expect]}` : `출처: ${src(cur.file, facts.examples[cur.where])} — 원고에 기록된 결과는 ${DECISION_LABEL[cur.expect]}`) : '직접 바꾼 값이다.'}</p>
       </fieldset>
 
       <div class="pe-controls">
@@ -74,6 +76,17 @@ export default function PolicyEval({ facts }) {
             ['cross', '다른 계정(교차 계정)'],
           ]}
           hint={`교차 계정은 치트시트의 식(${src('cheatsheet', facts.crossFormula)})대로 양쪽 모두 허용해야 한다.`}
+        />
+        <Radios
+          legend="요청하는 주체"
+          name="pe-caller"
+          value={x.caller}
+          onChange={(v) => set({ caller: v })}
+          options={[
+            ['user', 'IAM 사용자(장기 액세스 키)'],
+            ['role', '역할 세션(AssumeRole로 받은 임시 자격 증명)'],
+          ]}
+          hint="세션 정책은 역할 세션에만 있다. IAM 사용자를 고르면 세션 정책 단계는 해당 없음이다."
         />
         <Radios
           legend="명시적 Deny가 맞는 정책"
@@ -107,6 +120,15 @@ export default function PolicyEval({ facts }) {
           </label>
         </fieldset>
         <Radios
+          legend="리소스 정책이 Principal로 지정한 것"
+          name="pe-resource-to"
+          value={x.resourceTo}
+          onChange={(v) => set({ resourceTo: v })}
+          disabled={!x.resource || x.account === 'cross'}
+          options={x.caller === 'user' ? [['user', `${RESOURCE_TO_LABEL.user}(요청한 사용자 자신)`]] : [['role', `${RESOURCE_TO_LABEL.role}(맡은 역할)`], ['session', `${RESOURCE_TO_LABEL.session}(이 세션)`]]}
+          hint={`같은 계정에서만 결과가 갈린다(${src('lesson', facts.footnote)}): 사용자·역할 세션 ARN이면 허용 *, 역할 ARN이면 권한 경계·세션 정책 판정으로 이어진다. ${x.resource ? '' : '리소스 정책이 허용할 때만 고른다.'}`}
+        />
+        <Radios
           legend="권한 경계"
           name="pe-boundary"
           value={x.boundary}
@@ -121,6 +143,8 @@ export default function PolicyEval({ facts }) {
           legend="세션 정책(역할 세션)"
           name="pe-session"
           value={x.session}
+          disabled={x.caller === 'user'}
+          hint={x.caller === 'user' ? 'IAM 사용자 요청에는 세션 정책이 없다(요청하는 주체를 역할 세션으로 바꾸면 고를 수 있다).' : undefined}
           onChange={(v) => set({ session: v })}
           options={[
             ['none', '없음'],
@@ -150,11 +174,6 @@ export default function PolicyEval({ facts }) {
             `이 경우의 오류 문구는 원고(치트시트 ${src('cheatsheet', facts.phrases.identityDeny.line)}~${facts.phrases.noSession.line}줄 표)에 없다.`
           )}
         </p>
-        {r.caveat ? (
-          <p class="pe-caveat">
-            <strong>주의:</strong> 권한 경계나 세션 정책이 이 작업을 허용하지 않는다. 흐름도는 리소스 기반 정책이 허용하면 "허용 *"로 끝나지만, 각주({src('lesson', facts.footnote)})대로 경계·세션 정책이 있으면 세부 규칙이 달라지고, 치트시트의 식({src('cheatsheet', facts.sameFormula)})은 이때도 경계·세션 정책을 교집합으로 둔다(→ 거부). 이 모형은 흐름도를 따른다.
-          </p>
-        ) : null}
       </div>
 
       <ol class="pe-flow" aria-label="판정 단계">
@@ -165,7 +184,7 @@ export default function PolicyEval({ facts }) {
               {question(s.id, x.account)}
             </span>
             <span class="pe-a">
-              <span class="pe-badge">{describeStep(s, x.account)}</span>
+              <span class="pe-badge">{describeStep(s, x.account, x)}</span>
               {r.stoppedAt === s.id ? <strong class="pe-here"> ◀ 여기서 끝</strong> : null}
             </span>
           </li>
@@ -198,7 +217,7 @@ export default function PolicyEval({ facts }) {
                 <tr key={s.id} aria-current={r.stoppedAt === s.id ? 'step' : undefined}>
                   <td>{i + 1}</td>
                   <td>{question(s.id, x.account)}</td>
-                  <td>{describeStep(s, x.account)}</td>
+                  <td>{describeStep(s, x.account, x)}</td>
                   <td>{x.account === 'cross' ? src('cheatsheet', facts.crossFormula) : stepLine(s.id)}</td>
                 </tr>
               ))}
@@ -217,7 +236,8 @@ export default function PolicyEval({ facts }) {
         <summary>이 모형의 가정(실제 AWS와 다른 점)</summary>
         <ul>
           <li>정책마다 "이 요청을 허용하는가, Deny가 맞는가"는 직접 고른다. 정책 문장의 Action·Resource·조건 키·와일드카드는 해석하지 않는다.</li>
-          <li>같은 계정에서 리소스 기반 정책이 허용하면 흐름도대로 "허용 *"로 끝낸다. 실제로는 허용한 주체가 IAM 사용자인지, 역할인지, 역할 세션인지에 따라 권한 경계·세션 정책의 적용이 달라진다({src('lesson', facts.footnote)}).</li>
+          <li>같은 계정에서 리소스 기반 정책이 허용하면 흐름도·각주({src('lesson', facts.edges.direct)}~{facts.edges.role}줄, {src('lesson', facts.footnote)})대로 지정한 주체에 따라 나눈다: IAM 사용자 ARN·역할 세션 ARN은 허용 *, 역할 ARN은 자격 증명 정책 없이 권한 경계·세션 정책 판정으로 이어진다(AWS IAM 사용 설명서 "Policy evaluation logic"). 명시적 Deny는 늘 먼저다.</li>
+          <li>요청하는 주체는 IAM 사용자와 역할 세션만 고른다. STS 연동 사용자 세션(GetFederationToken), Principal의 와일드카드(*)와 aws:PrincipalArn 조건 키는 다루지 않는다.</li>
           <li>KMS 키 정책(같은 계정에서도 키 정책이 허용해야 한다)과 역할 신뢰 정책의 예외는 다루지 않는다({src('lesson', facts.footnote)}).</li>
           <li>교차 계정은 치트시트의 식({src('cheatsheet', facts.crossFormula)})대로 호출자 계정(자격 증명 정책 ∩ 경계 ∩ 세션 정책 ∩ SCP)과 리소스 계정(리소스 정책 ∩ RCP)이 모두 허용해야 허용으로 둔다.</li>
           <li>"SCP가 허용"에는 조직에 속하지 않았거나 관리 계정이라 SCP가 적용되지 않는 경우도 넣었다.</li>

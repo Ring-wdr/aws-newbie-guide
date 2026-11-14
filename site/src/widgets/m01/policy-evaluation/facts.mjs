@@ -4,7 +4,7 @@
 //
 // 읽는 원고:
 //  - LESSON(03-policy-evaluation.md): "같은 계정 안의 요청 평가 순서" 흐름도의 판정 노드(순서 확인), 각주(허용 *),
-//    Part A의 실제 출력(암묵적 거부·허용·명시적 거부·권한 경계), 워크시트 Q9 채점 줄
+//    리소스 정책이 허용할 때의 두 갈래 간선과 각주의 구분(사용자·세션 ARN → 허용 *, 역할 ARN → 경계·세션 정책), Part A의 실제 출력(암묵적 거부·허용·명시적 거부·권한 경계), 워크시트 Q9 채점 줄
 //  - ROLES(04-roles-and-sts.md): 세션 정책 거부 출력
 //  - CHEATSHEET(cheatsheet.md): 같은 계정·교차 계정 평가식, "오류 문구로 원인 찾기" 표
 
@@ -51,9 +51,15 @@ export function readPolicyFacts(texts) {
     prev = f.line;
   }
   const footnote = L(/^\\\* 같은 계정에서 리소스 기반 정책이/, '흐름도 각주(허용 *)').line;
+  // 리소스 기반 정책이 허용할 때의 두 갈래(누구를 지정했나) — 모형 model.mjs의 resourceTo 판정과 같아야 한다
+  const edges = {
+    direct: L(/E -- "예: IAM 사용자 ARN·<br\/>역할 세션 ARN 지정" --> OK1\["허용 \*"\]/, '흐름도 간선 "사용자·세션 ARN 지정 → 허용 *"').line,
+    role: L(/E -- "예: 역할 ARN 지정" --> G\s*$/, '흐름도 간선 "역할 ARN 지정 → 권한 경계 판정"').line,
+  };
+  L(/^\\\* 같은 계정에서 리소스 기반 정책이 허용할 때.*\*\*IAM 사용자 ARN\*\*.*\*\*역할 세션 ARN\*\*.*\*\*역할 ARN\*\*을 지정했으면.*권한 경계와 세션 정책의 암묵적 거부에는 제한된다/, '각주의 "누구를 지정했나" 구분');
 
   // 치트시트: 평가식과 오류 문구 표
-  const sameFormula = C(/같은 계정 안\*\*: 최종 = SCP ∩ RCP ∩ \(자격 증명 정책 ∪ 리소스 정책\) ∩ 경계 ∩ 세션 정책/, '같은 계정 평가식').line;
+  const sameFormula = C(/같은 계정 안\*\*: 최종 = SCP ∩ RCP ∩ \(자격 증명 정책 ∪ 리소스 정책\) ∩ 경계 ∩ 세션 정책 — 리소스 정책이 \*\*역할 ARN\*\*을 지정했거나/, '같은 계정 평가식(역할 ARN 지정의 식이라는 단서 포함)').line;
   const crossFormula = C(/교차 계정\*\*: 두 계정에서 따로 평가해 \*\*둘 다\*\* Allow여야 한다/, '교차 계정 평가식').line;
   const phraseRow = (code, what) => {
     const f = C(new RegExp('^\\|\\s*`(' + code.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')`\\s*\\|\\s*([^|]+?)\\s*\\|'), `오류 문구 표의 ${what}`);
@@ -79,6 +85,7 @@ export function readPolicyFacts(texts) {
     session: R(/kim-narrow is not authorized to perform: iam:ListRoles .* because no session policy allows/, '세션 정책 거부 출력'),
   };
   const examples = Object.fromEntries(Object.entries(ex).map(([k, v]) => [k, v.line]));
+  examples.footnote = footnote; // 리소스 정책이 역할 ARN·역할 세션 ARN을 지정한 예(각주의 구분)
 
-  return { lesson: LESSON, roles: ROLES, cheatsheet: CHEATSHEET, flow, footnote, sameFormula, crossFormula, phrases, examples };
+  return { lesson: LESSON, roles: ROLES, cheatsheet: CHEATSHEET, flow, edges, footnote, sameFormula, crossFormula, phrases, examples };
 }

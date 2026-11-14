@@ -44,14 +44,56 @@ test('SCP·RCP는 상한선: 허용하지 않으면 다른 Allow가 있어도 �
   assert.equal(ev({ scp: true, rcp: true }).decision, 'implicitDeny');
 });
 
-test('같은 계정: 리소스 기반 정책만 허용해도 허용 *(자격 증명 정책 없이)', () => {
-  const r = ev({ resource: true });
-  assert.deepEqual([r.decision, r.reason, r.stoppedAt, r.caveat], ['allowed', 'allowedByResource', 'resource', false]);
-  assert.deepEqual(r.steps.map((s) => s.outcome), ['no', 'yes', 'yes', 'skip', 'skip', 'skip']);
-  // 경계·세션 정책이 허용하지 않을 때는 원고 각주의 단서를 표시한다
-  assert.equal(ev({ resource: true, boundary: 'deny' }).caveat, true);
-  assert.equal(ev({ resource: true, session: 'deny' }).caveat, true);
-  assert.equal(ev({ resource: true, boundary: 'allow' }).caveat, false);
+// 근거(AWS IAM User Guide): "Policy evaluation logic" — How AWS enforcement code logic evaluates requests to allow or deny access
+// (Resource-based policies: IAM role / IAM role session / IAM user), "Permissions boundaries for IAM entities" — Evaluating effective
+// permissions with boundaries, "Policies and permissions" — Session policies.
+test('같은 계정: 리소스 정책이 IAM 사용자 ARN을 지정해 허용 → 자격 증명 정책·권한 경계와 상관없이 허용 *', () => {
+  for (const identity of [true, false])
+    for (const boundary of ['none', 'allow', 'deny']) {
+      const r = ev({ caller: 'user', resource: true, resourceTo: 'user', identity, boundary });
+      assert.deepEqual([r.decision, r.reason, r.stoppedAt], ['allowed', 'allowedByResource', 'resource'], `${identity}/${boundary}`);
+      assert.deepEqual(r.steps.map((s) => s.outcome), ['no', 'yes', 'yes', 'skip', 'skip', 'skip']);
+    }
+});
+
+test('같은 계정: 리소스 정책이 역할 세션 ARN을 지정해 허용 → 자격 증명 정책·권한 경계·세션 정책과 상관없이 허용 *', () => {
+  for (const identity of [true, false])
+    for (const boundary of ['none', 'allow', 'deny'])
+      for (const session of ['none', 'allow', 'deny']) {
+        const r = ev({ caller: 'role', resource: true, resourceTo: 'session', identity, boundary, session });
+        assert.deepEqual([r.decision, r.reason, r.stoppedAt], ['allowed', 'allowedByResource', 'resource'], `${identity}/${boundary}/${session}`);
+      }
+});
+
+test('같은 계정: 리소스 정책이 역할 ARN을 지정해 허용 → 자격 증명 정책은 필요 없고, 권한 경계·세션 정책의 암묵적 거부에 제한된다', () => {
+  for (const identity of [true, false])
+    for (const boundary of ['none', 'allow', 'deny'])
+      for (const session of ['none', 'allow', 'deny']) {
+        const r = ev({ caller: 'role', resource: true, resourceTo: 'role', identity, boundary, session });
+        const want = boundary === 'deny' ? 'noBoundary' : session === 'deny' ? 'noSession' : 'allowedByResourceRole';
+        assert.equal(r.reason, want, `${identity}/${boundary}/${session}`);
+        assert.equal(r.decision, want.startsWith('allowed') ? 'allowed' : 'implicitDeny');
+        assert.equal(r.steps.find((s) => s.id === 'identity').outcome, 'na'); // 자격 증명 정책은 묻지 않는다
+      }
+  assert.equal(ev({ caller: 'role', resource: true, resourceTo: 'role', boundary: 'deny' }).stoppedAt, 'boundary');
+  assert.equal(ev({ caller: 'role', resource: true, resourceTo: 'role', session: 'deny' }).stoppedAt, 'session');
+});
+
+test('명시적 Deny는 어느 지정이든 먼저 이긴다', () => {
+  for (const [caller, resourceTo] of [['user', 'user'], ['role', 'role'], ['role', 'session']]) {
+    const r = ev({ caller, resourceTo, resource: true, deny: 'resource' });
+    assert.equal(r.decision, 'explicitDeny');
+  }
+});
+
+test('성립하지 않는 조합은 입력에서 맞춘다: IAM 사용자에게 세션 정책·역할 ARN 없음, 역할 세션에 사용자 ARN 없음', () => {
+  assert.deepEqual([normalize({ caller: 'user', session: 'deny', resourceTo: 'role' }).session, normalize({ caller: 'user', session: 'deny', resourceTo: 'role' }).resourceTo], ['none', 'user']);
+  assert.equal(normalize({ caller: 'role', resourceTo: 'user' }).resourceTo, 'role');
+  assert.equal(normalize({ caller: 'role', resourceTo: 'session' }).resourceTo, 'session');
+  // IAM 사용자 요청의 세션 정책 단계는 "해당 없음"
+  const r = ev({ caller: 'user', identity: true });
+  assert.equal(r.steps.find((s) => s.id === 'session').outcome, 'na');
+  assert.match(describeStep(r.steps.find((s) => s.id === 'session'), 'same', { caller: 'user' }), /IAM 사용자 요청에는 세션 정책이 없다/);
 });
 
 test('교차 계정: 양쪽 모두 허용해야 한다', () => {
@@ -62,7 +104,7 @@ test('교차 계정: 양쪽 모두 허용해야 한다', () => {
   assert.equal(ok.decision, 'allowed');
   assert.equal(ok.reason, 'allowed');
   assert.equal(ev({ account: 'cross', identity: true, resource: true, boundary: 'deny' }).reason, 'noBoundary');
-  assert.equal(ev({ account: 'cross', identity: true, resource: true, session: 'deny' }).reason, 'noSession');
+  assert.equal(ev({ account: 'cross', caller: 'role', identity: true, resource: true, session: 'deny' }).reason, 'noSession');
   assert.deepEqual(displayOrder('cross'), ['deny', 'org', 'identity', 'boundary', 'session', 'resource']);
   assert.deepEqual(displayOrder('same'), STEP_ORDER);
 });
@@ -70,9 +112,9 @@ test('교차 계정: 양쪽 모두 허용해야 한다', () => {
 test('권한 경계·세션 정책: 없으면 통과, 있으면 교집합', () => {
   assert.equal(ev({ identity: true }).decision, 'allowed');
   assert.equal(ev({ identity: true }).steps.find((s) => s.id === 'boundary').outcome, 'pass');
-  assert.equal(ev({ identity: true, boundary: 'allow', session: 'allow' }).decision, 'allowed');
+  assert.equal(ev({ caller: 'role', identity: true, boundary: 'allow', session: 'allow' }).decision, 'allowed');
   assert.deepEqual([ev({ identity: true, boundary: 'deny' }).reason, ev({ identity: true, boundary: 'deny' }).stoppedAt], ['noBoundary', 'boundary']);
-  assert.deepEqual([ev({ identity: true, session: 'deny' }).reason, ev({ identity: true, session: 'deny' }).stoppedAt], ['noSession', 'session']);
+  assert.deepEqual([ev({ caller: 'role', identity: true, session: 'deny' }).reason, ev({ caller: 'role', identity: true, session: 'deny' }).stoppedAt], ['noSession', 'session']);
   // 경계만 허용하고 자격 증명 정책이 없으면 거부(경계는 권한을 주지 않는다)
   assert.equal(ev({ boundary: 'allow' }).reason, 'noIdentity');
   assert.match(summarize(ev({ boundary: 'allow' }), { boundary: 'allow' }), /상한선일 뿐 권한을 주지 않는다/);
@@ -81,6 +123,7 @@ test('권한 경계·세션 정책: 없으면 통과, 있으면 교집합', () =
 test('모든 입력 조합: 판정은 세 가지 중 하나, 끝난 단계 뒤는 보지 않는다, 문장이 있다', () => {
   let n = 0;
   for (const account of ['same', 'cross'])
+   for (const [caller, resourceTo] of [['user', 'user'], ['role', 'role'], ['role', 'session']])
     for (const deny of ['none', 'identity', 'resource', 'other'])
       for (const scp of [true, false])
         for (const rcp of [true, false])
@@ -88,7 +131,8 @@ test('모든 입력 조합: 판정은 세 가지 중 하나, 끝난 단계 뒤�
             for (const identity of [true, false])
               for (const boundary of ['none', 'allow', 'deny'])
                 for (const session of ['none', 'allow', 'deny']) {
-                  const input = { account, deny, scp, rcp, resource, identity, boundary, session };
+                  if (caller === 'user' && session !== 'none') continue; // 입력에서 막는 조합
+                  const input = { account, caller, resourceTo, deny, scp, rcp, resource, identity, boundary, session };
                   const r = evaluate(input);
                   n++;
                   assert.ok(['allowed', 'explicitDeny', 'implicitDeny'].includes(r.decision));
@@ -98,17 +142,22 @@ test('모든 입력 조합: 판정은 세 가지 중 하나, 끝난 단계 뒤�
                     assert.ok(scp && rcp);
                     assert.ok(account === 'same' ? resource || identity : resource && identity);
                   }
+                  // 같은 계정, Deny·SCP·RCP 통과, 리소스 정책 허용일 때: 사용자·세션 ARN은 늘 허용, 역할 ARN은 경계·세션 정책을 따른다
+                  if (account === 'same' && deny === 'none' && scp && rcp && resource) {
+                    const want = resourceTo === 'role' ? (boundary === 'deny' || session === 'deny' ? 'implicitDeny' : 'allowed') : 'allowed';
+                    assert.equal(r.decision, want, JSON.stringify(input));
+                  }
                   const order = displayOrder(account);
                   const at = r.stoppedAt ? order.indexOf(r.stoppedAt) : order.length;
                   for (const id of order.slice(at + 1)) assert.equal(r.steps.find((s) => s.id === id).outcome, 'skip', JSON.stringify(input));
                   assert.ok(summarize(r, input).length > 10);
-                  for (const s of r.steps) assert.ok(describeStep(s, account).length > 0);
+                  for (const s of r.steps) assert.ok(describeStep(s, account, input).length > 0);
                 }
-  assert.equal(n, 2 * 4 * 2 * 2 * 2 * 2 * 3 * 3);
+  assert.equal(n, 2 * (4 * 2 * 2 * 2 * 2 * 3 * 1 + 2 * 4 * 2 * 2 * 2 * 2 * 3 * 3));
 });
 
 test('normalize: 모르는 값은 기본값, 참거짓은 Boolean', () => {
-  assert.deepEqual(normalize({ account: 'x', deny: 'y', boundary: 'z', session: 1, scp: 0, identity: 'yes' }), { ...DEFAULT_INPUT, scp: false, identity: true });
+  assert.deepEqual(normalize({ account: 'x', caller: 'q', resourceTo: 'r', deny: 'y', boundary: 'z', session: 1, scp: 0, identity: 'yes' }), { ...DEFAULT_INPUT, scp: false, identity: true });
   assert.deepEqual(normalize(undefined), DEFAULT_INPUT);
 });
 
@@ -116,6 +165,8 @@ test('원고에서 흐름도 순서·오류 문구·예의 줄을 읽는다(실�
   const f = readPolicyFacts(texts);
   const lines = texts.lesson.split('\n');
   assert.deepEqual(Object.keys(f.flow), STEP_ORDER);
+  assert.match(lines[f.edges.direct - 1], /IAM 사용자 ARN·<br\/>역할 세션 ARN 지정" --> OK1/);
+  assert.match(lines[f.edges.role - 1], /역할 ARN 지정" --> G/);
   assert.match(lines[f.flow.deny - 1], /명시적 Deny\?/);
   assert.match(lines[f.flow.session - 1], /세션 정책도 허용\?/);
   assert.match(lines[f.footnote - 1], /^\\\* 같은 계정에서/);
@@ -136,8 +187,9 @@ test('원고의 예마다 모형 판정이 원고에 기록된 결과와 같고,
     assert.ok(line, p.id);
     if (p.phrase) {
       assert.equal(REASON_PHRASE[r.reason], p.phrase, p.id);
-      assert.ok(line.includes(f.phrases[p.phrase].text.replace(/^because /, '')), `${p.id}: ${line}`);
+      if (p.where !== 'footnote') assert.ok(line.includes(f.phrases[p.phrase].text.replace(/^because /, '')), `${p.id}: ${line}`);
     }
+    if (p.where === 'footnote') assert.match(line, p.expect === 'allowed' ? /역할 세션 ARN/ : /역할 ARN\*\*을 지정했으면.*권한 경계와 세션 정책의 암묵적 거부에는 제한된다/);
     if (p.id === 'q9') assert.match(line, new RegExp(`\\s${DECISION_CODE[r.decision]}\\s+${DECISION_CODE[r.decision]}\\s`));
   }
 });
