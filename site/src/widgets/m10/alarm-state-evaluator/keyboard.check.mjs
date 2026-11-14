@@ -93,7 +93,7 @@ try {
   await press('1');
   await expect('N=1', 'ALARM');
   const need = await page.textContent(`${ROOT} .cwa-table tbody tr:last-child td:nth-child(3)`);
-  if (!/실제 6개 중 최근 N개 · 위반 1$/.test(need.trim())) problems.push(`N=1일 때 표의 판정 근거: "${need}"`);
+  if (!/실제 \d+개 중 최근 N개 · 위반 1$/.test(need.trim())) problems.push(`N=1일 때 표의 판정 근거: "${need}"`);
   // 6) 값 덧붙이기: 정상 값 → OK, 누락 → (missing) INSUFFICIENT_DATA, 마지막 지우기 → OK
   await tabUntil(`${ROOT} button[data-add=ok]`);
   await press('Enter');

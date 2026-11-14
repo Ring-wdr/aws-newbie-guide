@@ -177,6 +177,7 @@ export default function Evaluator({ facts }) {
               ? `마지막 구간은 모형이 판정하지 않는다(가능한 결과: ${res.finalPossible ? res.finalPossible.join(' 또는 ') : '문서로 정해지지 않음'}). 판정한 구간에서 상태가 ${res.changes}번 바뀌었다.`
               : `구간 ${res.steps.length}개를 지난 마지막 상태. 상태가 ${res.changes}번 바뀌었다 — 액션은 상태가 바뀔 때만 실행된다(${src(facts.actionLine)}).`}
           {res.undecided && res.final !== null ? ` 판정하지 않은 구간 ${res.undecided}개.` : ''}
+          {res.steps.some((x) => x.changed === null) ? ' 직전 상태를 판정하지 않은 구간 바로 뒤의 변화는 세지 않았다.' : ''}
         </p>
         <div class="cwa-rules" data-part="assumptions">
           <p>
