@@ -1,0 +1,1013 @@
+/* 가이드 사이트 공용 스타일 — 시스템 글꼴만 쓰고, 외부 리소스를 불러오지 않는다(GUIDE-SITE 2·3장). */
+
+/* ---------- 바탕: 글꼴·색·한국어 조판 ---------- */
+:root {
+  --sl-font: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', 'Segoe UI', system-ui, sans-serif;
+  /* 코드의 한글은 고정폭 글꼴이 없으면 넓게 벌어지므로, 영문 고정폭 뒤에 한글 고딕을 둔다 */
+  --sl-font-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, 'D2Coding', Consolas, 'Liberation Mono', 'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', monospace;
+  --sl-content-width: 48rem;
+  --sl-line-height: 1.8;
+  --guide-radius: 0.5rem;
+
+  /* 어두운 테마(Starlight 기본) */
+  --sl-color-accent-low: #10302f;
+  --sl-color-accent: #2fb3a6;
+  --sl-color-accent-high: #b5ece5;
+  --guide-surface: #17191e;
+  --guide-surface-2: #1f232a;
+  --guide-border: #343a44;
+  --guide-muted: #a7afbb;
+  --guide-out-bg: #121418;
+  --guide-g-bg: #12341f; --guide-g-fg: #b9f0c9; --guide-g-bd: #2f7a49;
+  --guide-y-bg: #3a300c; --guide-y-fg: #f6e19c; --guide-y-bd: #8f7420;
+  --guide-r-bg: #3d1717; --guide-r-fg: #ffc4c4; --guide-r-bd: #9b3b3b;
+  --guide-ok: #6fdc95;
+  --guide-bad: #ff8f8f;
+}
+:root[data-theme='light'] {
+  --sl-color-accent-low: #d3f1ed;
+  --sl-color-accent: #0b766d;
+  --sl-color-accent-high: #064640;
+  --guide-surface: #f7f8fa;
+  --guide-surface-2: #eef1f4;
+  --guide-border: #d5dae1;
+  --guide-muted: #57606c;
+  --guide-out-bg: #f3f5f7;
+  --guide-g-bg: #e3f6e8; --guide-g-fg: #12552a; --guide-g-bd: #7cc596;
+  --guide-y-bg: #fdf3d3; --guide-y-fg: #5c4700; --guide-y-bd: #d9b543;
+  --guide-r-bg: #fde6e6; --guide-r-fg: #8a1c1c; --guide-r-bd: #e08f8f;
+  --guide-ok: #13733a;
+  --guide-bad: #b42323;
+}
+
+body {
+  word-break: keep-all;
+  /* 한 줄에 다 들어가지 않는 긴 낱말만 끊는다(break-word 는 최소 폭 계산에 끼지 않아 표가 좁아지지 않는다) */
+  overflow-wrap: break-word;
+  line-height: var(--sl-line-height);
+}
+.sl-markdown-content {
+  font-size: 1.0625rem;
+}
+.sl-markdown-content :is(h2, h3, h4) {
+  line-height: 1.4;
+}
+.sl-markdown-content h2 {
+  margin-top: 2.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--guide-border);
+}
+.sl-markdown-content > h2:first-child {
+  margin-top: 0.5rem;
+  border-top: 0;
+}
+.sl-markdown-content :is(p, li) {
+  text-wrap: pretty;
+}
+.sl-markdown-content code:not(pre code) {
+  word-break: normal;
+  overflow-wrap: break-word;
+  font-size: 0.9em;
+}
+/* 페이지 제목: 길고 한국어 조사·영문이 섞이므로 균형 있게 줄을 나눈다 */
+h1#_top {
+  text-wrap: balance;
+  line-height: 1.35;
+}
+@media (max-width: 50rem) {
+  h1#_top {
+    font-size: 1.75rem;
+  }
+}
+
+/* 가운뎃점으로 이은 낱말 묶음(rehype-guide.mjs) */
+.nb {
+  display: inline-block;
+  text-indent: 0;
+}
+
+/* ---------- 코드 블록(Shiki 라이트·다크 이중 테마) ---------- */
+/* <pre>는 브라우저 기본 monospace 를 받으므로 글꼴을 직접 준다(한글이 고딕으로 나오게) */
+pre,
+pre code,
+.sl-markdown-content code,
+kbd {
+  font-family: var(--sl-font-mono);
+}
+.sl-markdown-content pre.astro-code {
+  border: 1px solid var(--guide-border);
+  border-radius: var(--guide-radius);
+  padding: 0.85rem 1rem;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  overflow-x: auto;
+  word-break: normal;
+  overflow-wrap: normal;
+}
+.astro-code,
+.astro-code span {
+  color: var(--shiki-light);
+  background-color: var(--shiki-light-bg);
+}
+:root[data-theme='dark'] .astro-code,
+:root[data-theme='dark'] .astro-code span {
+  color: var(--shiki-dark);
+  background-color: var(--shiki-dark-bg);
+}
+
+/* ---------- 메타 칩·등급 배지 ---------- */
+.lesson-meta {
+  margin: 0.25rem 0 1.75rem;
+}
+.meta-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0;
+}
+.meta-chip {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 0.35rem 0.75rem;
+  border: 1px solid var(--guide-border);
+  border-radius: 999px;
+  background: var(--guide-surface);
+  font-size: 0.875rem;
+  line-height: 1.6;
+  margin: 0 !important;
+}
+.meta-chip dt {
+  color: var(--guide-muted);
+  font-weight: 600;
+  white-space: nowrap;
+  margin: 0;
+}
+.meta-chip dd {
+  margin: 0;
+}
+.meta-chip.meta-grade {
+  border-radius: var(--guide-radius);
+  flex: 1 1 100%;
+}
+.grade-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0 0.45rem;
+  margin: 0 0.15rem;
+  border: 1px solid;
+  border-radius: 0.35rem;
+  font-weight: 700;
+  font-size: 0.85em;
+  white-space: nowrap;
+  line-height: 1.7;
+  vertical-align: baseline;
+}
+.grade-emoji {
+  font-size: 0.9em;
+}
+.grade-g { background: var(--guide-g-bg); color: var(--guide-g-fg); border-color: var(--guide-g-bd); }
+.grade-y { background: var(--guide-y-bg); color: var(--guide-y-fg); border-color: var(--guide-y-bd); }
+.grade-r { background: var(--guide-r-bg); color: var(--guide-r-fg); border-color: var(--guide-r-bd); }
+.grade-legend {
+  margin-top: 0.5rem;
+  font-size: 0.875rem;
+}
+.grade-legend summary {
+  cursor: pointer;
+  color: var(--guide-muted);
+  width: fit-content;
+}
+.grade-legend ul {
+  list-style: none;
+  padding: 0.5rem 0 0;
+  margin: 0;
+}
+.grade-legend li + li {
+  margin-top: 0.35rem;
+}
+.grade-legend-src {
+  color: var(--guide-muted);
+  font-size: 0.8125rem;
+  margin-top: 0.35rem !important;
+}
+
+/* ---------- 명령 + 기록된 실제 출력 ---------- */
+.cmd-pair {
+  margin-top: 1.25rem;
+  border: 1px solid var(--guide-border);
+  border-radius: var(--guide-radius);
+  overflow: hidden;
+  background: var(--guide-surface);
+}
+.cmd-pair :is(.cmd-block, .out-block) {
+  margin: 0;
+}
+.cmd-pair .out-block {
+  border-top: 1px dashed var(--guide-border);
+}
+.cmd-head,
+.out-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.3rem 0.5rem 0.3rem 0.85rem;
+  margin: 0 !important;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--guide-muted);
+  background: var(--guide-surface-2);
+}
+.block-label {
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+.cmd-pair pre.astro-code {
+  margin: 0 !important;
+  border: 0;
+  border-radius: 0;
+}
+.cmd-pair .out-block pre.astro-code,
+:root[data-theme='dark'] .cmd-pair .out-block pre.astro-code {
+  background-color: var(--guide-out-bg) !important;
+}
+.cmd-pair .out-block pre.astro-code span,
+:root[data-theme='dark'] .cmd-pair .out-block pre.astro-code span {
+  background-color: transparent;
+}
+.copy-btn {
+  font: inherit;
+  font-size: 0.8125rem;
+  padding: 0.15rem 0.7rem;
+  border: 1px solid var(--guide-border);
+  border-radius: 0.35rem;
+  background: var(--sl-color-bg);
+  color: var(--sl-color-text);
+  cursor: pointer;
+  min-height: 1.9rem;
+}
+.copy-btn:hover {
+  border-color: var(--sl-color-accent);
+}
+.copy-btn[data-state='done'] {
+  border-color: var(--sl-color-accent);
+  color: var(--sl-color-accent-high);
+}
+
+/* ---------- Mermaid 다이어그램(빌드 시점 SVG) ---------- */
+.diagram {
+  margin: 1.5rem 0 0;
+  border: 1px solid var(--guide-border);
+  border-radius: var(--guide-radius);
+  background: var(--guide-surface);
+  padding: 0.75rem;
+}
+.diagram-scroll {
+  overflow-x: auto;
+  margin: 0 !important;
+}
+.diagram-scroll > div {
+  margin: 0 !important;
+}
+.diagram-scroll svg {
+  display: block;
+  margin: 0 auto;
+  height: auto;
+  /* 원래 크기보다 키우지 않고, 상자에 맞추되 글자가 너무 작아지지 않게 원래 폭의 80%까지만 줄인다.
+     그보다 넓으면 상자 안에서 가로로 스크롤한다. */
+  max-width: none !important;
+  width: min(var(--diagram-w), max(100%, calc(var(--diagram-w) * 0.8))) !important;
+}
+/* SVG 안의 HTML 라벨(foreignObject)은 Mermaid 가 빌드 때 잰 조건(줄 간격 normal, 여백 0, 일반 줄바꿈)으로 되돌린다.
+   본문 스타일(줄 간격 1.8, keep-all 등)이 들어가면 라벨이 상자보다 커져 잘린다. */
+.diagram foreignObject,
+.diagram foreignObject * {
+  line-height: 1.5 !important;
+  word-break: normal !important;
+  overflow-wrap: normal !important;
+  text-wrap: wrap;
+  letter-spacing: normal;
+}
+.diagram foreignObject p {
+  margin: 0 !important;
+}
+.diagram-open {
+  margin: 0.4rem 0 0 !important;
+  font-size: 0.8125rem;
+}
+.diagram-open-dark { display: none; }
+:root[data-theme='dark'] .diagram-open-light { display: none; }
+:root[data-theme='dark'] .diagram-open-dark { display: inline; }
+.diagram-dark { display: none; }
+:root[data-theme='dark'] .diagram-light { display: none; }
+:root[data-theme='dark'] .diagram-dark { display: block; }
+.diagram-src {
+  margin-top: 0.5rem !important;
+  font-size: 0.8125rem;
+}
+.diagram-src summary {
+  cursor: pointer;
+  color: var(--guide-muted);
+  width: fit-content;
+}
+.diagram-src pre {
+  font-size: 0.8125rem;
+  max-height: 20rem;
+  overflow: auto;
+}
+
+/* ---------- 표(자체 스크롤) ---------- */
+.table-scroll {
+  overflow-x: auto;
+  margin-top: 1.25rem;
+}
+.sl-markdown-content .table-scroll > table {
+  display: table;
+  margin: 0;
+  width: 100%;
+  font-size: 0.9375rem;
+}
+.sl-markdown-content .table-scroll :is(th, td) {
+  min-width: 6.5rem;
+  vertical-align: top;
+  /* 표 칸은 낱말 중간에서 끊지 않는다. 넓으면 표가 자기 상자 안에서 가로로 스크롤된다 */
+  overflow-wrap: normal;
+  word-break: keep-all;
+}
+.sl-markdown-content .table-scroll :is(th, td) code {
+  overflow-wrap: normal;
+}
+/* 좁은 화면: 열을 내용 폭(최대 16rem)으로 두고 표 전체를 상자 안에서 가로로 스크롤한다.
+   (100% 폭에 맞추면 마지막 열이 좁아져 줄이 매우 길어진다) */
+@media (max-width: 50rem) {
+  .sl-markdown-content .table-scroll > table {
+    width: max-content;
+    max-width: none;
+  }
+  .sl-markdown-content .table-scroll :is(th, td) {
+    max-width: 16rem;
+  }
+}
+.sl-markdown-content .table-scroll :is(th, td):first-child {
+  min-width: 4.5rem;
+}
+.table-scroll:focus-visible,
+.diagram-scroll:focus-visible,
+pre:focus-visible {
+  outline: 2px solid var(--sl-color-accent);
+  outline-offset: 2px;
+}
+
+/* ---------- 답 가리기(스스로 확인·워크시트) ---------- */
+details.self-check,
+details.reveal {
+  border: 1px solid var(--guide-border);
+  border-radius: var(--guide-radius);
+  background: var(--guide-surface);
+  padding: 0 1rem;
+}
+details.self-check > summary,
+details.reveal > summary {
+  cursor: pointer;
+  padding: 0.6rem 0;
+  font-weight: 700;
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+details.self-check[open],
+details.reveal[open] {
+  padding-bottom: 0.75rem;
+}
+.reveal-state {
+  margin-left: auto;
+  font-weight: 400;
+  font-size: 0.8125rem;
+  color: var(--guide-muted);
+  border: 1px solid var(--guide-border);
+  border-radius: 999px;
+  padding: 0 0.6rem;
+}
+
+/* ---------- 퀴즈 ---------- */
+.quiz-summary,
+.checklist-summary {
+  margin: 1.5rem 0;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--guide-border);
+  border-left: 4px solid var(--sl-color-accent);
+  border-radius: var(--guide-radius);
+  background: var(--sl-color-bg);
+  font-size: 0.9375rem;
+}
+.quiz-summary p,
+.checklist-summary p {
+  margin: 0 !important;
+}
+.quiz-progress {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  align-items: center;
+  margin-top: 0.35rem !important;
+}
+.quiz-score {
+  font-weight: 700;
+}
+.quiz-summary[data-state='pass'] .quiz-score::before { content: '✓ '; color: var(--guide-ok); }
+.quiz-summary[data-state='fail'] .quiz-score::before { content: '△ '; color: var(--guide-bad); }
+.storage-panel {
+  margin-top: 0.35rem !important;
+  font-size: 0.875rem;
+}
+.storage-panel summary {
+  cursor: pointer;
+  color: var(--guide-muted);
+  width: fit-content;
+}
+.storage-panel .storage-actions {
+  margin-top: 0.4rem;
+}
+
+.storage-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.storage-note:empty {
+  display: none;
+}
+:is(.quiz-summary, .checklist-summary, .exam-app) button,
+.quiz-actions button {
+  font: inherit;
+  font-size: 0.875rem;
+  padding: 0.3rem 0.85rem;
+  min-height: 2.25rem;
+  border-radius: 0.4rem;
+  border: 1px solid var(--guide-border);
+  background: var(--guide-surface-2);
+  color: var(--sl-color-text);
+  cursor: pointer;
+}
+:is(.quiz-summary, .checklist-summary, .exam-app, .quiz-actions) button:hover:not(:disabled) {
+  border-color: var(--sl-color-accent);
+}
+:is(.quiz-summary, .checklist-summary, .exam-app, .quiz-actions, .exam-controls) button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+section.quiz-q {
+  margin-top: 1.5rem;
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--guide-border);
+  border-radius: var(--guide-radius);
+  background: var(--guide-surface);
+}
+section.quiz-q > :first-child {
+  margin-top: 0;
+}
+section.quiz-q[data-result='correct'] { border-left: 4px solid var(--guide-ok); }
+section.quiz-q[data-result='wrong'] { border-left: 4px solid var(--guide-bad); }
+.quiz-options,
+.exam-options {
+  /* fieldset 의 기본 최소 폭(min-content)이 긴 영문 식별자 때문에 360px 화면을 넘지 않게 */
+  min-inline-size: 0;
+  border: 0;
+  padding: 0;
+  margin: 0.75rem 0 0 !important;
+  display: grid;
+  gap: 0.5rem;
+}
+.quiz-option,
+.exam-option {
+  display: flex;
+  gap: 0.65rem;
+  align-items: flex-start;
+  padding: 0.55rem 0.8rem;
+  border: 1px solid var(--guide-border);
+  border-radius: 0.45rem;
+  background: var(--sl-color-bg);
+  cursor: pointer;
+  margin: 0 !important;
+  line-height: 1.65;
+}
+.quiz-option,
+.exam-option,
+.quiz-option-text,
+.exam-option-text {
+  min-width: 0;
+}
+.quiz-option-text,
+.exam-option-text,
+.sl-markdown-content :is(.quiz-option-text, .exam-option-text) code {
+  overflow-wrap: anywhere;
+}
+.quiz-option input,
+.exam-option input {
+  margin-top: 0.35rem;
+  flex: none;
+  width: 1.05rem;
+  height: 1.05rem;
+  accent-color: var(--sl-color-accent);
+}
+.quiz-option:has(input:checked),
+.exam-option:has(input:checked) {
+  border-color: var(--sl-color-accent);
+  box-shadow: inset 0 0 0 1px var(--sl-color-accent);
+}
+.quiz-option:has(input:focus-visible),
+.exam-option:has(input:focus-visible) {
+  outline: 2px solid var(--sl-color-accent);
+  outline-offset: 2px;
+}
+.quiz-option:has(input:disabled),
+.exam-option:has(input:disabled) {
+  cursor: default;
+}
+/* 채점 뒤: 색과 함께 글자 표시를 붙인다(색만으로 전하지 않는다) */
+:is(.quiz-option, .exam-option).is-answer,
+:is(.quiz-option, .exam-option).is-answer:has(input:checked) {
+  border: 2px solid var(--guide-ok);
+  box-shadow: none;
+  background: var(--guide-g-bg);
+}
+:is(.quiz-option, .exam-option).is-answer::after {
+  content: '✓ 정답';
+  margin-left: auto;
+  flex: none;
+  font-weight: 700;
+  font-size: 0.8125rem;
+  color: var(--guide-ok);
+}
+:is(.quiz-option, .exam-option).is-wrong,
+:is(.quiz-option, .exam-option).is-wrong:has(input:checked) {
+  /* 고른 오답: 빨강 + 점선 테두리 + "✕ 고른 답" 글자 — 색을 못 구분해도 모양과 글자로 구분된다 */
+  border: 2px dashed var(--guide-bad);
+  box-shadow: none;
+  background: var(--guide-r-bg);
+}
+:is(.quiz-option, .exam-option).is-wrong::after {
+  content: '✕ 고른 답';
+  margin-left: auto;
+  flex: none;
+  font-weight: 700;
+  font-size: 0.8125rem;
+  color: var(--guide-bad);
+}
+.quiz-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.75rem !important;
+}
+.quiz-verdict {
+  margin: 0 !important;
+  font-weight: 700;
+}
+section.quiz-q[data-result='correct'] .quiz-verdict { color: var(--guide-ok); }
+section.quiz-q[data-result='wrong'] .quiz-verdict { color: var(--guide-bad); }
+details.quiz-explain {
+  margin-top: 0.75rem !important;
+  border-top: 1px dashed var(--guide-border);
+  padding-top: 0.5rem;
+}
+details.quiz-explain > summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+.quiz-q + hr,
+hr + .quiz-summary + hr {
+  display: none;
+}
+.sl-markdown-content hr:has(+ section.quiz-q) {
+  display: none;
+}
+
+/* ---------- 자기 점검 체크리스트 ---------- */
+.check input {
+  width: 1.15rem;
+  height: 1.15rem;
+  accent-color: var(--sl-color-accent);
+  display: none;
+}
+.has-checklist-js .check input {
+  display: inline-block;
+}
+.has-checklist-js .check-src {
+  display: none;
+}
+.checklist-summary {
+  display: grid;
+  gap: 0.35rem;
+}
+.checklist-summary[hidden] {
+  display: none;
+}
+.checklist-progress {
+  font-weight: 700;
+}
+.checklist-note {
+  color: var(--guide-muted);
+  font-size: 0.8125rem;
+}
+.checklist-summary .checklist-reset {
+  justify-self: start;
+}
+
+/* ---------- 모의고사 시험 모드 ---------- */
+.exam-app {
+  margin: 2rem 0 1rem;
+  padding: 1.25rem;
+  border: 1px solid var(--guide-border);
+  border-radius: var(--guide-radius);
+  background: var(--guide-surface);
+}
+.exam-app h2 {
+  margin: 0 0 0.5rem;
+  border: 0;
+  padding: 0;
+  font-size: var(--sl-text-h3);
+}
+.exam-app p {
+  margin: 0.5rem 0;
+}
+.exam-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.5rem;
+  margin: 0.75rem 0;
+}
+.exam-facts div {
+  display: flex;
+  gap: 0.5rem;
+}
+.exam-facts dt {
+  color: var(--guide-muted);
+}
+.exam-facts dd {
+  margin: 0;
+  font-weight: 700;
+}
+.exam-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0.75rem 0;
+}
+.exam-app button.exam-primary {
+  background: var(--sl-color-accent);
+  border-color: var(--sl-color-accent);
+  color: var(--sl-color-black);
+  font-weight: 700;
+}
+:root[data-theme='light'] .exam-app button.exam-primary {
+  color: #fff;
+}
+.exam-bar {
+  position: sticky;
+  top: var(--sl-nav-height);
+  z-index: 3;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  margin: 0 -1.25rem;
+  padding: 0.6rem 1.25rem;
+  background: var(--sl-color-bg);
+  border-block: 1px solid var(--guide-border);
+}
+.exam-bar[hidden] { display: none; }
+.exam-timer {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+.exam-timer-label {
+  color: var(--guide-muted);
+  font-size: 0.8125rem;
+}
+.exam-clock {
+  font-family: var(--sl-font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+[data-paused='true'] .exam-clock::after {
+  content: ' (일시 정지)';
+  font-size: 0.8125rem;
+  font-weight: 400;
+  font-family: var(--sl-font);
+}
+.exam-counts {
+  margin: 0 !important;
+  font-size: 0.875rem;
+  color: var(--guide-muted);
+}
+.exam-bar-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 0.5rem;
+}
+.exam-nav {
+  margin-top: 1rem;
+}
+.exam-nav-box > summary {
+  cursor: pointer;
+  font-weight: 700;
+  width: fit-content;
+}
+.exam-nav-legend {
+  font-size: 0.8125rem;
+  color: var(--guide-muted);
+}
+.exam-nav-grid {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(2.6rem, 1fr));
+  gap: 0.35rem;
+}
+.exam-nav-grid li {
+  margin: 0 !important;
+}
+.exam-app .exam-nav-grid button {
+  width: 100%;
+  min-height: 2.4rem;
+  padding: 0;
+  position: relative;
+  font-variant-numeric: tabular-nums;
+  background: var(--sl-color-bg);
+}
+.exam-app .exam-nav-grid button[data-answered='true'] {
+  background: var(--sl-color-accent-low);
+  border-color: var(--sl-color-accent);
+  font-weight: 700;
+}
+.exam-app .exam-nav-grid button[data-flagged='true']::after {
+  content: '⚑';
+  position: absolute;
+  top: -0.1rem;
+  right: 0.15rem;
+  font-size: 0.75rem;
+  color: var(--guide-y-fg);
+}
+.exam-app .exam-nav-grid button[aria-current='step'] {
+  outline: 2px solid var(--sl-color-text);
+  outline-offset: 1px;
+}
+.exam-app .exam-nav-grid button[data-result='wrong'] {
+  border-color: var(--guide-bad);
+  text-decoration: line-through;
+}
+section.exam-q {
+  margin-top: 1rem;
+}
+.exam-js section.exam-q > h2 {
+  border-top: 0;
+  margin-top: 1rem;
+}
+.exam-controls {
+  margin-top: 1rem;
+}
+.exam-controls[hidden] { display: none; }
+.exam-controls-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: space-between;
+}
+.exam-controls button {
+  white-space: nowrap;
+  font: inherit;
+  padding: 0.45rem 1rem;
+  min-height: 2.5rem;
+  border-radius: 0.4rem;
+  border: 1px solid var(--guide-border);
+  background: var(--guide-surface-2);
+  color: var(--sl-color-text);
+  cursor: pointer;
+}
+.exam-controls button[aria-pressed='true'] {
+  background: var(--guide-y-bg);
+  color: var(--guide-y-fg);
+  border-color: var(--guide-y-bd);
+  font-weight: 700;
+}
+.exam-choose-status {
+  font-weight: 700;
+  color: var(--sl-color-accent-high);
+}
+.exam-choose-status:empty { display: none; }
+.exam-explain-slot {
+  margin: 1rem 0;
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--guide-border);
+  border-radius: var(--guide-radius);
+  background: var(--guide-surface);
+}
+.exam-explain-slot > h3 { margin-top: 0; }
+.exam-result {
+  margin-top: 1rem;
+}
+.exam-result:focus { outline: none; }
+.exam-total {
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+.exam-verdict {
+  font-weight: 700;
+}
+.exam-verdict[data-pass='true']::before { content: '✓ '; color: var(--guide-ok); }
+.exam-verdict[data-pass='false']::before { content: '△ '; color: var(--guide-bad); }
+.exam-domains {
+  width: 100%;
+  border-collapse: collapse;
+}
+.exam-domains caption {
+  text-align: left;
+  font-weight: 700;
+  padding-bottom: 0.35rem;
+}
+.exam-domains :is(th, td) {
+  padding: 0.4rem 0.6rem;
+  border-bottom: 1px solid var(--guide-border);
+  text-align: left;
+}
+.exam-meter {
+  display: inline-block;
+  width: 6rem;
+  height: 0.55rem;
+  border-radius: 999px;
+  background: var(--guide-surface-2);
+  border: 1px solid var(--guide-border);
+  vertical-align: middle;
+  overflow: hidden;
+}
+.exam-meter > span {
+  display: block;
+  height: 100%;
+  background: var(--sl-color-accent);
+}
+.exam-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+.exam-app .exam-filter button[aria-pressed='true'] {
+  background: var(--sl-color-accent-low);
+  border-color: var(--sl-color-accent);
+  font-weight: 700;
+}
+.exam-review-list {
+  padding-left: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.35rem;
+}
+.exam-review-list li { margin: 0 !important; }
+.exam-app .exam-review-list button {
+  width: 100%;
+  text-align: left;
+  line-height: 1.5;
+  padding: 0.45rem 0.75rem;
+}
+.exam-app .exam-review-list button[data-result='wrong'] { border-left: 4px solid var(--guide-bad); }
+.exam-app .exam-review-list button[data-result='correct'] { border-left: 4px solid var(--guide-ok); }
+.exam-hint {
+  font-size: 0.8125rem;
+  color: var(--guide-muted);
+}
+
+/* 확인 상자 */
+.guide-dialog {
+  max-width: min(28rem, calc(100vw - 2rem));
+  border: 1px solid var(--guide-border);
+  border-radius: var(--guide-radius);
+  background: var(--sl-color-bg);
+  color: var(--sl-color-text);
+  padding: 1.25rem;
+}
+.guide-dialog::backdrop {
+  background: rgb(0 0 0 / 0.5);
+}
+.guide-dialog p {
+  margin: 0 0 1rem;
+  line-height: 1.7;
+}
+.guide-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+.guide-dialog button {
+  font: inherit;
+  padding: 0.4rem 1rem;
+  min-height: 2.5rem;
+  border-radius: 0.4rem;
+  border: 1px solid var(--guide-border);
+  background: var(--guide-surface-2);
+  color: var(--sl-color-text);
+  cursor: pointer;
+}
+.guide-dialog button.exam-primary {
+  background: var(--sl-color-accent);
+  border-color: var(--sl-color-accent);
+  color: var(--sl-color-black);
+  font-weight: 700;
+}
+:root[data-theme='light'] .guide-dialog button.exam-primary {
+  color: #fff;
+}
+
+/* ---------- 소스 보기 페이지 ---------- */
+.source-run-basis {
+  margin: 0 !important;
+  padding: 0.4rem 0.85rem;
+  font-size: 0.8125rem;
+  color: var(--guide-muted);
+  border-top: 1px dashed var(--guide-border);
+}
+.source-norun {
+  padding: 0.6rem 0.85rem;
+  border-left: 4px solid var(--guide-border);
+  background: var(--guide-surface);
+  font-size: 0.9375rem;
+}
+.source-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  font-size: 0.875rem;
+  color: var(--guide-muted);
+}
+.source-run {
+  margin: 1rem 0;
+  border: 1px solid var(--guide-border);
+  border-radius: var(--guide-radius);
+  overflow: hidden;
+  background: var(--guide-surface);
+}
+.source-run pre.astro-code { margin: 0 !important; border: 0; border-radius: 0; }
+.source-code pre.astro-code { counter-reset: line; }
+.source-code pre.astro-code .line::before {
+  counter-increment: line;
+  content: counter(line);
+  display: inline-block;
+  width: 3ch;
+  margin-right: 1.25ch;
+  text-align: right;
+  color: var(--guide-muted);
+  opacity: 0.7;
+  user-select: none;
+}
+
+/* ---------- 위젯 자리 ---------- */
+.guide-widget {
+  margin-top: 1.5rem;
+}
+
+/* Starlight 검색 단추의 단축키 표시(⌘K)는 보이는 글자가 접근 이름("검색")과 달라져(axe label-content-name-mismatch) 숨긴다.
+   단축키 자체(⌘K / Ctrl+K)는 그대로 동작한다. */
+button[data-open-modal] > kbd {
+  display: none !important;
+}
+
+/* ---------- 움직임 줄이기 ---------- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ---------- 인쇄(치트시트를 종이 한두 장으로) ---------- */
+@media print {
+  :root {
+    --sl-color-bg: #fff;
+    --sl-color-text: #000;
+  }
+  header, .sidebar-pane, starlight-toc, mobile-starlight-toc, .right-sidebar, .pagination-links, .sl-skip-link,
+  .copy-btn, .quiz-summary, .checklist-summary, .storage-panel, .quiz-actions, .grade-legend, .diagram-src, .exam-app {
+    display: none !important;
+  }
+  .main-frame { padding-top: 0 !important; }
+  .sl-markdown-content { font-size: 10.5pt; }
+  .table-scroll { overflow: visible; }
+  .sl-markdown-content .table-scroll > table { font-size: 9pt; page-break-inside: auto; }
+  .sl-markdown-content tr { page-break-inside: avoid; }
+  .sl-markdown-content :is(th, td) { min-width: 0 !important; border: 1px solid #999; padding: 0.2rem 0.45rem !important; line-height: 1.45; }
+  pre.astro-code { white-space: pre-wrap !important; border: 1px solid #999 !important; }
+  .diagram-dark { display: none !important; }
+  .diagram-light { display: block !important; }
+  .diagram-scroll svg { width: 100% !important; max-width: 100% !important; }
+  details:not([open]) > :not(summary) { display: block; }
+}

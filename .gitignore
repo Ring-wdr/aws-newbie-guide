@@ -7,3 +7,7 @@ __pycache__/
 .claude/
 *.log
 .worktrees/
+# 가이드 사이트(site/) — 설치물·빌드 산출물·Astro 캐시
+site/node_modules/
+site/dist/
+.astro/

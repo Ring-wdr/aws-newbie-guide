@@ -1,0 +1,100 @@
+---
+// 소스 보기: 원고가 링크한 lab·sdk·scripts 등의 실제 파일을 빌드 때 읽어 그대로 보여 준다(사본을 두지 않는다).
+// 실행 명령은 복사만 할 수 있다 — 페이지가 명령을 실행하지 않는다(GUIDE-SITE 2장 원칙 5).
+import fs from 'node:fs';
+import path from 'node:path';
+import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
+import { Code } from 'astro:components';
+import { REPO_ROOT, fileViewRoute, routeForRepoPath, readTitle, builtContentFiles } from '../../lib/repo.mjs';
+import { collectLinkedFiles, langFor, runInfo } from '../../lib/linked-files.mjs';
+import { ko } from '../../i18n/ko.mjs';
+
+export function getStaticPaths() {
+  const { files, dirs } = collectLinkedFiles();
+  return [
+    ...[...files.entries()].map(([rel, from]) => ({ params: { path: rel }, props: { rel, kind: 'file', from: [...from] } })),
+    ...[...dirs.entries()].map(([rel, from]) => ({ params: { path: rel }, props: { rel, kind: 'dir', from: [...from] } })),
+  ];
+}
+
+const { rel, kind, from } = Astro.props as { rel: string; kind: 'file' | 'dir'; from: string[] };
+const abs = path.join(REPO_ROOT, rel);
+const built = new Set(builtContentFiles());
+const { files } = collectLinkedFiles();
+let code = '';
+let entries: { name: string; href: string | null }[] = [];
+if (kind === 'file') code = fs.readFileSync(abs, 'utf8');
+else
+  entries = fs
+    .readdirSync(abs, { withFileTypes: true })
+    .filter((e) => !e.name.startsWith('.'))
+    .map((e) => {
+      const child = `${rel}/${e.name}`;
+      const href = e.isDirectory() ? null : built.has(child) ? routeForRepoPath(child) : files.has(child) ? fileViewRoute(child) : null;
+      return { name: e.isDirectory() ? `${e.name}/` : e.name, href };
+    });
+const lines = code ? code.split('\n').length - (code.endsWith('\n') ? 1 : 0) : 0;
+const info = kind === 'file' ? runInfo(rel) : { command: null, basis: 'none' as const };
+const run = info.command;
+const title = kind === 'dir' ? `${rel}/` : rel.split('/').pop()!;
+---
+
+<StarlightPage frontmatter={{ title, tableOfContents: false, pagefind: kind === 'file' }}>
+  <p class="source-meta">
+    <span>{kind === 'dir' ? ko.source.dirTitle : ko.source.path}: <code>{kind === 'dir' ? `${rel}/` : rel}</code></span>
+    {kind === 'file' && <span>{ko.source.lines(lines)}</span>}
+  </p>
+  <p>{ko.source.note}</p>
+  {
+    run && (
+      <div class="source-run" data-run-basis={info.basis}>
+        <div class="cmd-head">
+          <span class="block-label">{ko.source.run}</span>
+          <button type="button" class="copy-btn" data-copy hidden aria-label={`${ko.source.run} ${ko.cmd.copy}`}>
+            {ko.cmd.copy}
+          </button>
+        </div>
+        <Code code={run} lang="bash" themes={{ light: 'github-light-default', dark: 'github-dark-default' }} defaultColor={false} />
+        <p class="source-run-basis">
+          {info.basis === 'manuscript' ? (
+            <>
+              {ko.source.basisManuscript}{' '}
+              {built.has(info.from!) ? <a href={routeForRepoPath(info.from!)}>{readTitle(info.from!)}</a> : <code>{info.from}</code>}
+            </>
+          ) : (
+            ko.source.basisEntry(rel)
+          )}
+        </p>
+      </div>
+    )
+  }
+  {info.basis === 'helper' && <p class="source-norun">{ko.source.helper}</p>}
+  {info.basis === 'module' && <p class="source-norun">{ko.source.module}</p>}
+  {
+    kind === 'file' ? (
+      <div class="source-code">
+        <Code code={code.replace(/\n$/, '')} lang={langFor(rel) as any} themes={{ light: 'github-light-default', dark: 'github-dark-default' }} defaultColor={false} />
+      </div>
+    ) : (
+      <ul>
+        {entries.map((e) => (
+          <li>{e.href ? <a href={e.href}><code>{e.name}</code></a> : <code>{e.name}</code>}</li>
+        ))}
+      </ul>
+    )
+  }
+  {
+    from.length > 0 && (
+      <>
+        <h2>{ko.source.linkedFrom}</h2>
+        <ul>
+          {from.map((f) => (
+            <li>
+              {built.has(f) ? <a href={routeForRepoPath(f)}>{readTitle(f)}</a> : <code>{f}</code>}
+            </li>
+          ))}
+        </ul>
+      </>
+    )
+  }
+</StarlightPage>
