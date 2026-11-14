@@ -3,18 +3,21 @@
 // - 본문 등 그 밖의 링크는 누르면 "시험 중에는 열지 않기" 확인을 띄운다(확인하면 연다).
 // 주소를 직접 입력해 여는 것까지 막지는 않는다(혼자 공부하는 가이드 — site/README "알아 둘 성질").
 // 시험 상태는 exam.ts가 저장하는 "exam:m14-mock-exam"의 phase로 판단하므로 어느 페이지에서나 같다.
+// 시작만 하고 떠난 시험(마지막 저장 + 남은 시간 + 24시간이 지남)은 가리지 않는다(lib/exam-live.mjs).
+// 사이트 검색(Pagefind) 결과의 정답·해설 링크도 본문 링크와 같이 누를 때 확인을 거친다(문서 전체에 건 클릭 처리).
 import { ko } from '../i18n/ko.mjs';
 import { load, onStorageChange } from './storage';
 import { confirmDialog } from './dialog';
+import { examLiveState } from '../lib/exam-live.mjs';
 
 export const EXAM_STORE = 'exam:m14-mock-exam';
 export const ANSWER_KEY_PATH = '/curriculum/m14-capstone-exam/mock-exam/answer-key/';
 
 const NAV_SELECTOR = 'nav.sidebar, .pagination-links';
 
+/** 진행 중인 시험이 있는가. 시작만 하고 떠나 종료 예정 시각 + 24시간이 지난 진행 상태는 버려진 것으로 보고 가리지 않는다(lib/exam-live.mjs). */
 export function examRunning(): boolean {
-  const s = load<{ phase?: string } | null>(EXAM_STORE, null);
-  return Boolean(s && typeof s === 'object' && s.phase === 'running');
+  return examLiveState(load<unknown>(EXAM_STORE, null), Date.now()) === 'running';
 }
 
 function isKeyLink(a: HTMLAnchorElement): boolean {
