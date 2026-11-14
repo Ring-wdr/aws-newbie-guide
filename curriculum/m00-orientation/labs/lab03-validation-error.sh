@@ -5,10 +5,13 @@
 set -euo pipefail
 source "$(git rev-parse --show-toplevel)/scripts/env.sh"
 # DynamoDB 테이블은 wait_dynamodb_table_active 로 기다린다 (= table-exists + 준비 직후 재확인, scripts/lab-wait.sh)
+# 삭제는 wait_dynamodb_table_gone 으로 끝날 때까지 기다린다 (= table-not-exists 를 1초 간격으로) — 삭제 중(DELETING)인
+# 같은 이름으로 만들면 ResourceInUseException 이므로, 곧바로 다시 실행해도 통과하게 한다 (규칙 4)
 source "$(git rev-parse --show-toplevel)/scripts/lab-wait.sh"
 
 TABLE="todayorder-m00-orders"
 aws dynamodb delete-table --table-name "$TABLE" >/dev/null 2>&1 || true
+wait_dynamodb_table_gone "$TABLE"   # = aws dynamodb wait table-not-exists (scripts/lab-wait.sh)
 
 create() {
   aws dynamodb create-table --table-name "$1" \
@@ -33,6 +36,7 @@ echo "대기 후 상태: $status"
 
 echo "== 3. 정리"
 aws dynamodb delete-table --table-name "$TABLE" --query 'TableDescription.TableStatus' --output text
+wait_dynamodb_table_gone "$TABLE"   # = aws dynamodb wait table-not-exists (scripts/lab-wait.sh)
 
 # ---- 단언
 [ "$rc" -eq 254 ] || { echo "FAIL: 종료 코드가 254가 아님 ($rc)"; exit 1; }
