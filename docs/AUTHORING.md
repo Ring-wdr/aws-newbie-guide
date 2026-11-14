@@ -80,6 +80,7 @@ curriculum/mNN-<slug>/
 ## 6. 검증 통과 기준 (검증 에이전트 체크리스트)
 
 - [ ] 깨끗한 에뮬레이터에서 `verify.sh`가 0으로 종료한다.
+- [ ] 리소스를 지운 뒤 같은 이름으로 다시 만드는 lab·sdk 예제(DynamoDB 테이블, Kinesis 스트림, RDS·ElastiCache, Firehose 등)를 새로 쓰거나 고쳤다면, 그 단위를 같은 에뮬레이터에서 사이에 기다림 없이 3회 연속 실행해 모두 통과한다. `verify.sh`는 순서대로 한 번·역순으로 한 번 돌리므로 마지막 lab 말고는 같은 lab이 연달아 실행되지 않아, 삭제 완료를 기다리지 않는 결함을 잡지 못한다(규칙 4). 실패하면 `scripts/clock-check.sh --stability`로 VM 시계가 흔들리는지 먼저 본다.
 - [ ] 모든 sdk 예제가 클라이언트 생성 전에 `require_emulator()`(두 번째 에뮬레이터를 쓰면 `emulator_site()` / `emulator_site("DR_")`)를 호출하고, 셸 스크립트는 `scripts/env.sh`를 source한다(실제 AWS로 나갈 경로가 없다). `verify.sh`는 sdk 예제마다 `guard_refuses`를 돌린다.
 - [ ] 문서에 실린 출력이 실제 실행 결과와 일치한다(표본 3개 이상 대조). 실행마다 바뀌는 값(무작위 ID, ARN 접미사, 타임스탬프, 액세스 키 ID)은 비교에서 제외하고 구조·필드·상태 값·오류 코드와 메시지를 대조한다.
 - [ ] 🟡/🔴 실습에 "실제 AWS에서 해 보려면" 메모가 있다.
