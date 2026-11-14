@@ -17,6 +17,7 @@ flowchart TB
     R2["Aurora 복제본(reader)<br/>us-east-1c"]
   end
   subgraph V["클러스터 볼륨 (공유 스토리지) — 3개 AZ에 걸쳐 데이터 사본 6개"]
+    direction TB
     A1[(1a 사본)]:::s
     A2[(1a 사본)]:::s
     B1[(1b 사본)]:::s
@@ -30,7 +31,7 @@ flowchart TB
   EPW["클러스터 엔드포인트(쓰기)<br/>...cluster-xxxx..."] --> W
   EPR["리더 엔드포인트(읽기, 부하 분산)<br/>...cluster-ro-xxxx..."] --> R1
   EPR --> R2
-  classDef s fill:#eef,stroke:#88a
+  classDef s fill:#eef,stroke:#88a,color:#222
 ```
 
 - 인스턴스마다 디스크를 따로 갖는 RDS와 달리, Aurora 인스턴스들은 **하나의 클러스터 볼륨을 공유**한다. 볼륨은 데이터를 **3개 AZ에 6개 사본**으로 저장한다.
