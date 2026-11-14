@@ -367,10 +367,11 @@ kbd {
   overflow-wrap: anywhere;
   word-break: normal;
 }
-/* 인라인 코드는 rehype-guide 가 넣은 <wbr>(구분 기호 뒤·낱말 경계)에서 먼저 끊고, 그래도 길면 아무 데서나 끊는다 */
+/* 인라인 코드는 rehype-guide 가 넣은 <wbr>(구분 기호 뒤·낱말 경계)에서 끊는다. 코드 안의 한국어 낱말도
+   중간에서 끊지 않게 keep-all 을 둔다(영문 코드는 <wbr> 자리에서 계속 끊긴다). 그래도 칸보다 긴 덩어리만 break-word. */
 .sl-markdown-content .table-scroll :is(th, td) code {
   overflow-wrap: break-word;
-  word-break: normal;
+  word-break: keep-all;
 }
 /* 가운뎃점 묶음 조각이 칸보다 길면 칸 폭에 맞춰 안에서 줄바꿈한다(옆 칸으로 넘치지 않게) */
 .sl-markdown-content .table-scroll :is(th, td) .nb {
