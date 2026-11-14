@@ -4,6 +4,8 @@
 # 오류 메시지를 읽는 연습과, CLI 종료 코드(254)를 스크립트에서 다루는 법을 익힌다.
 set -euo pipefail
 source "$(git rev-parse --show-toplevel)/scripts/env.sh"
+# DynamoDB 테이블은 wait_dynamodb_table_active 로 기다린다 (= table-exists + 준비 직후 재확인, scripts/lab-wait.sh)
+source "$(git rev-parse --show-toplevel)/scripts/lab-wait.sh"
 
 TABLE="todayorder-m00-orders"
 aws dynamodb delete-table --table-name "$TABLE" >/dev/null 2>&1 || true
@@ -25,7 +27,7 @@ echo "종료 코드: $rc"
 
 echo "== 2. 올바른 이름으로 다시 만들기"
 create "$TABLE" --query 'TableDescription.{Name: TableName, Status: TableStatus, Billing: BillingModeSummary.BillingMode}'
-aws dynamodb wait table-exists --table-name "$TABLE"
+wait_dynamodb_table_active "$TABLE"   # = aws dynamodb wait table-exists + 준비 직후 재확인 (scripts/lab-wait.sh)
 status="$(aws dynamodb describe-table --table-name "$TABLE" --query Table.TableStatus --output text)"
 echo "대기 후 상태: $status"
 
