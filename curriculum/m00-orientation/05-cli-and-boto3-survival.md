@@ -176,7 +176,7 @@ SDK client_resource_paginator_waiter OK
 
 방금 본 것:
 - client 한 번 호출은 `MaxKeys=3` 만큼만 주고 `IsTruncated=True` 로 "더 있다"고 알린다. paginator는 3+3+1 세 번 호출해 7개를 모두 읽었다.
-- `create_table` **응답**의 상태는 CLI([lab03](./labs/lab03-validation-error.sh))든 boto3든 항상 `CREATING`이다. 에뮬레이터는 1초 안에 `ACTIVE`가 되는 경우가 많아서, 만든 직후 `describe_table`을 부르면 실행할 때마다 `CREATING`이 나오기도 하고 `ACTIVE`가 나오기도 한다(경쟁 상태). 실제 AWS에서는 보통 수 초 동안 `CREATING`이다. 그래서 상태를 가정하지 말고 **항상 waiter로 기다리는 습관**이 중요하다. CLI에서는 `aws dynamodb wait table-exists`, `aws s3api wait bucket-exists` 가 같은 역할을 한다.
+- `create_table` **응답**의 상태는 CLI([lab03](./labs/lab03-validation-error.sh))든 boto3든 항상 `CREATING`이다. 에뮬레이터는 1초 안에 `ACTIVE`가 되는 경우가 많아서, 만든 직후 `describe_table`을 부르면 실행할 때마다 `CREATING`이 나오기도 하고 `ACTIVE`가 나오기도 한다(경쟁 상태). 실제 AWS에서는 보통 수 초 동안 `CREATING`이다. 그래서 상태를 가정하지 말고 **항상 waiter로 기다리는 습관**이 중요하다. CLI에서는 `aws dynamodb wait table-exists`, `aws s3api wait bucket-exists` 가 같은 역할을 한다. (lab03 스크립트는 `table-exists` 대신 `scripts/lab-wait.sh`의 `wait_dynamodb_table_active`로 기다린다 — 1초 간격으로 확인하고, `ACTIVE`를 본 뒤 잠시 뒤 한 번 더 확인해 VM 시계가 흔들릴 때의 "준비됨 직후 실패"를 크게 드러낸다. 직접 입력할 때는 위 CLI `wait`를 쓰면 된다.)
 
 **5) 같은 S3 왕복을 boto3로** — [sdk/s3_roundtrip.py](./sdk/s3_roundtrip.py) (lab02의 Python 버전)
 
