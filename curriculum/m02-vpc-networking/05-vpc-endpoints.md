@@ -18,7 +18,7 @@ flowchart LR
     end
     rt["app-rt-a<br/>pl-(S3) → vpce-(게이트웨이)<br/>0.0.0.0/0 → nat-a"]
   end
-  api -->|"S3 요청: 라우팅 테이블의<br/>prefix list 경로"| gw["S3 게이트웨이 엔드포인트"] --> s3[(S3)]
+  api --> gw["S3 게이트웨이 엔드포인트<br/>S3 요청: 라우팅 테이블의 prefix list 경로"] --> s3[(S3)]
   api -->|"sqs.us-east-1.amazonaws.com<br/>→ 사설 DNS가 10.0.10.4 반환"| eni --> sqs[[SQS]]
 ```
 
