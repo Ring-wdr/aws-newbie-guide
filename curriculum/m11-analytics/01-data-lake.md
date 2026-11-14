@@ -23,13 +23,14 @@
 flowchart LR
   subgraph 수집
     APP[주문 API] --> FH[Data Firehose]
-    DB[(DynamoDB/RDS)] -. 내보내기·DMS .-> S3R
-    FH --> S3R
+    DB[(DynamoDB/RDS)]
   end
   subgraph S3["S3 데이터 레이크 (todayorder-datalake)"]
     S3R[raw/<br/>원본 그대로]
     S3C[curated/<br/>정제·집계·Parquet]
   end
+  DB -. 내보내기·DMS .-> S3R
+  FH --> S3R
   S3R -- Glue ETL --> S3C
   CAT[(Glue Data Catalog<br/>DB·테이블·파티션)]
   S3R & S3C -. 메타데이터 .- CAT
