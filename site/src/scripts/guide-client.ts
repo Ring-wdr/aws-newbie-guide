@@ -203,20 +203,18 @@ function initReveal() {
   }
 }
 
-/* ---------- 넓은 다이어그램: 가장 위쪽 노드(흐름의 시작)가 보이는 곳에서 시작한다 ---------- */
+/* ---------- 넓은 다이어그램: 왼쪽 끝(흐름의 시작)부터 보이게 한다 ---------- */
 function initDiagrams() {
   const dark = document.documentElement.dataset.theme === 'dark';
   for (const box of document.querySelectorAll<HTMLElement>('.diagram-scroll')) {
     if (box.scrollWidth <= box.clientWidth + 1) continue;
     const svg = box.querySelector<SVGSVGElement>(`.diagram-${dark ? 'dark' : 'light'} svg`);
     if (!svg) continue;
-    const nodes = [...svg.querySelectorAll('g.node')].map((n) => n.getBoundingClientRect()).filter((r) => r.width > 0);
-    if (!nodes.length) continue;
-    const top = Math.min(...nodes.map((r) => r.top));
-    const first = nodes.filter((r) => r.top - top < 4).sort((a, b) => a.left - b.left)[0];
-    const boxRect = box.getBoundingClientRect();
-    const center = first.left + first.width / 2 - boxRect.left + box.scrollLeft;
-    box.scrollLeft = Math.max(0, Math.min(box.scrollWidth - box.clientWidth, center - box.clientWidth / 2));
+    // 노드·간선 라벨·서브그래프 중 가장 왼쪽 것의 바로 앞에서 시작한다(그림 앞 여백을 건너뛴다)
+    const rects = [...svg.querySelectorAll('g.node, g.edgeLabel, g.cluster')].map((n) => n.getBoundingClientRect()).filter((r) => r.width > 0);
+    if (!rects.length) continue;
+    const left = Math.min(...rects.map((r) => r.left)) - box.getBoundingClientRect().left + box.scrollLeft;
+    box.scrollLeft = Math.max(0, Math.min(box.scrollWidth - box.clientWidth, left - 8));
   }
 }
 
