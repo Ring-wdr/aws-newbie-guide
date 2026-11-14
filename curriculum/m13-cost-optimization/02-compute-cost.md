@@ -73,6 +73,8 @@ TodayOrder API 서버 대수 (하루):
 
 </details>
 
+<!-- widget: purchase-mix -->
+
 ### 실습: 인벤토리를 읽어 월 비용 추정 — [labs/lab01-compute-cost-estimate.sh](./labs/lab01-compute-cost-estimate.sh)
 
 Cost Explorer는 에뮬레이터에서 501이고, 에뮬레이터는 과금을 하지 않는다. 그래서 **리소스 구성(인벤토리)을 읽어 예시 단가를 곱하는** 추정기를 만든다. 아직 청구서가 없는 설계안을 비교할 때 실무에서도 쓰는 방법이다. lab01은 TodayOrder의 "지금" 구성을 만든다(모두 태그 `cost-lab=m13`).
