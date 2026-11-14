@@ -352,6 +352,26 @@ function initHydrationGuard() {
 }
 initHydrationGuard();
 
+// 붙는 동안은 위젯 상자(.guide-widget)에 aria-busy="true"를 둬 화면 낭독기에 아직 준비 중임을 알리고, 붙으면(ssr 속성이 사라지면) 뗀다.
+function initHydrationBusy() {
+  const sync = (box: Element) => {
+    if (box.querySelector('astro-island[ssr]')) box.setAttribute('aria-busy', 'true');
+    else box.removeAttribute('aria-busy');
+  };
+  const boxes = [...document.querySelectorAll('.guide-widget')].filter((b) => b.querySelector('astro-island'));
+  if (!boxes.length) return;
+  boxes.forEach(sync);
+  const mo = new MutationObserver((records) => {
+    for (const r of records) {
+      const box = (r.target as Element).closest?.('.guide-widget');
+      if (box) sync(box);
+    }
+  });
+  for (const b of boxes) mo.observe(b, { subtree: true, attributes: true, attributeFilter: ['ssr'] });
+}
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initHydrationBusy);
+else initHydrationBusy();
+
 function init() {
   document.documentElement.classList.add('guide-js');
   initCopy();
