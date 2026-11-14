@@ -87,6 +87,10 @@ h1#_top {
   display: inline-block;
   text-indent: 0;
 }
+/* inline-block 에는 링크 밑줄이 전해지지 않으므로 링크 안의 조각은 밑줄을 직접 받는다 */
+a .nb {
+  text-decoration: inherit;
+}
 
 /* ---------- 코드 블록(Shiki 라이트·다크 이중 테마) ---------- */
 /* <pre>는 브라우저 기본 monospace 를 받으므로 글꼴을 직접 준다(한글이 고딕으로 나오게) */
