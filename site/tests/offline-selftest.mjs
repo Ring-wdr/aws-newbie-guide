@@ -38,7 +38,7 @@ const CASES = {
   'meta-refresh': page('', '<meta http-equiv="refresh" content="30; url=https://net-selftest.invalid/">'),
   'beacon-pagehide': page(`<script>addEventListener('pagehide', () => navigator.sendBeacon(${EXT} + '/bye', 'x'));</script>`),
   'beacon-visibility': page(`<script>document.addEventListener('visibilitychange', () => navigator.sendBeacon(${EXT} + '/hidden', 'x'));</script>`),
-  'srcset-2x': page('<img alt="" src="/ok.svg" srcset="/ok.svg 1x, https://net-selftest.invalid/i@2x.png 2x">'),
+  'srcset-2x': page('<img alt="" src="/ok.svg" srcset="/ok.svg 1x, https://net-selftest.invalid/i-2x.png 2x">'),
   'picture-source': page('<picture><source srcset="https://net-selftest.invalid/p.webp" type="image/webp"><img alt="" src="/ok.svg"></picture>'),
   'object-data': page('<object data="https://net-selftest.invalid/o.svg" type="image/svg+xml"></object>'),
   'embed-src': page('<embed src="https://net-selftest.invalid/e.svg" type="image/svg+xml">'),

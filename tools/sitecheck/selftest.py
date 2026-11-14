@@ -42,7 +42,7 @@ STATIC_CASES = [
     ("dist: location.href 외부 주소", "dist", "p6/index.html", "<script>location.href = 'https://away.selftest.invalid/'</script>"),
     ("dist: location.assign 외부 주소", "dist", "_astro/g.js", "location.assign(`https://away.selftest.invalid/2`)"),
     ("dist: <object data>", "dist", "p7/index.html", '<object data="https://obj.selftest.invalid/o.svg"></object>'),
-    ("dist: srcset 2x 후보", "dist", "p8/index.html", '<img alt="" src="/a.png" srcset="/a.png 1x, https://img.selftest.invalid/a@2x.png 2x">'),
+    ("dist: srcset 2x 후보", "dist", "p8/index.html", '<img alt="" src="/a.png" srcset="/a.png 1x, https://img.selftest.invalid/a-2x.png 2x">'),
     ("dist: meta refresh", "dist", "p5/index.html", '<meta http-equiv="refresh" content="0; url=https://x.selftest.invalid">'),
 ]
 

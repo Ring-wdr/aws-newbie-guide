@@ -10,6 +10,7 @@ if (outIdx < 0) throw new Error('--out <폴더> 가 필요하다');
 const out = path.resolve(process.argv[outIdx + 1]);
 fs.mkdirSync(out, { recursive: true });
 const full = process.argv.includes('--full');
+const only = process.argv.includes('--only') ? process.argv[process.argv.indexOf('--only') + 1] : null;
 
 const SHOTS = [
   { name: 'lesson-sqs', path: '/curriculum/m06-integration-messaging/02-sqs/' },
@@ -23,6 +24,7 @@ const SHOTS = [
   { name: 'exam-result', path: '/curriculum/m14-capstone-exam/mock-exam/questions/', prepare: examResult },
   { name: 'source-view', path: '/files/curriculum/m06-integration-messaging/labs/lab01-sqs-basics.sh/' },
   { name: 'source-helper', path: '/files/scripts/lab-wait.sh/' },
+  { name: 'diagram-m14-02', path: '/curriculum/m14-capstone-exam/02-capstone-requirements-and-design/', prepare: (p) => p.locator('.diagram').first().evaluate((e) => e.scrollIntoView({ block: 'start' })) },
   { name: 'diagram-m02', path: '/curriculum/m02-vpc-networking/02-vpc-subnet-route-igw/', prepare: (p) => p.locator('.diagram').first().evaluate((e) => e.scrollIntoView({ block: 'start' })) },
 ];
 
@@ -67,7 +69,7 @@ try {
   for (const theme of ['light', 'dark']) {
     for (const width of [1280, 360]) {
       const { browser, context, blocked } = await offlineBrowser({ colorScheme: theme, viewport: { width, height: width === 360 ? 780 : 900 } });
-      for (const s of SHOTS) {
+      for (const s of SHOTS.filter((x) => !only || x.name === only)) {
         const page = await context.newPage();
         await page.goto(`http://127.0.0.1:${port}${s.path}`, { waitUntil: 'networkidle' });
         await page.evaluate(() => localStorage.clear());
