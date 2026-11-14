@@ -212,8 +212,8 @@ flowchart LR
   end
   subgraph dr["DR 리전 (평소 데이터만)"]
     vault2[(백업 볼트 사본)] ; s32[(receipts 복제본)]
-    iac[CloudFormation 템플릿<br/>= 이 레슨의 3개 + 스크립트]
   end
+  iac[CloudFormation 템플릿<br/>= 이 레슨의 3개 + 스크립트]
   ddb1 & rds1 --> bk -->|"교차 리전 복사"| vault2
   s31 -->|"CRR"| s32
   iac -.->|"장애 시 복원·배포 (RTO 4h)"| dr
