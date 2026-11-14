@@ -1,0 +1,145 @@
+---
+// M04 레슨 2 — S3 수명 주기 규칙 점검기(설명용 모형).
+// 수치·규칙은 빌드 때 원고(curriculum/m04-storage/02-storage-classes-and-lifecycle.md)에서 읽는다(facts.mjs). 읽지 못하면 빌드가 실패한다.
+import fs from 'node:fs';
+import path from 'node:path';
+import { REPO_ROOT } from '../../../lib/repo.mjs';
+import { readLifecycleFacts, LESSON } from './facts.mjs';
+import Planner from './Planner.jsx';
+
+const facts = readLifecycleFacts(fs.readFileSync(path.join(REPO_ROOT, LESSON), 'utf8'));
+---
+
+<Planner client:visible facts={facts} />
+
+<style is:global>
+  .lc {
+    margin: 1.5rem 0;
+    padding: 1rem;
+    border: 1px solid var(--guide-border);
+    border-left: 4px solid var(--sl-color-accent);
+    border-radius: var(--guide-radius);
+    background: var(--guide-surface);
+    font-size: 0.9375rem;
+    overflow-wrap: anywhere;
+  }
+  .lc :is(p, ul, ol, fieldset, figure, details, table) { margin: 0; }
+  .lc > * + * { margin-top: 0.85rem; }
+  .lc-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+  .lc-head h4 { margin: 0; font-size: 1.05rem; }
+  .lc-model {
+    display: inline-block;
+    padding: 0 0.5rem;
+    border: 1px dashed currentColor;
+    border-radius: 999px;
+    font-size: 0.8125rem;
+    font-weight: 700;
+    color: var(--guide-y-fg);
+    background: var(--guide-y-bg);
+  }
+  .lc-intro, .lc-hint { color: var(--guide-muted); }
+  .lc-hint { margin-top: 0.35rem !important; font-size: 0.8125rem; }
+  .lc fieldset { border: 0; padding: 0; min-width: 0; }
+  .lc legend { font-weight: 700; padding: 0; margin-bottom: 0.3rem; }
+  .lc-row { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+  .lc button {
+    font: inherit;
+    font-size: 0.875rem;
+    padding: 0.3rem 0.8rem;
+    min-height: 2.25rem;
+    border-radius: 0.4rem;
+    border: 1px solid var(--guide-border);
+    background: var(--guide-surface-2);
+    color: var(--sl-color-text);
+    cursor: pointer;
+    text-align: left;
+  }
+  .lc button:hover { border-color: var(--sl-color-accent); }
+  .lc button[aria-pressed='true'] { border-color: var(--sl-color-accent); box-shadow: inset 0 0 0 1px var(--sl-color-accent); font-weight: 700; }
+  .lc button[aria-pressed='true']::before { content: '✓ '; }
+  .lc :is(button, input, select, summary):focus-visible { outline: 2px solid var(--sl-color-accent); outline-offset: 2px; }
+  .lc-trows { list-style: none; padding: 0 !important; display: grid; gap: 0.5rem; }
+  .lc-trows > li { margin: 0 !important; }
+  .lc-trow, .lc-exp { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); gap: 0.4rem 1rem; align-items: end; }
+  .lc-exp { margin-top: 0.6rem; }
+  .lc-field { display: flex; flex-direction: column; gap: 0.2rem; }
+  .lc-field > span { font-weight: 700; font-size: 0.875rem; }
+  .lc :is(input[type='number'], select) {
+    font: inherit;
+    width: 100%;
+    max-width: 16rem;
+    padding: 0.3rem 0.5rem;
+    border: 1px solid var(--guide-border);
+    border-radius: 0.4rem;
+    background: var(--sl-color-bg);
+    color: var(--sl-color-text);
+  }
+  .lc input[type='number']:disabled { opacity: 0.55; }
+  .lc-check, .lc-radios label { display: flex; gap: 0.4rem; align-items: baseline; }
+  .lc-radios { margin-top: 0.6rem !important; }
+  .lc-result {
+    padding: 0.6rem 0.75rem;
+    border: 1px solid var(--guide-border);
+    border-radius: var(--guide-radius);
+    background: var(--sl-color-bg);
+  }
+  .lc-tag { font-weight: 700; }
+  .lc-result[data-result='ok'] .lc-tag { color: var(--guide-ok); }
+  .lc-result[data-result='rejected'] .lc-tag { color: var(--guide-bad); }
+  .lc-result[data-result='warned'] .lc-tag { color: var(--guide-y-fg); background: var(--guide-y-bg); padding: 0 0.3rem; border-radius: 0.25rem; }
+  .lc-findings { margin-top: 0.4rem !important; padding-left: 1.2rem; font-size: 0.875rem; }
+  .lc-findings li { margin: 0.2rem 0 !important; }
+  .lc-level { font-weight: 700; }
+  .lc-findings li[data-level='error'] .lc-level { color: var(--guide-bad); }
+  .lc-chart { padding: 0.25rem 0; }
+  .lc-legend { display: flex; flex-wrap: wrap; gap: 0.35rem 1rem; font-size: 0.8125rem; color: var(--guide-muted); }
+  .lc-legend span { display: inline-flex; align-items: center; gap: 0.35rem; }
+  .lc-sw { display: inline-block; width: 1.6rem; height: 0.8rem; border-radius: 0.2rem; }
+  .lc-track {
+    position: relative;
+    display: block;
+    height: 1.6rem;
+    margin-top: 0.4rem;
+    border-radius: 0.25rem;
+    background: var(--guide-surface-2);
+    overflow: hidden;
+  }
+  .lc-seg {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    min-width: 2px;
+    box-sizing: border-box;
+    overflow: hidden;
+    font-size: 0.75rem;
+    font-weight: 700;
+    line-height: 1.6rem;
+    text-align: center;
+    color: var(--sl-color-text);
+  }
+  /* 바로 읽힘: 채운 상자(색 + 실선), 복원 필요: 빗금(색 + 무늬), 지운 뒤 요금: 점선 테두리(모양) */
+  .lc-seg-now, .lc-sw-now { background: var(--sl-color-accent-low); border: 2px solid var(--sl-color-accent); }
+  .lc-seg-restore, .lc-sw-restore {
+    background: repeating-linear-gradient(135deg, var(--sl-color-accent) 0 2px, var(--sl-color-accent-low) 2px 7px);
+    border: 2px solid var(--sl-color-text);
+  }
+  .lc-seg-open { border-right-style: dashed; }
+  .lc-seg-fee, .lc-sw-fee { background: transparent; border: 2px dashed var(--guide-bad); }
+  .lc-seg { border-radius: 0.25rem; }
+  .lc-axis { display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--guide-muted); }
+  .lc-keys { display: flex; flex-wrap: wrap; gap: 0.2rem 1rem; list-style: none; padding: 0 !important; margin-top: 0.3rem !important; font-size: 0.8125rem; }
+  .lc-keys li { margin: 0 !important; }
+  .lc details > summary { cursor: pointer; font-weight: 700; width: fit-content; }
+  .lc-table-scroll { overflow-x: auto; margin-top: 0.5rem; }
+  .lc-table { width: 100%; min-width: 34rem; border-collapse: collapse; font-size: 0.8125rem; display: table; }
+  .lc-table :is(th, td) { border: 1px solid var(--guide-border); padding: 0.3rem 0.45rem; text-align: left; vertical-align: top; }
+  .lc-table code { font-size: 0.75rem; }
+  .lc-table :is(td, th):first-child { white-space: nowrap; }
+  .lc-table-scroll:focus-visible { outline: 2px solid var(--sl-color-accent); outline-offset: 2px; }
+  .lc-scroll-hint { display: none; }
+  @media (max-width: 40rem) { .lc-scroll-hint { display: block; } }
+  .lc :is(.lc-water, .lc-assume) ul { margin-top: 0.4rem !important; padding-left: 1.2rem; font-size: 0.875rem; }
+  @media (prefers-reduced-motion: reduce) {
+    .lc * { transition: none !important; animation: none !important; }
+  }
+</style>

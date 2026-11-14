@@ -74,10 +74,13 @@ flowchart TD
 AWS가 **거부하는** 규칙(`InvalidArgument`):
 - 한 규칙 안에서 다음 전환이 이전 클래스의 최소 보관 기간보다 빠름. 예: Glacier IR 4일 → Deep Archive 20일은 안 되고 94일 이후여야 한다.
 - 폭포를 거스르는 전환(예: Glacier → Standard-IA).
+- 만료(`Expiration`)가 전환보다 빠르거나 같음: 만료 일수는 그 규칙의 모든 전환 일수보다 커야 한다(예: Glacier Flexible Retrieval 90일 전환에 60일·90일 만료는 안 되고 91일부터). 이 저장소의 에뮬레이터는 이 규칙을 검사하지 않고 저장한다(2026-11 확인).
 
 > 📌 **2026년 7월 변경**: 예전에는 "Standard-IA·One Zone-IA로의 전환은 생성 후 30일 이상"이어야 했고, 그보다 짧으면 `InvalidArgument`였다. [2026-07-16 발표](https://aws.amazon.com/about-aws/whats-new/2026/07/s3-removes-30-day-transitions-standard-ia-one-zone-ia/)로 이 제한이 없어져 **0일 전환도 가능**하다. 하지만 IA의 **최소 보관 기간 30일(요금)** 은 그대로다. 그 전에 지우거나 다른 클래스로 옮기면 남은 기간만큼 요금이 나온다. 시험 문제나 옛 자료는 여전히 "30일 이후부터"를 정답으로 기대할 수 있으니 두 가지를 모두 알아 둔다.
 
 그리고 2024년 9월부터 **128 KB 미만 객체는 기본적으로 어떤 클래스로도 전환되지 않는다**. 작은 객체는 전환 요청 요금이 절감액보다 크기 때문이다. 필요하면 필터에 `ObjectSizeGreaterThan`/`ObjectSizeLessThan`을 직접 쓴다. 에뮬레이터 응답의 `"TransitionDefaultMinimumObjectSize": "all_storage_classes_128K"`가 이 기본값이다.
+
+<!-- widget: s3-lifecycle-planner -->
 
 ### Glacier 복원(Restore)
 
@@ -191,7 +194,7 @@ aws: [ERROR]: An error occurred (InvalidArgument) when calling the PutBucketLife
 LAB02 OK
 ```
 
-방금 본 것: 에뮬레이터 1.0.322의 수명 주기 검증은 위 "AWS가 거부하는 규칙"과 같게 동작했다. IA 10일 전환은 저장하고(2026-07 이후 AWS와 같음), 최소 보관 기간보다 빠른 연쇄 전환(이전 버전 전환에도 적용)과 역방향 전환은 거부한다. 존재하지 않는 클래스, 중복 규칙 ID, 0일 만료도 거부한다.
+방금 본 것: 에뮬레이터 1.0.322의 수명 주기 검증은 위 "AWS가 거부하는 규칙" 중 앞의 두 가지(이른 연쇄 전환, 역방향 전환)는 같게 동작했고, 셋째(전환보다 빠르거나 같은 만료)는 거부하지 않고 저장했다. IA 10일 전환은 저장하고(2026-07 이후 AWS와 같음), 최소 보관 기간보다 빠른 연쇄 전환(이전 버전 전환에도 적용)과 역방향 전환은 거부한다. 존재하지 않는 클래스, 중복 규칙 ID, 0일 만료도 거부한다.
 
 하지만 **"저장됐다"가 "좋은 규칙"이라는 뜻은 아니다.** IA로 10일 만에 옮기고 20일에 지우는 규칙은 저장되지만 IA 최소 보관 30일 요금을 낸다. [sdk/lifecycle_lint.py](./sdk/lifecycle_lint.py)는 저장되는 규칙의 비용 함정과, 저장 전에 걸러야 할 규칙(현재·이전 버전 전환 모두, 첫 전환이 0일인 경우 포함)을 찾는다.
 

@@ -67,6 +67,8 @@ sequenceDiagram
 - **수평(scale out)**: 읽기 복제본을 늘린다. **읽기만** 늘어난다. 쓰기는 여전히 원본 하나.
 - 쓰기가 한계라면? → 더 큰 인스턴스, Aurora, 샤딩, 또는 DynamoDB 같은 다른 모델(레슨 4).
 
+<!-- widget: rds-multiaz-vs-replica -->
+
 ## 직접 해 보기
 
 [labs/lab02-rds-multiaz-replica.sh](./labs/lab02-rds-multiaz-replica.sh)
