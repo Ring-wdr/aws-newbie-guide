@@ -412,3 +412,34 @@ export async function widgetOverflow({ port, path: pagePath, widget, widths = [3
   }
   return problems;
 }
+
+/**
+ * 위젯 상자만 찍는다. 찍기 전에 붙박이(fixed·sticky) 요소 — Starlight 머리글 등 — 를 숨겨 상자 위에 겹쳐 찍히지 않게 하고,
+ * 찍은 뒤 되돌린다(요소 스크린샷은 상자를 화면 안으로 스크롤하므로 머리글이 상자 윗부분을 덮을 수 있다).
+ */
+export async function shootElement(page, selector, file) {
+  const hidden = await page.evaluate((sel) => {
+    const target = document.querySelector(sel);
+    let n = 0;
+    for (const el of document.querySelectorAll('body *')) {
+      const pos = getComputedStyle(el).position;
+      if ((pos === 'fixed' || pos === 'sticky') && !el.contains(target) && !target.contains(el)) {
+        el.dataset.shotHidden = el.style.visibility;
+        el.style.visibility = 'hidden';
+        n++;
+      }
+    }
+    return n;
+  }, selector);
+  try {
+    await page.locator(selector).first().screenshot({ path: file });
+  } finally {
+    if (hidden)
+      await page.evaluate(() => {
+        for (const el of document.querySelectorAll('[data-shot-hidden]')) {
+          el.style.visibility = el.dataset.shotHidden;
+          delete el.dataset.shotHidden;
+        }
+      });
+  }
+}

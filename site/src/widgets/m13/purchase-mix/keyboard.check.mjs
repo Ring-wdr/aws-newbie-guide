@@ -4,7 +4,7 @@
 // 사용(site/에서, 빌드 뒤): node src/widgets/m13/purchase-mix/keyboard.check.mjs --port 4334 [--shots <폴더>]
 import fs from 'node:fs';
 import path from 'node:path';
-import { baseUrl, offlineBrowser, portFromArgs, serve } from '../../../../tests/lib/harness.mjs';
+import { baseUrl, offlineBrowser, portFromArgs, serve, shootElement } from '../../../../tests/lib/harness.mjs';
 
 const PAGE = '/curriculum/m13-cost-optimization/02-compute-cost/';
 const ROOT = '.pmx';
@@ -111,7 +111,7 @@ try {
         if (wide.length) problems.push(`${colorScheme} ${width}px: 화면 밖으로 나간 요소 ${wide.join(', ')}`);
         const file = shots && path.join(shots, `m13-mix-${colorScheme}-${width}.png`);
         if (shots) {
-          await o.page.locator(ROOT).screenshot({ path: file });
+          await shootElement(o.page, ROOT, file);
           console.log(`  스크린샷 ${path.basename(file)}`);
         }
         await o.browser.close();

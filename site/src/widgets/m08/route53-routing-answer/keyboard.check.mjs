@@ -4,7 +4,7 @@
 // 사용(site/ 에서, 빌드 뒤): node src/widgets/m08/route53-routing-answer/keyboard.check.mjs --port 4333 [--shots <폴더>]
 import fs from 'node:fs';
 import path from 'node:path';
-import { baseUrl, offlineBrowser, portFromArgs, serve, widgetOverflow } from '../../../../tests/lib/harness.mjs';
+import { baseUrl, offlineBrowser, portFromArgs, serve, shootElement, widgetOverflow } from '../../../../tests/lib/harness.mjs';
 
 const PAGE = '/curriculum/m08-dns-edge/02-routing-policies-and-health-checks/';
 const ROOT = '.rr';
@@ -114,7 +114,7 @@ try {
           return { page: doc.scrollWidth - doc.clientWidth, widget: w.scrollWidth - w.clientWidth };
         }, ROOT);
         if (over.page > 0 || over.widget > 0) problems.push(`${scheme} ${width}px: 가로 넘침 ${JSON.stringify(over)}`);
-        await p.locator(ROOT).screenshot({ path: path.join(shots, `m08-route53-routing-answer-${scheme}-${width}.png`) });
+        await shootElement(p, ROOT, path.join(shots, `m08-route53-routing-answer-${scheme}-${width}.png`));
         await c.browser.close();
       }
     }

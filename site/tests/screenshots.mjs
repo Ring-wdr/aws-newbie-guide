@@ -2,7 +2,9 @@
 // 사용: node tests/screenshots.mjs --port <포트> --out <폴더> [--full] [--only 이름,이름]
 import fs from 'node:fs';
 import path from 'node:path';
-import { offlineBrowser, portFromArgs, serve } from './lib/harness.mjs';
+import { offlineBrowser, portFromArgs, serve, shootElement } from './lib/harness.mjs';
+import { widgetPages } from './lib/widget-checks.mjs';
+import { WIDGETS_DIR } from '../src/lib/repo.mjs';
 
 const port = portFromArgs(4321);
 const outIdx = process.argv.indexOf('--out');
@@ -26,7 +28,7 @@ const SHOTS = [
   { name: 'source-helper', path: '/files/scripts/lab-wait.sh/' },
   { name: 'diagram-m14-02', path: '/curriculum/m14-capstone-exam/02-capstone-requirements-and-design/', prepare: (p) => p.locator('.diagram').first().evaluate((e) => e.scrollIntoView({ block: 'start' })) },
   // M06 맞춤 위젯(element: 위젯 상자만 찍는다)
-  { name: 'widget-sqs-timeline', path: '/curriculum/m06-integration-messaging/02-sqs/', element: '.vt', prepare: timelineMid },
+  { name: 'widget-sqs-timeline', widget: 'm06/sqs-visibility-timeline', path: '/curriculum/m06-integration-messaging/02-sqs/', element: '.vt', prepare: timelineMid },
   { name: 'widget-progress', path: '/curriculum/m06-integration-messaging/', element: '.pt-wrap', prepare: progressSome },
   // 진행 추적(전 모듈 공용)·홈 요약·레슨 완료·모의고사 기록
   { name: 'home-progress', path: '/', element: '.po-wrap', prepare: homeProgress },
@@ -38,6 +40,19 @@ const SHOTS = [
   { name: 'exam-running-nav', path: '/curriculum/m14-capstone-exam/mock-exam/questions/', prepare: examRunningNav },
   { name: 'diagram-m02', path: '/curriculum/m02-vpc-networking/02-vpc-subnet-route-igw/', prepare: (p) => p.locator('.diagram').first().evaluate((e) => e.scrollIntoView({ block: 'start' })) },
 ];
+
+// 맞춤 위젯은 폴더(src/widgets/mNN/<이름>/index.astro)와 원고의 표시 줄에서 자동으로 찾는다 — 새 위젯을 여기에 적지 않아도 찍힌다.
+// 위에 손으로 적은 항목(widget: 'mNN/<이름>')이 있으면 그것을 쓴다. 이름: widget-mNN-<이름>, 상자: .guide-widget[data-widget="mNN/<이름>"].
+for (const [key, pages] of Object.entries(widgetPages()).sort()) {
+  if (!fs.existsSync(path.join(WIDGETS_DIR, key, 'index.astro')) || SHOTS.some((x) => x.widget === key)) continue;
+  const element = `.guide-widget[data-widget="${key}"]`;
+  SHOTS.push({ name: `widget-${key.replace('/', '-')}`, widget: key, path: pages[0], element, prepare: (p) => hydrated(p, element) });
+}
+
+async function hydrated(page, element) {
+  await page.locator(element).scrollIntoViewIfNeeded();
+  await page.waitForFunction((sel) => document.querySelector(`${sel} astro-island:not([ssr])`) !== null, element);
+}
 
 async function timelineMid(page) {
   // lab02 예(독 메시지 → DLQ)를 고르고 3단계까지 넘긴 상태
@@ -151,22 +166,7 @@ try {
         if (s.prepare) await s.prepare(page);
         await page.waitForTimeout(300); // 스크롤 직후 붙박이(sticky) 요소가 다 그려지기를 기다린다
         const file = path.join(out, `${s.name}-${theme}-${width}.png`);
-        if (s.element) {
-          // 붙박이 머리글이 위젯을 가리지 않게, 전체 페이지에서 위젯 상자만 잘라 찍는다.
-          await page.evaluate((sel) => {
-            const target = document.querySelector(sel);
-            for (const el of document.querySelectorAll('body *')) {
-              const pos = getComputedStyle(el).position;
-              if ((pos === 'fixed' || pos === 'sticky') && !el.contains(target) && !target.contains(el)) el.style.visibility = 'hidden';
-            }
-          }, s.element);
-          const box = await page.locator(s.element).evaluate((e) => {
-            const r = e.getBoundingClientRect();
-            return { x: r.left + scrollX, y: r.top + scrollY, width: r.width, height: r.height };
-          });
-          const pad = 8;
-          await page.screenshot({ path: file, fullPage: true, clip: { x: Math.max(0, box.x - pad), y: Math.max(0, box.y - pad), width: box.width + 2 * pad, height: box.height + 2 * pad } });
-        }
+        if (s.element) await shootElement(page, s.element, file); // 붙박이 머리글을 숨기고 위젯 상자만 찍는다
         else await page.screenshot({ path: file, fullPage: full });
         written.push(file);
         // 페이지 가로 넘침(360px에서 본문이 밀리는지)
