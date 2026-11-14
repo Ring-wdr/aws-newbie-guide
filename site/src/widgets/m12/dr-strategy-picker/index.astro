@@ -1,0 +1,109 @@
+---
+// M12 레슨 2 — 요구 사항(RPO·RTO)으로 DR 전략 고르기(설명용 모형).
+// 전략 표·워크시트·스스로 확인은 빌드 때 원고에서 읽는다(facts.mjs). 읽지 못하거나 레슨과 치트시트의 표가 다르면 빌드가 실패한다.
+import fs from 'node:fs';
+import path from 'node:path';
+import { REPO_ROOT } from '../../../lib/repo.mjs';
+import { readDrFacts, LESSON, CHEATSHEET } from './facts.mjs';
+import Picker from './Picker.jsx';
+
+const read = (p) => fs.readFileSync(path.join(REPO_ROOT, p), 'utf8');
+const facts = readDrFacts(read(LESSON), read(CHEATSHEET));
+---
+
+<Picker client:visible facts={facts} />
+
+<style is:global>
+  .drp {
+    margin: 1.5rem 0;
+    padding: 1rem;
+    border: 1px solid var(--guide-border);
+    border-left: 4px solid var(--sl-color-accent);
+    border-radius: var(--guide-radius);
+    background: var(--guide-surface);
+    font-size: 0.9375rem;
+    overflow-wrap: anywhere;
+  }
+  .drp :is(p, ul, ol, dl, fieldset, details, table) { margin: 0; }
+  .drp > * + * { margin-top: 0.85rem; }
+  .drp-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+  .drp-head h4 { margin: 0; font-size: 1.05rem; }
+  .drp-model {
+    display: inline-block;
+    padding: 0 0.5rem;
+    border: 1px dashed currentColor;
+    border-radius: 999px;
+    font-size: 0.8125rem;
+    font-weight: 700;
+    color: var(--guide-y-fg);
+    background: var(--guide-y-bg);
+  }
+  .drp-intro, .drp-hint, .drp-legend, .drp-small { color: var(--guide-muted); }
+  .drp fieldset { border: 0; padding: 0; min-width: 0; }
+  .drp legend { font-weight: 700; padding: 0; margin-bottom: 0.3rem; }
+  .drp-row { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+  .drp-hint, .drp-legend { margin-top: 0.35rem !important; font-size: 0.8125rem; }
+  .drp button {
+    font: inherit;
+    font-size: 0.875rem;
+    padding: 0.3rem 0.8rem;
+    min-height: 2.25rem;
+    border-radius: 0.4rem;
+    border: 1px solid var(--guide-border);
+    background: var(--guide-surface-2);
+    color: var(--sl-color-text);
+    cursor: pointer;
+    text-align: left;
+  }
+  .drp button:hover { border-color: var(--sl-color-accent); }
+  .drp button[aria-pressed='true'] { border-color: var(--sl-color-accent); box-shadow: inset 0 0 0 1px var(--sl-color-accent); font-weight: 700; }
+  .drp button[aria-pressed='true']::before { content: '✓ '; }
+  .drp :is(button, input, summary):focus-visible { outline: 2px solid var(--sl-color-accent); outline-offset: 2px; }
+  .drp-controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 0.85rem 1.25rem; }
+  .drp-radios label { display: flex; gap: 0.4rem; align-items: baseline; }
+  .drp-result {
+    padding: 0.6rem 0.75rem;
+    border: 1px solid var(--guide-border);
+    border-radius: var(--guide-radius);
+    background: var(--sl-color-bg);
+  }
+  .drp-result > * + * { margin-top: 0.4rem !important; }
+  .drp-tag { font-weight: 700; color: var(--guide-g-fg); background: var(--guide-g-bg); border: 1px solid var(--guide-g-bd); border-radius: 0.3rem; padding: 0 0.4rem; }
+  .drp-cards {
+    list-style: none;
+    padding: 0 !important;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+    gap: 0.6rem;
+  }
+  .drp-card {
+    margin: 0 !important;
+    padding: 0.6rem 0.7rem;
+    border: 2px solid var(--guide-border);
+    border-radius: var(--guide-radius);
+    background: var(--sl-color-bg);
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+  .drp-card[data-verdict='pick'] { border-color: var(--guide-g-bd); border-width: 3px; box-shadow: inset 0 0 0 1px var(--guide-g-bd); }
+  .drp-card[data-verdict='no'] { border-style: dashed; }
+  .drp-card-head { display: flex; flex-direction: column; gap: 0.2rem; }
+  .drp-verdict { font-size: 0.8125rem; font-weight: 700; width: fit-content; padding: 0 0.4rem; border-radius: 0.3rem; border: 1px solid; }
+  .drp-verdict[data-verdict='pick'] { color: var(--guide-g-fg); background: var(--guide-g-bg); border-color: var(--guide-g-bd); }
+  .drp-verdict[data-verdict='over'] { color: var(--guide-y-fg); background: var(--guide-y-bg); border-color: var(--guide-y-bd); }
+  .drp-verdict[data-verdict='no'] { color: var(--guide-r-fg); background: var(--guide-r-bg); border-color: var(--guide-r-bd); border-style: dashed; }
+  .drp-card dl { display: grid; grid-template-columns: auto 1fr; gap: 0.1rem 0.6rem; font-size: 0.875rem; }
+  .drp-card dl > div { display: contents; }
+  .drp-card dt { font-weight: 700; margin: 0; }
+  .drp-card dd { margin: 0; }
+  .drp-small { font-size: 0.8125rem; line-height: 1.5; }
+  .drp details > summary { cursor: pointer; font-weight: 700; width: fit-content; }
+  .drp-table-scroll { overflow-x: auto; margin-top: 0.5rem; }
+  .drp-table { width: 100%; border-collapse: collapse; font-size: 0.8125rem; display: table; }
+  .drp-table :is(th, td) { border: 1px solid var(--guide-border); padding: 0.3rem 0.45rem; text-align: left; vertical-align: top; }
+  .drp-assume ul { margin-top: 0.4rem !important; padding-left: 1.2rem; }
+  @media (prefers-reduced-motion: reduce) {
+    .drp * { transition: none !important; animation: none !important; }
+  }
+</style>
