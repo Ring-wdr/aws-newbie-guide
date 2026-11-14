@@ -70,9 +70,11 @@ uv run python tools/sitecheck/sitecheck.py a11y --port 4331                   # 
 node site/tests/screenshots.mjs --port 4331 --out <폴더> [--full]            # 라이트/다크 × 1280/360px
 ```
 
-관문: `parity`(제목·코드 블록 바이트·표·메타 줄), `quiz`, `exam`(= grade.py), `links`, `run-commands`(소스 보기 실행 명령의 근거), `static`(외부 주소·네트워크 API, `site/src`와 산출물), `selftest`(정적·실행 명령 관문에 결함을 심어 잡는지), `offline`(먼저 `tests/offline-selftest.mjs`로 통로 19가지에 결함을 심어 잡는지 확인), `a11y`, `keyboard`, `diagrams`(Mermaid 라벨 잘림·서브그래프/노드 겹침).
+관문: `parity`(제목·코드 블록 바이트·표·메타 줄, 원고의 백슬래시 이스케이프는 CommonMark대로 풀어 비교), `quiz`, `exam`(= grade.py), `links`, `run-commands`(소스 보기 실행 명령의 근거), `static`(외부 주소·네트워크 API, `site/src`와 산출물), `scanner`(`tools/probe/no_external_hosts.py`를 돌려 0건이 아니면 실패, 그리고 `site/tests`·`tools/sitecheck`에 심은 결함 주소가 `.invalid` 호스트나 루프백뿐인지), `selftest`(정적·실행 명령 관문에 결함을 심어 잡는지), `offline`(먼저 `tests/offline-selftest.mjs`로 통로 30가지에 결함을 심어 잡는지 확인), `a11y`, `keyboard`, `diagrams`(Mermaid 라벨 잘림, 서브그래프·노드·간선 라벨 겹침. 원고 구조 때문에 배치로 못 고치는 것만 이유와 함께 `tests/diagrams-known.json`에 둔다).
 
-오프라인 관문이 기록하는 통로: HTTP(S) 요청 전부(문서·스크립트·스타일·이미지·iframe, fetch, XMLHttpRequest, EventSource, sendBeacon, 전용 워커와 그 안의 요청), WebSocket(페이지와 워커), 서비스 워커 등록(차단하고 기록), WebRTC(`RTCPeerConnection` 생성), `<link rel=preconnect|dns-prefetch|prefetch|preload|modulepreload|prerender>`, `<meta http-equiv=refresh>`. 브라우저 자체의 배경 통신은 다루지 않는다.
+결함을 심는 시험(새로 만드는 것 포함)의 주소는 모두 `.invalid` 호스트나 루프백이어야 한다. 그렇지 않으면 `scanner` 관문이 실패한다.
+
+오프라인 관문이 기록하는 통로: HTTP(S) 요청 전부(문서·스크립트·스타일·이미지·iframe, fetch, XMLHttpRequest, EventSource, sendBeacon, 전용 워커와 그 안의 요청), WebSocket(페이지와 워커), 서비스 워커 등록(차단하고 기록), WebRTC(`RTCPeerConnection` 생성), `<link rel=preconnect|dns-prefetch|prefetch|preload|modulepreload|prerender>`, `<meta http-equiv=refresh>`, pagehide·visibilitychange 때의 sendBeacon, `<object data>`·`<embed>`·모든 `srcset` 후보·`<video poster>`, `window.open`·`location` 이동. 각 통로를 어느 층이 맡는지는 `tests/lib/harness.mjs` 머리 주석에 있고, 정적 검사(`static`)가 뒤를 받친다. 브라우저 자체의 배경 통신은 다루지 않는다.
 
 브라우저 검사(`offline`·`a11y`·`keyboard`·`diagrams`)는 `site/tests/`의 Node 스크립트이며, 이미 설치된 Playwright Chromium을 쓰고 아무것도 내려받지 않는다. 키보드 검사 스크립트는 `site/tests/keyboard.mjs`다.
 
@@ -81,3 +83,5 @@ node site/tests/screenshots.mjs --port 4331 --out <폴더> [--full]            #
 - **모의고사 정답은 페이지 소스에 들어 있다.** 시험 모드는 서버 없이 브라우저에서 채점하므로, 정답표(`#exam-data` JSON)와 65문항 해설(`<template>`)이 제출 전부터 HTML에 있다. 화면에는 제출 뒤에만 나온다. 혼자 공부하는 가이드라서 이렇게 두었다(소스를 열면 볼 수 있다는 점은 원고의 `answer-key.md`와 같다).
 - 시험 타이머는 페이지가 열려 있는 동안만 줄어든다. 0이 되면 자동 제출한다.
 - Mermaid 그림은 기본 배치에서 서브그래프·노드가 겹치면, 내용은 그대로 두고 간격을 넓힌 배치로 다시 그린다(`src/plugins/mermaid-render.mjs`).
+- 폭이 640px를 넘는 그림은 가로 스크롤 상자 안에서 왼쪽 끝(흐름의 시작)부터 보이고, 아래에 같은 사이트의 원래 크기 SVG(`/diagrams/<id>.svg`)를 새 탭으로 여는 링크가 붙는다.
+- 로컬 서버(`scripts/serve.mjs`, 검사 스크립트)는 경로를 실제 경로(realpath)로 풀어 `dist` 안인지 확인한다. `dist` 안의 심볼릭 링크가 밖을 가리키면 403을 돌려준다.
