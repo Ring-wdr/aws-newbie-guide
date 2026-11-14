@@ -67,6 +67,7 @@ pnpm report                   # 변환기 보고 모드: 원고 133개에 변환
 6. 저장은 `src/scripts/storage.ts`의 `load`/`save`(try/catch, 저장소가 막혀도 동작)를 쓰고, 키 앞에 `guide:`가 자동으로 붙는다. 진행 상태 내보내기/가져오기에 함께 담긴다.
 7. 외부 리소스(글꼴·CDN·이미지)를 쓰지 않는다. `site/src` 안에 외부 주소가 있으면 검사가 실패한다.
 8. 새 패키지가 필요하면 PR 본문에 요청한다(`package.json`·lockfile은 환경 구축 담당).
+9. 키보드 검사는 위젯 폴더에 `keyboard.check.mjs`로 둔다: 독립 실행(스스로 `tests/lib/harness.mjs`의 `serve`로 서버를 연다), `--port <포트>` 인자, 실패면 0이 아닌 종료 코드. `keyboard` 관문이 `src/widgets/**/keyboard.check.mjs`를 찾아, 그 위젯의 표시가 있는 페이지가 대상(`--pages`)일 때 자기 서버를 닫은 뒤 같은 포트로 하나씩 돌린다(`tests/lib/widget-checks.mjs`, 자체 시험 `tests/widget-checks-selftest.mjs`). 표시가 원고 어디에도 없는 위젯의 검사 파일은 관문 실패로 보고한다. `tests/keyboard.mjs`는 고치지 않아도 된다.
 
 ## 검사 (PR 관문, GUIDE-SITE 5장)
 

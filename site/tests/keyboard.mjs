@@ -3,12 +3,16 @@
 // 대상일 때, 모의고사는 시험 페이지가 대상일 때.
 // 조작은 전부 키 입력(Tab, Shift+Tab, 화살표, Space, Enter)이다. 마우스 클릭·page.check 같은 API 조작은 쓰지 않는다.
 // 페이지 상태를 "읽는" 것(어디에 초점이 있나, 정답이 무엇인가)만 DOM에서 한다.
+// 위젯 폴더의 keyboard.check.mjs(UI 저자)는 자동으로 찾아, 그 위젯이 놓인 페이지가 대상일 때 이 스크립트의 서버를 닫은 뒤
+// 같은 포트로 하나씩 돌린다(tests/lib/widget-checks.mjs). 발견 방식은 tests/widget-checks-selftest.mjs가 먼저 시험한다.
 // 결과: --out 폴더에 keyboard-answers.txt(시험 모드가 내보낸 답안), keyboard-result.json(화면의 채점 결과).
 // 사용: node tests/keyboard.mjs --port <포트> --out <폴더> [--pages pilot|all|/a/,/b/]
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { EXAM_PAGE, isQuizPage, offlineBrowser, pagesFromArgs, portFromArgs, serve } from './lib/harness.mjs';
+import { spawnSync } from 'node:child_process';
+import { EXAM_PAGE, SITE_DIR, isQuizPage, offlineBrowser, pagesFromArgs, portFromArgs, serve } from './lib/harness.mjs';
+import { discoverWidgetChecks, runWidgetChecks } from './lib/widget-checks.mjs';
 
 const port = portFromArgs(4321);
 const base = `http://127.0.0.1:${port}`;
@@ -341,7 +345,19 @@ try {
   problems.push(`중단: ${e.message}`);
 } finally {
   await browser.close();
-  server.close();
+  await new Promise((r) => server.close(r));
+}
+
+/* ---------------- 위젯 폴더의 keyboard.check.mjs(자동 발견) ---------------- */
+{
+  const st = spawnSync(process.execPath, ['tests/widget-checks-selftest.mjs'], { cwd: SITE_DIR, encoding: 'utf8' });
+  console.log((st.stdout || st.stderr || '').trim().split('\n').at(-1));
+  if (st.status !== 0) problems.push(`widget-checks-selftest 실패:\n${st.stdout}${st.stderr}`);
+  const checks = discoverWidgetChecks();
+  const { ran, problems: wp } = runWidgetChecks(checks, { port, pages, cwd: SITE_DIR });
+  problems.push(...wp);
+  console.log(`위젯 키보드 검사: 발견 ${checks.length}개, 대상 페이지에 있어 실행 ${ran.length}개, 실패 ${ran.filter((r) => !r.ok).length}개`);
+  for (const r of ran.filter((x) => x.ok)) done.push(`위젯 ${r.widget}(keyboard.check.mjs)`);
 }
 
 console.log(`누른 키 ${keys}번`);
