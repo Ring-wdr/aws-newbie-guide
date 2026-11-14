@@ -2,11 +2,12 @@
 
 사용 (저장소 루트에서, 먼저 `pnpm --dir site build`):
 
-    uv run python tools/sitecheck/sitecheck.py all --port 4390            # 모든 관문(시범 페이지)
+    uv run python tools/sitecheck/sitecheck.py all --port 4390            # 모든 관문(전 페이지가 기본, 약 9분)
+    uv run python tools/sitecheck/sitecheck.py all --pages pilot --port 4390  # 시범 페이지만(빠른 확인)
     uv run python tools/sitecheck/sitecheck.py parity --pages all         # 내용 동등성(전 페이지)
     uv run python tools/sitecheck/sitecheck.py parity --pages /curriculum/m06-integration-messaging/02-sqs/
     uv run python tools/sitecheck/sitecheck.py quiz | exam | links | static
-    uv run python tools/sitecheck/sitecheck.py browser --port 4390        # 오프라인·접근성·키보드(Node, site/ 안의 Playwright)
+    uv run python tools/sitecheck/sitecheck.py browser --port 4390        # 오프라인·접근성·키보드·다이어그램·표(Node, site/ 안의 Playwright)
 
 관문마다 "PASS"/"FAIL" 요약 줄을 내고, 하나라도 실패하면 종료 코드 1.
 브라우저 검사는 지정한 포트의 127.0.0.1 에서만 서버를 연다(에이전트마다 전용 포트 — GUIDE-SITE 6장).
@@ -616,7 +617,7 @@ def gate_browser(port: int, which: str, pages: str = "pilot") -> Gate:
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="가이드 사이트 검사기 (GUIDE-SITE 5장)")
     ap.add_argument("check", choices=["all", "parity", "grades", "quiz", "exam", "links", "run-commands", "static", "selftest", "scanner", "offline", "a11y", "keyboard", "diagrams", "tables", "browser"])
-    ap.add_argument("--pages", default="pilot", help="pilot(기본) | all | 쉼표로 구분한 경로(/curriculum/.../)")
+    ap.add_argument("--pages", default="all", help="all(기본, 전 페이지) | pilot(시범 14쪽, 빠른 확인) | 쉼표로 구분한 경로(/curriculum/.../)")
     ap.add_argument("--dist", default=None, help="빌드 산출물 폴더(기본: site/dist)")
     ap.add_argument("--site", default=None, help="site/ 폴더(기본: 저장소의 site/) — 검사기 자체를 시험할 때 사본을 가리킨다")
     ap.add_argument("--port", type=int, default=int(os.environ.get("GUIDE_PORT", "0")) or None, help="브라우저 검사용 127.0.0.1 포트(필수)")

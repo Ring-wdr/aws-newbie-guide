@@ -63,14 +63,20 @@ pnpm report                   # 변환기 보고 모드: 원고 133개에 변환
 저장소 루트에서, 빌드한 뒤:
 
 ```bash
-uv run python tools/sitecheck/sitecheck.py all --port 4331                    # 시범 페이지 전체 관문
+uv run python tools/sitecheck/sitecheck.py all --port 4331                    # 전 페이지 전체 관문(기본 --pages all, 약 9분)
+uv run python tools/sitecheck/sitecheck.py all --pages pilot --port 4331      # 시범 14쪽만(빠른 확인)
 uv run python tools/sitecheck/sitecheck.py parity --pages all                 # 내용 동등성(전 페이지)
 uv run python tools/sitecheck/sitecheck.py parity --pages /curriculum/m06-integration-messaging/02-sqs/
-uv run python tools/sitecheck/sitecheck.py a11y --port 4331                   # 하나만: parity·quiz·exam·links·static·offline·a11y·keyboard
+uv run python tools/sitecheck/sitecheck.py a11y --port 4331                   # 하나만: parity·grades·quiz·exam·links·static·offline·a11y·keyboard·diagrams·tables
+uv run python tools/sitecheck/sitecheck.py tables --pages /curriculum/m01-iam-identity/ --port 4331
 node site/tests/screenshots.mjs --port 4331 --out <폴더> [--full]            # 라이트/다크 × 1280/360px
 ```
 
-관문: `parity`(제목·코드 블록 바이트·표·메타 줄, 원고의 백슬래시 이스케이프는 CommonMark대로 풀어 비교), `quiz`, `exam`(= grade.py), `links`, `run-commands`(소스 보기 실행 명령의 근거), `static`(외부 주소·네트워크 API, `site/src`와 산출물), `scanner`(`tools/probe/no_external_hosts.py`를 돌려 0건이 아니면 실패, 그리고 `site/tests`·`tools/sitecheck`에 심은 결함 주소가 `.invalid` 호스트나 루프백뿐인지), `selftest`(정적·실행 명령 관문에 결함을 심어 잡는지), `offline`(먼저 `tests/offline-selftest.mjs`로 통로 30가지에 결함을 심어 잡는지 확인), `a11y`, `keyboard`, `diagrams`(Mermaid 라벨 잘림, 서브그래프·노드·간선 라벨 겹침. 원고 구조 때문에 배치로 못 고치는 것만 이유와 함께 `tests/diagrams-known.json`에 둔다).
+관문: `parity`(제목·코드 블록 바이트·표·메타 줄, 원고의 백슬래시 이스케이프는 CommonMark대로 풀어 비교), `grades`(본문·표 칸의 등급 이모지 🟢🟡🔴에 글자 라벨이나 접근 가능한 이름이 있는지 — 색만으로 전달 금지), `quiz`, `exam`(= grade.py), `links`, `run-commands`(소스 보기 실행 명령의 근거), `static`(외부 주소·네트워크 API, `site/src`와 산출물), `scanner`(`tools/probe/no_external_hosts.py`를 돌려 0건이 아니면 실패, 그리고 `site/tests`·`tools/sitecheck`에 심은 결함 주소가 `.invalid` 호스트나 루프백뿐인지), `selftest`(정적·실행 명령·등급 관문에 결함을 심어 잡는지), `offline`(먼저 `tests/offline-selftest.mjs`로 통로 30가지에 결함을 심어 잡는지 확인), `a11y`, `keyboard`, `diagrams`(Mermaid 라벨 잘림, 서브그래프·노드·간선 라벨 겹침, 노드 글자 명암비, 넓은 그림의 첫 화면에서 잘린 흐름의 시작. 원고 구조 때문에 배치로 못 고치는 것만 이유와 함께 `tests/diagrams-known.json`에 둔다 — 재현되지 않는 항목은 낡은 예외로 실패), `tables`(표 칸 내용이 칸 경계를 넘어 옆 칸과 겹치면 실패(1280·360px), 1280px에서 상자보다 넓은 표는 `tests/tables-known.json`의 목록과 같아야 하고, 넘치는 표에는 키보드 스크롤과 스크롤 표시가 있어야 한다). `diagrams`·`tables`·`offline`은 결함을 심은 페이지로 자체 시험을 먼저 한다.
+
+**`--pages`와 브라우저 관문**: `--pages`(기본 `all`)는 브라우저 관문(`offline`·`a11y`·`keyboard`·`diagrams`·`tables`)에도 그대로 넘어간다. 상호작용 단계는 그 페이지가 대상에 있을 때만 돈다 — 퀴즈는 대상의 퀴즈 페이지마다(전 페이지면 문항이 있는 14개 모듈 전부) 키보드로 풀고, M06 위젯은 그 페이지가, 모의고사는 `mock-exam/questions/`가 대상일 때만 조작한다. 경로 목록만 주면 그 페이지들만 연다.
+
+**기본 범위를 전 페이지로 둔 이유**: P2로 전 페이지가 만들어졌고, 시범 범위만 보는 `all`은 범위 밖 페이지의 문제를 놓쳤다(전 페이지로 처음 돌렸을 때 `docs/` 작업 목록 체크 상자의 이름 없음, 표 칸 겹침 215칸이 그렇게 드러났다). 측정(이 저장소, 빌드 뒤): `all`(전 페이지 약 350쪽 — 브라우저 관문은 소스 보기 포함 offline·a11y 354쪽 × 4가지 화면) 540초, 그중 offline·a11y가 대부분이다. 고치는 중 빨리 볼 때만 `--pages pilot`이나 경로 목록을 쓴다. 브라우저 탭 수는 `GUIDE_TABS`(기본 6)로 바꾼다.
 
 결함을 심는 시험(새로 만드는 것 포함)의 주소는 모두 `.invalid` 호스트나 루프백이어야 한다. 그렇지 않으면 `scanner` 관문이 실패한다.
 
@@ -83,5 +89,8 @@ node site/tests/screenshots.mjs --port 4331 --out <폴더> [--full]            #
 - **모의고사 정답은 페이지 소스에 들어 있다.** 시험 모드는 서버 없이 브라우저에서 채점하므로, 정답표(`#exam-data` JSON)와 65문항 해설(`<template>`)이 제출 전부터 HTML에 있다. 화면에는 제출 뒤에만 나온다. 혼자 공부하는 가이드라서 이렇게 두었다(소스를 열면 볼 수 있다는 점은 원고의 `answer-key.md`와 같다).
 - 시험 타이머는 페이지가 열려 있는 동안만 줄어든다. 0이 되면 자동 제출한다.
 - Mermaid 그림은 기본 배치에서 서브그래프·노드가 겹치면, 내용은 그대로 두고 간격을 넓힌 배치로 다시 그린다(`src/plugins/mermaid-render.mjs`).
-- 폭이 640px를 넘는 그림은 가로 스크롤 상자 안에서 왼쪽 끝(흐름의 시작)부터 보이고, 아래에 같은 사이트의 원래 크기 SVG(`/diagrams/<id>.svg`)를 새 탭으로 여는 링크가 붙는다.
+- 폭이 640px를 넘는 그림은 가로 스크롤 상자 안에서 흐름의 시작(들어오는 간선이 없는 노드 중 가장 위·왼쪽)이 보이게 열린다 — 왼쪽 끝에서 그 노드가 다 보이면 왼쪽 끝부터, 아니면 그 노드를 가운데에. 아래에 같은 사이트의 원래 크기 SVG(`/diagrams/<id>.svg`)를 새 탭으로 여는 링크가 붙는다.
+- 원고가 `classDef`/`style`로 밝은 바탕(fill)만 주고 글자색(`color`)을 주지 않은 노드는 다크 테마로 그릴 때만 어두운 글자색을 더한다(원고는 그대로).
+- 표: 한국어 낱말은 중간에서 끊지 않고(keep-all), 칸 안의 인라인 코드는 구분 기호 뒤·낱말 경계(`<wbr>`)에서, 공백 없는 16자 이상 영문 토큰(API 이름·JSON·주소)은 아무 데서나 끊는다. 그래도 상자보다 넓은 표는 위에 "가로로 스크롤" 안내와 가장자리 그림자·점선 테두리가 붙고, Tab으로 고른 뒤 ←/→로 스크롤한다.
+- 본문·표 칸의 등급 이모지 🟢/🟡/🔴 옆에는 원고 README 등급 표의 라벨(재현/부분/개념)이 작은 배지로 붙는다(원고 글자는 그대로, 제목 안에서는 접근 가능한 이름만).
 - 로컬 서버(`scripts/serve.mjs`, 검사 스크립트)는 경로를 실제 경로(realpath)로 풀어 `dist` 안인지 확인한다. `dist` 안의 심볼릭 링크가 밖을 가리키면 403을 돌려준다.
