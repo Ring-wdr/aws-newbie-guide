@@ -116,7 +116,12 @@ def main() -> int:
         import htmlbuilt
         for name, html, want_bare in [
             ("표 칸의 맨 이모지", '<div class="sl-markdown-content"><table><tr><td>\U0001F7E2</td></tr></table></div>', True),
-            ("라벨 붙은 이모지", '<div class="sl-markdown-content"><p><span class="grade-mark"><span aria-hidden="true">\U0001F7E1</span><span class="grade-mark-label">부분</span></span></p></div>', False),
+            ("라벨 붙은 이모지", '<div class="sl-markdown-content"><p><span class="grade-mark"><span role="img" aria-label="부분">\U0001F7E1</span><span class="grade-mark-label" data-label="부분" aria-hidden="true"></span></span></p></div>', False),
+            ("빈 라벨(data-label=\"\")", '<div class="sl-markdown-content"><p><span class="grade-mark"><span role="img" aria-label="부분">\U0001F7E1</span><span class="grade-mark-label" data-label="" aria-hidden="true"></span></span></p></div>', True),
+            ("라벨 속성 없음", '<div class="sl-markdown-content"><p><span class="grade-badge"><span class="grade-emoji" role="img" aria-label="재현">\U0001F7E2</span><span class="grade-label" aria-hidden="true"></span></span></p></div>', True),
+            ("빈 aria-label", '<div class="sl-markdown-content"><p><span class="grade-mark"><span role="img" aria-label=" ">\U0001F534</span><span class="grade-mark-label" data-label="개념" aria-hidden="true"></span></span></p></div>', True),
+            ("이름 없이 숨긴 이모지", '<div class="sl-markdown-content"><p><span class="grade-mark"><span aria-hidden="true">\U0001F534</span><span class="grade-mark-label" data-label="개념" aria-hidden="true"></span></span></p></div>', True),
+            ("뒤에 라벨 글자가 있는 이모지", '<div class="sl-markdown-content"><p><span class="grade-mark">\U0001F7E2</span> 재현</p></div>', False),
             ("코드 안의 이모지", '<div class="sl-markdown-content"><pre><code># (\U0001F534)</code></pre></div>', False),
         ]:
             got = bool(sitecheck.bare_grade_emoji(htmlbuilt.content_root(htmlbuilt.parse(html))))
@@ -129,7 +134,7 @@ def main() -> int:
     if failures:
         print(f"FAIL selftest: {failures}")
         return 1
-    print(f"PASS selftest: 정적 관문에 심은 결함 {len(STATIC_CASES)}가지와 실행 명령 결함 3가지를 모두 잡고, 근거 있는 경우는 통과, 메타 줄 이스케이프 2가지 일치, 등급 이모지 3가지")
+    print(f"PASS selftest: 정적 관문에 심은 결함 {len(STATIC_CASES)}가지와 실행 명령 결함 3가지를 모두 잡고, 근거 있는 경우는 통과, 메타 줄 이스케이프 2가지 일치, 등급 이모지 8가지(빈 라벨·빈 이름 포함)")
     return 0
 
 

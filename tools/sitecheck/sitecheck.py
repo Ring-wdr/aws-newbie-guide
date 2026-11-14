@@ -147,22 +147,57 @@ GRADE_OK_CLASS = {"grade-mark", "grade-badge"}
 GRADE_SKIP_TAGS = {"pre", "code", "svg", "script", "style", "kbd", "template", "title"}
 
 
+GRADE_LABEL_CLASS = {"grade-mark-label", "grade-label"}
+
+
+def _grade_mark_problem(mark: "htmlbuilt.Node") -> str | None:
+    """등급 표시(.grade-mark·.grade-badge) 하나가 글자 라벨과 접근 가능한 이름을 제대로 갖췄는지.
+    문제가 없으면 None. 라벨 칸이 비었거나(data-label="" 또는 속성 없음), role=img 의 이름이 비었거나,
+    이름을 줄 것이 하나도 없으면 그 사유."""
+    names = 0
+    for n in mark.iter():
+        if n.cls() & GRADE_LABEL_CLASS:
+            if not n.attrs.get("data-label", "").strip():
+                return "글자 라벨이 비었다(data-label 없음·빈 값)"
+            if n.attrs.get("aria-hidden") != "true":
+                names += 1  # 생성 콘텐츠 라벨을 화면 낭독기가 읽는다(옛 구조)
+        if n.attrs.get("role") == "img":
+            if not n.attrs.get("aria-label", "").strip():
+                return "role=img 인데 aria-label 이 비었다"
+            names += 1
+    if names:
+        return None
+    # 바로 뒤에 라벨 글자가 원고에 이미 있는 경우("🟢 재현")는 이모지만 감싼다 — 뒤에 글자가 있어야 한다
+    par = mark.parent
+    if par is not None:
+        kids = par.children
+        i = next(k for k, c in enumerate(kids) if c is mark)
+        nxt = kids[i + 1] if i + 1 < len(kids) else ""
+        if isinstance(nxt, str) and nxt.strip():
+            return None
+    return "이름이 없다(role=img·aria-label 도, 읽히는 라벨도, 뒤따르는 라벨 글자도 없음)"
+
+
 def bare_grade_emoji(content: "htmlbuilt.Node") -> list[str]:
-    """글자 라벨(.grade-mark·.grade-badge) 없이 색으로만 남은 등급 이모지가 있는 글 조각들."""
+    """글자 라벨·접근 가능한 이름 없이 색으로만 남은 등급 이모지가 있는 글 조각들(빈 라벨 포함)."""
     out: list[str] = []
 
-    def walk(n, ok: bool) -> None:
+    def walk(n) -> None:
         if n.tag in GRADE_SKIP_TAGS:
             return
-        ok = ok or bool(n.cls() & GRADE_OK_CLASS)
+        if n.cls() & GRADE_OK_CLASS:
+            why = _grade_mark_problem(n)
+            if why:
+                out.append(f"{n.text().strip()[:20]} — {why}")
+            return
         for c in n.children:
             if isinstance(c, str):
-                if not ok and GRADE_EMOJI.search(c):
+                if GRADE_EMOJI.search(c):
                     out.append(c.strip()[:40])
             else:
-                walk(c, ok)
+                walk(c)
 
-    walk(content, False)
+    walk(content)
     return out
 
 
