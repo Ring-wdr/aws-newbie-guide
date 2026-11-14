@@ -79,21 +79,23 @@ export default function Simulator({ facts }) {
         </fieldset>
         <fieldset class="rr-group" disabled={!c.replicas}>
           <legend>복제본 위치와 연결{c.replicas ? '' : ' (복제본이 있을 때)'}</legend>
-          <div class="rr-radios" role="radiogroup" aria-label="복제본 위치">
+          <fieldset class="rr-radios">
+            <legend class="rr-sublegend">복제본 위치</legend>
             {Object.entries(LOC_LABEL).map(([v, label]) => (
               <label key={v}>
                 <input type="radio" name="rr-loc" value={v} checked={c.location === v} onChange={() => set({ location: v })} /> {label}
               </label>
             ))}
-          </div>
-          <div class="rr-radios" role="radiogroup" aria-label="정산 배치가 붙는 곳">
+          </fieldset>
+          <fieldset class="rr-radios">
+            <legend class="rr-sublegend">정산 배치가 붙는 곳</legend>
             <label>
               <input type="radio" name="rr-batch" value="primary" checked={c.batchTo === 'primary'} onChange={() => set({ batchTo: 'primary' })} /> 정산 배치 → 원본 엔드포인트
             </label>
             <label>
               <input type="radio" name="rr-batch" value="replica" checked={c.batchTo === 'replica'} onChange={() => set({ batchTo: 'replica' })} /> 정산 배치 → 복제본 엔드포인트
             </label>
-          </div>
+          </fieldset>
         </fieldset>
       </div>
 
@@ -154,7 +156,7 @@ export default function Simulator({ facts }) {
         ))}
       </ol>
 
-      <div class="rr-table-scroll">
+      <div class="rr-table-scroll" tabIndex={0} role="region" aria-label="결과 요약 표(좁은 화면에서는 가로로 스크롤)">
         <table class="rr-table">
           <caption>결과 요약(모형)</caption>
           <tbody>

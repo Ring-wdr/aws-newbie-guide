@@ -59,6 +59,7 @@ const facts = readReplicaFacts(fs.readFileSync(path.join(REPO_ROOT, LESSON), 'ut
   .rr-check, .rr-radios label { display: flex; gap: 0.4rem; align-items: baseline; }
   .rr-radios { display: flex; flex-direction: column; gap: 0.2rem; }
   .rr-radios + .rr-radios { margin-top: 0.4rem; }
+  .rr .rr-sublegend { font-size: 0.875rem; margin-bottom: 0.2rem; }
   .rr-row { display: flex; flex-wrap: wrap; gap: 0.5rem; }
   .rr button {
     font: inherit;
@@ -107,6 +108,7 @@ const facts = readReplicaFacts(fs.readFileSync(path.join(REPO_ROOT, LESSON), 'ut
   .rr-steps li { margin: 0.25rem 0 !important; }
   .rr-src { display: inline-block; }
   .rr-table-scroll { overflow-x: auto; }
+  .rr-table-scroll:focus-visible { outline: 2px solid var(--sl-color-accent); outline-offset: 2px; }
   .rr-table { width: 100%; border-collapse: collapse; font-size: 0.875rem; display: table; }
   .rr-table caption { text-align: left; font-weight: 700; padding-bottom: 0.3rem; }
   .rr-table :is(th, td) { border: 1px solid var(--guide-border); padding: 0.3rem 0.45rem; text-align: left; vertical-align: top; }
