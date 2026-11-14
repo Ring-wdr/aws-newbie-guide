@@ -29,6 +29,7 @@ scripts/guide-up.sh 4331     # 포트 지정 — 비대화형 실행(에이전�
   GUIDE_BASE=/aws-newbie-guide/ scripts/guide-up.sh 4331            # http://127.0.0.1:4331/aws-newbie-guide/
   ```
 
+- **워크플로**: 액션은 전체 커밋 SHA로 고정한다(주석에 릴리스 태그). `configure-pages`가 알려 주는 base 경로로 빌드하고, 배포 전에 브라우저가 필요 없는 관문(`parity`·`links`·`static`·`grades`·`quiz`·`exam`·`widgets`, 전 페이지)을 돌려 하나라도 실패하면 배포하지 않는다. 브라우저 관문은 PR 검증에서 돈다. 빌드 러너(ubuntu-24.04)에는 Mermaid 글자 폭을 잴 한국어 글꼴(`fonts-noto-cjk`)과 Playwright 헤드리스 Chromium을 설치한다. 저장소 비밀값은 쓰지 않는다.
 - 배포본도 외부 요청이 0건이다(같은 `offline`·`static` 관문). GitHub Pages가 방문 기록(접속 로그)을 남기는 것은 이 사이트가 정할 수 없는 호스팅의 성질이다.
 
 ## 개발
