@@ -335,6 +335,22 @@ kbd {
 .diagram-dark { display: none; }
 :root[data-theme='dark'] .diagram-light { display: none; }
 :root[data-theme='dark'] .diagram-dark { display: block; }
+/* 아주 넓은 LR 그림의 좁은 화면용 TB 배치(mermaid-render.mjs narrowSource): 40rem 이하에서만 원래 그림 대신 보인다 */
+.diagram-scroll-narrow,
+.diagram-narrow-note { display: none; }
+.diagram-n-dark { display: none; }
+:root[data-theme='dark'] .diagram-n-light { display: none; }
+:root[data-theme='dark'] .diagram-n-dark { display: block; }
+.diagram-narrow-note {
+  margin: 0.4rem 0 0 !important;
+  font-size: 0.8125rem;
+  color: var(--guide-muted);
+}
+@media (max-width: 40rem) {
+  .diagram.has-narrow > .diagram-scroll-wide { display: none; }
+  .diagram.has-narrow > .diagram-scroll-narrow,
+  .diagram.has-narrow > .diagram-narrow-note { display: block; }
+}
 .diagram-src {
   margin-top: 0.5rem !important;
   font-size: 0.8125rem;

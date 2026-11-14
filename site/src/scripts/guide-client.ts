@@ -251,7 +251,8 @@ function initDiagrams() {
   const dark = document.documentElement.dataset.theme === 'dark';
   for (const box of document.querySelectorAll<HTMLElement>('.diagram-scroll')) {
     if (box.scrollWidth <= box.clientWidth + 1) continue;
-    const svg = box.querySelector<SVGSVGElement>(`.diagram-${dark ? 'dark' : 'light'} svg`);
+    const t = dark ? 'dark' : 'light';
+    const svg = box.querySelector<SVGSVGElement>(`.diagram-${t} svg, .diagram-n-${t} svg`);
     if (!svg) continue;
     // 노드·간선 라벨·서브그래프 중 가장 왼쪽 것의 바로 앞(그림 앞 여백을 건너뛴다)
     const rects = [...svg.querySelectorAll('g.node, g.edgeLabel, g.cluster')].map((n) => n.getBoundingClientRect()).filter((r) => r.width > 0);

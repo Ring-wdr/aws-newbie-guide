@@ -81,7 +81,7 @@ export function transformCode(tree, ctx) {
   });
 }
 
-export function mermaidHtml(source, rendered, ids) {
+export function mermaidHtml(source, rendered, ids, narrow = null) {
   const svgBox = (theme) => {
     const r = rendered[theme];
     // SVG의 가로 크기를 원래 크기로 유지해, 좁은 화면에서는 줄이지 않고 상자 안에서 가로로 스크롤한다.
@@ -95,9 +95,16 @@ export function mermaidHtml(source, rendered, ids) {
         `<a class="diagram-open-dark" href="/diagrams/${ids.dark}.svg" target="_blank" rel="noopener">${esc(ko.diagram.openFull)}</a>` +
         `</p>`
       : '';
+  // 좁은 화면용 TB 배치(있을 때만). 클래스를 diagram-n-* 로 따로 두어 넓은 그림의 순번·검사와 섞이지 않게 한다.
+  const narrowBox = narrow
+    ? `<div class="diagram-scroll diagram-scroll-narrow" tabindex="0" role="group" aria-label="${esc(ko.diagram.labelNarrow)}">` +
+      ['light', 'dark'].map((t) => `<div class="diagram-n-${t}" style="--diagram-w:${Math.ceil(narrow[t].width)}px">${narrow[t].svg}</div>`).join('') +
+      `</div><p class="diagram-narrow-note">${esc(ko.diagram.narrowNote)}</p>`
+    : '';
   return (
-    `<figure class="diagram">` +
-    `<div class="diagram-scroll" tabindex="0" role="group" aria-label="${esc(ko.diagram.label)}">${svgBox('light')}${svgBox('dark')}</div>` +
+    `<figure class="diagram${narrow ? ' has-narrow' : ''}">` +
+    `<div class="diagram-scroll diagram-scroll-wide" tabindex="0" role="group" aria-label="${esc(ko.diagram.label)}">${svgBox('light')}${svgBox('dark')}</div>` +
+    narrowBox +
     open +
     `<details class="diagram-src"><summary>${esc(ko.diagram.source)}</summary><pre class="mermaid-src"><code>${esc(source)}</code></pre></details>` +
     `</figure>`

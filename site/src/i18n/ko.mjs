@@ -28,6 +28,8 @@ export const ko = {
   },
   diagram: {
     label: '다이어그램',
+    labelNarrow: '다이어그램(좁은 화면용 위→아래 배치)',
+    narrowNote: '좁은 화면이라 같은 그림을 위→아래로 다시 배치해 보여 준다(노드·연결은 원문과 같다). 원래 배치는 아래 링크로 본다.',
     source: '다이어그램 원문(Mermaid 텍스트)',
     openFull: '그림을 원래 크기로 보기(새 탭)',
     fullTitle: '다이어그램 원래 크기',

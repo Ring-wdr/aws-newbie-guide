@@ -15,7 +15,7 @@ import { transformMarkers } from './markers.mjs';
 import { transformExamQuestions, transformExamKey } from './exam.mjs';
 import { transformChecklist } from './checklist.mjs';
 import { checkLessonSections, transformSelfCheck } from './sections.mjs';
-import { renderMermaid, prefixFor } from './mermaid-render.mjs';
+import { renderMermaid, prefixFor, narrowSource } from './mermaid-render.mjs';
 
 function relOf(file) {
   const p = file.path ? (String(file.path).startsWith('file:') ? fileURLToPath(file.path) : String(file.path)) : null;
@@ -77,13 +77,22 @@ export function remarkGuide(options = {}) {
     // 3) Mermaid → SVG (보고 모드에서는 그리지 않는다)
     if (!report && ctx.mermaid.length) {
       const results = await renderMermaid(ctx.mermaid.map((m) => m.source));
+      // 아주 넓은 LR 그림은 좁은 화면용 TB 배치를 한 벌 더 그린다(mermaid-render.mjs narrowSource).
+      const narrowSrc = ctx.mermaid.map((m, i) => (results[i].light ? narrowSource(m.source, results[i].light) : null));
+      const narrowOut = narrowSrc.some(Boolean) ? await renderMermaid(narrowSrc.filter(Boolean)) : [];
+      let ni = 0;
+      const narrow = narrowSrc.map((src) => {
+        if (!src) return null;
+        const r = narrowOut[ni++];
+        return r && r.light && r.dark ? { ...r, ids: { light: prefixFor(src, 'light'), dark: prefixFor(src, 'dark') } } : null;
+      });
       ctx.mermaid.forEach((ph, i) => {
         const r = results[i];
         if (r.error || !r.light || !r.dark) {
           const line = ph.position?.start?.line;
           throw new Error(`${rel}:${line}: Mermaid 다이어그램을 그리지 못했다 — ${r.error || '알 수 없는 오류'}`);
         }
-        Object.assign(ph, html(mermaidHtml(ph.source, r, { light: prefixFor(ph.source, 'light'), dark: prefixFor(ph.source, 'dark') })));
+        Object.assign(ph, html(mermaidHtml(ph.source, r, { light: prefixFor(ph.source, 'light'), dark: prefixFor(ph.source, 'dark') }, narrow[i])));
         delete ph.data;
         delete ph.source;
       });
