@@ -328,6 +328,50 @@ function initTables() {
   );
 }
 
+/* ---------- 맞춤 위젯이 붙기 전의 입력 막기 ---------- */
+// 위젯(Preact 아일랜드)은 화면에 보일 때 스크립트가 붙는다(client:visible). 붙기 전(서버가 그린 상태 — astro-island[ssr])에
+// 입력하면 값은 화면에 남지만 위젯 상태에는 들어가지 않아 결과가 갱신되지 않는다(초점 직후 수십 ms 사이에 재현됨).
+// 그래서 붙기 전에는 위젯 안 입력 요소의 값을 바꾸는 입력(글자·화살표·Space·Enter·누르기·붙여넣기)을 받지 않는다.
+// Tab 이동은 그대로 둔다. 붙으면 astro-island 의 ssr 속성이 사라져 막힘도 풀린다. 페이지가 열리자마자 건다(DOMContentLoaded 전).
+const HYDRATION_PENDING = '.guide-widget astro-island[ssr]';
+const CONTROL = 'input, select, textarea, button, label, summary, [role=button], [role=radio], [role=checkbox], [role=slider], [role=spinbutton], [contenteditable]';
+const PASS_KEYS = new Set(['Tab', 'Shift', 'Escape', 'Alt', 'Control', 'Meta']);
+function initHydrationGuard() {
+  const pending = (t: EventTarget | null) => t instanceof Element && t.closest(HYDRATION_PENDING) !== null && t.closest(CONTROL) !== null;
+  for (const type of ['beforeinput', 'keydown', 'click', 'paste', 'drop'] as const) {
+    document.addEventListener(
+      type,
+      (ev) => {
+        if (!pending(ev.target)) return;
+        if (ev instanceof KeyboardEvent && PASS_KEYS.has(ev.key)) return;
+        ev.preventDefault();
+      },
+      true,
+    );
+  }
+}
+initHydrationGuard();
+
+// 붙는 동안은 위젯 상자(.guide-widget)에 aria-busy="true"를 둬 화면 낭독기에 아직 준비 중임을 알리고, 붙으면(ssr 속성이 사라지면) 뗀다.
+function initHydrationBusy() {
+  const sync = (box: Element) => {
+    if (box.querySelector('astro-island[ssr]')) box.setAttribute('aria-busy', 'true');
+    else box.removeAttribute('aria-busy');
+  };
+  const boxes = [...document.querySelectorAll('.guide-widget')].filter((b) => b.querySelector('astro-island'));
+  if (!boxes.length) return;
+  boxes.forEach(sync);
+  const mo = new MutationObserver((records) => {
+    for (const r of records) {
+      const box = (r.target as Element).closest?.('.guide-widget');
+      if (box) sync(box);
+    }
+  });
+  for (const b of boxes) mo.observe(b, { subtree: true, attributes: true, attributeFilter: ['ssr'] });
+}
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initHydrationBusy);
+else initHydrationBusy();
+
 function init() {
   document.documentElement.classList.add('guide-js');
   initCopy();

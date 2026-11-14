@@ -1,7 +1,7 @@
 // 키보드만으로 M05 Multi-AZ vs 읽기 복제본 실험대를 끝까지 조작한다(GUIDE-SITE 5장). 공용 tests/keyboard.mjs 와 별개인 위젯 전용 검사.
 // 조작은 전부 키 입력(Tab, Shift+Tab, 화살표, Space, Enter, 글자)이다. 상태를 "읽는" 것만 DOM에서 한다.
 // 사용(site/ 에서, 빌드 뒤): node src/widgets/m05/rds-multiaz-vs-replica/keyboard.check.mjs --port <포트>
-import { offlineBrowser, portFromArgs, serve } from '../../../../tests/lib/harness.mjs';
+import { baseUrl, offlineBrowser, portFromArgs, serve, widgetOverflow } from '../../../../tests/lib/harness.mjs';
 
 const PAGE = '/curriculum/m05-databases/02-multi-az-vs-read-replica/';
 const port = portFromArgs(4321);
@@ -38,7 +38,7 @@ const clearAndType = async (s) => {
 };
 
 try {
-  await page.goto(`http://127.0.0.1:${port}${PAGE}`, { waitUntil: 'networkidle' }); // sitecheck-allow: 검사용 로컬 서버(루프백)
+  await page.goto(`${baseUrl(port)}${PAGE}`, { waitUntil: 'networkidle' });
   await page.locator('.rr').evaluate((e) => e.scrollIntoView());
   await page.waitForFunction(() => document.querySelector('.guide-widget[data-widget="m05/rds-multiaz-vs-replica"] astro-island:not([ssr])') !== null);
   await page.evaluate(() => document.activeElement?.blur());
@@ -108,6 +108,8 @@ try {
   await press('Enter');
   if (!(await page.$eval('.rr details.rr-assume', (d) => d.open))) problems.push('가정 설명이 Enter로 펼쳐지지 않음');
   if (blocked.length) problems.push(`루프백 밖 요청: ${blocked.join(', ')}`);
+  // 360px 가로 넘침(라이트·다크, 처음 상태와 미리 채우기마다) — --shots 없이도 늘 확인한다
+  problems.push(...(await widgetOverflow({ port, path: PAGE, widget: 'm05/rds-multiaz-vs-replica' })));
 } catch (e) {
   problems.push(String(e?.stack || e));
 } finally {

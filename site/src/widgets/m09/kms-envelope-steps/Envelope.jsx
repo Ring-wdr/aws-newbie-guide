@@ -120,7 +120,7 @@ export default function Envelope({ facts }) {
           {r.result === 'ok' ? '복호화 성공' : `${r.error}로 실패`}
         </span>{' '}
         {r.result === 'ok'
-          ? `${r.steps.length}단계 끝에 평문 ${input.size.toLocaleString('en-US')}바이트가 원본과 같게 돌아온다. KMS와는 데이터 키(${facts.dataKeyBytes.value}바이트)만 오갔다.`
+          ? `${r.steps.length}단계 끝에 평문 ${input.size.toLocaleString('en-US')}바이트가 원본과 같게 돌아온다. KMS와는 데이터 키만 오갔다 — 평문 데이터 키(${facts.dataKeyBytes.value}바이트)와 그것을 감싼 암호화된 데이터 키.`
           : `${r.steps.length}단계(읽기)에서 멈춘다(원고 ${src(errLine[r.error])}).`}
       </p>
 

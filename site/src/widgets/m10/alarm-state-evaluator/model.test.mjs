@@ -1,4 +1,4 @@
-// node --test src/widgets/m10/alarm-state-evaluator/
+// node --test src/widgets/m10/alarm-state-evaluator/*.test.mjs   (site/ 에서. 위젯 시험 전부: pnpm test:widgets)
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -53,13 +53,28 @@ test('문서의 이른 ALARM 설명: N=M=3에서 - - - - X, - - - X - 는 곧바
   assert.notEqual(evaluateRange(toRange('- - - X -'), 3, 3, 'missing').result, 'ALARM');
 });
 
-test('문서로 정해지지 않는 경우: 이른 ALARM 후보 위반이 최근 N개 밖이면 판정하지 않음', () => {
-  assert.equal(evaluateRange(toRange('- X - - -'), 3, 3, 'missing').result, 'unknown');
+test('이른 ALARM의 "가장 오래된 위반"은 평가 범위 전체에서 찾는다(모형 가정 4 — 문서의 두 문장 중 "evaluation range")', () => {
+  assert.equal(evaluateRange(toRange('- X - - -'), 3, 3, 'missing').result, 'ALARM');
+  assert.equal(evaluateRange(toRange('- X - - -'), 3, 3, 'ignore').result, 'retain');
   const r = run({ n: 3, m: 3, points: [900, null, null, null] });
-  // 범위 4: "X - - -"의 X는 나이 4 > N → 판정 안 함
-  assert.equal(r.steps[3].state, null);
-  assert.equal(r.steps[3].unknown, true);
-  assert.match(explain(r.steps[3], normalize({ n: 3, m: 3 })), /판정하지 않는다/);
+  // 900 하나뿐 — 첫 구간은 실제 1개 <M, 나이 1 <M 이라 ALARM 아님. 나이가 M(3)에 이르는 3구간에서 이른 ALARM
+  assert.equal(r.steps[2].state, 'ALARM');
+  assert.equal(r.steps[3].unknown, false);
+});
+
+test('검증 지적 재현: N=M=3, 900·900·900 뒤 데이터가 끊기면 ignore는 이전 상태(ALARM)를 계속 유지한다', () => {
+  const r = run({ n: 3, m: 3, tmd: 'ignore', points: [900, 900, 900, null, null, null, null, null] });
+  assert.deepEqual(states(r).slice(2), Array(6).fill('ALARM'));
+  for (const s of r.steps.slice(3)) {
+    assert.equal(s.state, 'ALARM');
+    assert.equal(s.changed, false);
+    assert.ok(s.outcomes.every((o) => o.result === 'retain' || o.result === 'ALARM'), JSON.stringify(s.outcomes.map((o) => o.result)));
+  }
+  // 범위 밖으로 다 빠지면(모두 누락) ignore → 직전 상태 유지, missing → INSUFFICIENT_DATA
+  const last = r.steps.at(-1);
+  assert.ok(last.outcomes.some((o) => o.result === 'retain'));
+  const m = run({ n: 3, m: 3, tmd: 'missing', points: [900, 900, 900, null, null, null, null, null] });
+  assert.equal(m.steps.at(-1).state, 'INSUFFICIENT_DATA');
 });
 
 test('검증 지적 재현: N=M=3, 900·900·900·- → missing·ignore 모두 ALARM 유지', () => {

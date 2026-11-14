@@ -4,12 +4,12 @@
 // 사용(site/ 에서, 빌드 뒤): node src/widgets/m09/kms-envelope-steps/keyboard.check.mjs --port 4333 [--shots <폴더>]
 import fs from 'node:fs';
 import path from 'node:path';
-import { offlineBrowser, portFromArgs, serve } from '../../../../tests/lib/harness.mjs';
+import { baseUrl, offlineBrowser, portFromArgs, serve, shootElement, widgetOverflow } from '../../../../tests/lib/harness.mjs';
 
 const PAGE = '/curriculum/m09-security-encryption/01-kms/';
 const ROOT = '.ev';
 const port = portFromArgs(4333);
-const base = `http://127.0.0.1:${port}`; // sitecheck-allow: 검사 스크립트가 여는 루프백 서버 주소(빌드 산출물에 들어가지 않는다)
+const base = baseUrl(port);
 const shotsIdx = process.argv.indexOf('--shots');
 const shots = shotsIdx >= 0 ? path.resolve(process.argv[shotsIdx + 1]) : null;
 const problems = [];
@@ -43,7 +43,7 @@ try {
   // 1) lab03 예: 성공, 9단계
   await tabUntil(`${ROOT} button[data-preset=lab03]`);
   await press('Enter');
-  await expect('lab03', '.ev-result', '복호화 성공', '9단계', '데이터 키(32바이트)만');
+  await expect('lab03', '.ev-result', '복호화 성공', '9단계', '데이터 키만 오갔다', '평문 데이터 키(32바이트)');
   // 2) 처음에는 1단계("처음"·"이전"은 비활성). "끝까지" → 초점이 "이전 단계"로
   await expect('1단계', '.ev-now', '단계 1/9');
   await tabUntil(`${ROOT} button[data-step=last]`);
@@ -117,12 +117,14 @@ try {
           return { page: doc.scrollWidth - doc.clientWidth, widget: w.scrollWidth - w.clientWidth };
         }, ROOT);
         if (over.page > 0 || over.widget > 0) problems.push(`${scheme} ${width}px: 가로 넘침 ${JSON.stringify(over)}`);
-        await p.locator(ROOT).screenshot({ path: path.join(shots, `m09-kms-envelope-steps-${scheme}-${width}.png`) });
+        await shootElement(p, ROOT, path.join(shots, `m09-kms-envelope-steps-${scheme}-${width}.png`));
         await c.browser.close();
       }
     }
     console.log(`스크린샷: ${shots}`);
   }
+  // 360px 가로 넘침(라이트·다크, 처음 상태와 미리 채우기마다) — --shots 없이도 늘 확인한다
+  problems.push(...(await widgetOverflow({ port, path: PAGE, widget: 'm09/kms-envelope-steps' })));
 } catch (e) {
   problems.push(String(e?.stack || e));
 } finally {

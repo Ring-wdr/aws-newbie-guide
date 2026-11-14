@@ -13,8 +13,8 @@ function LabelText({ text, grades }) {
   return text.split(/(🟢|🟡|🔴)/u).map((part, i) =>
     GRADE_CLASS[part] && grades[part] ? (
       <span key={i} class={`grade-mark grade-mark-${GRADE_CLASS[part]}`} title={grades[part].title}>
-        <span aria-hidden="true">{part}</span>
-        <span class="grade-mark-label" data-label={grades[part].label}></span>
+        <span role="img" aria-label={grades[part].label}>{part}</span>
+        <span class="grade-mark-label" data-label={grades[part].label} aria-hidden="true"></span>
       </span>
     ) : (
       part

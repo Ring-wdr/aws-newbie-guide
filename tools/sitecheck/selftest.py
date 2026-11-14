@@ -20,6 +20,9 @@ CLEAN_HTML = "<!doctype html><html lang=ko><body><main><p>WebSocket 이라는 �
 # (이름, 심을 곳, 파일, 내용) — src 는 site/src, dist 는 빌드 산출물
 STATIC_CASES = [
     ("src: 외부 주소", "src", "components/A.astro", '<link rel="stylesheet" href="https://fonts.selftest.invalid/a.css" />'),
+    ("src: 시험 스크립트의 루프백처럼 보이는 외부 주소", "src", "widgets/m99/w/keyboard.check.mjs", "const base = `http://127.0.0.1.selftest.invalid:${port}`;"),
+    ("src: 시험 스크립트의 사용자 정보 뒤 외부 호스트", "src", "widgets/m99/w/model.test.mjs", "const u = 'http://127.0.0.1:80@x.selftest.invalid/';"),
+    ("src: 시험이 아닌 소스의 루프백 주소", "src", "scripts/h.ts", "const u = `http://127.0.0.1:${port}/`;"),
     ("src: WebSocket", "src", "scripts/a.ts", "const u = location.host; new WebSocket('ws://' + u);"),
     ("src: EventSource", "src", "scripts/b.ts", "new EventSource(path);"),
     ("src: sendBeacon", "src", "scripts/c.ts", "navigator.sendBeacon(path, data);"),
@@ -51,6 +54,12 @@ def make_tree(root: Path) -> tuple[Path, Path]:
     site = root / "site"
     (site / "src").mkdir(parents=True)
     (site / "src/ok.ts").write_text("export const ok = 1;\n", encoding="utf-8")
+    # 위젯 검사·시험 스크립트의 루프백 주소는 허용된다(결함 없는 사본에 둔다)
+    (site / "src/widgets/m99/w").mkdir(parents=True)
+    (site / "src/widgets/m99/w/keyboard.check.mjs").write_text(
+        "const base = `http://127.0.0.1:${port}`;\nawait page.goto(`http://127.0.0.1:${port}${PAGE}`);\nconst a = 'http://localhost:4321/x'; const b = 'http://[::1]:4321/';\n",
+        encoding="utf-8",
+    )
     dist = site / "dist"
     dist.mkdir()
     (dist / "index.html").write_text(CLEAN_HTML, encoding="utf-8")
@@ -116,7 +125,14 @@ def main() -> int:
         import htmlbuilt
         for name, html, want_bare in [
             ("표 칸의 맨 이모지", '<div class="sl-markdown-content"><table><tr><td>\U0001F7E2</td></tr></table></div>', True),
-            ("라벨 붙은 이모지", '<div class="sl-markdown-content"><p><span class="grade-mark"><span aria-hidden="true">\U0001F7E1</span><span class="grade-mark-label">부분</span></span></p></div>', False),
+            ("라벨 붙은 이모지", '<div class="sl-markdown-content"><p><span class="grade-mark"><span role="img" aria-label="부분">\U0001F7E1</span><span class="grade-mark-label" data-label="부분" aria-hidden="true"></span></span></p></div>', False),
+            ("빈 라벨(data-label=\"\")", '<div class="sl-markdown-content"><p><span class="grade-mark"><span role="img" aria-label="부분">\U0001F7E1</span><span class="grade-mark-label" data-label="" aria-hidden="true"></span></span></p></div>', True),
+            ("라벨 속성 없음", '<div class="sl-markdown-content"><p><span class="grade-badge"><span class="grade-emoji" role="img" aria-label="재현">\U0001F7E2</span><span class="grade-label" aria-hidden="true"></span></span></p></div>', True),
+            ("빈 aria-label", '<div class="sl-markdown-content"><p><span class="grade-mark"><span role="img" aria-label=" ">\U0001F534</span><span class="grade-mark-label" data-label="개념" aria-hidden="true"></span></span></p></div>', True),
+            ("이름 없이 숨긴 이모지", '<div class="sl-markdown-content"><p><span class="grade-mark"><span aria-hidden="true">\U0001F534</span><span class="grade-mark-label" data-label="개념" aria-hidden="true"></span></span></p></div>', True),
+            ("보이는 라벨 없이 이름만(제목 안 옛 구조)", '<div class="sl-markdown-content"><h2 id="x">실습 <span class="grade-mark" role="img" aria-label="재현">\U0001F7E2</span></h2></div>', True),
+            ("보이는 라벨 없이 이름만(라벨 칸 없음)", '<div class="sl-markdown-content"><p>등급 <span class="grade-mark"><span role="img" aria-label="개념">\U0001F534</span></span></p></div>', True),
+            ("뒤에 라벨 글자가 있는 이모지", '<div class="sl-markdown-content"><p><span class="grade-mark">\U0001F7E2</span> 재현</p></div>', False),
             ("코드 안의 이모지", '<div class="sl-markdown-content"><pre><code># (\U0001F534)</code></pre></div>', False),
         ]:
             got = bool(sitecheck.bare_grade_emoji(htmlbuilt.content_root(htmlbuilt.parse(html))))
@@ -129,7 +145,7 @@ def main() -> int:
     if failures:
         print(f"FAIL selftest: {failures}")
         return 1
-    print(f"PASS selftest: 정적 관문에 심은 결함 {len(STATIC_CASES)}가지와 실행 명령 결함 3가지를 모두 잡고, 근거 있는 경우는 통과, 메타 줄 이스케이프 2가지 일치, 등급 이모지 3가지")
+    print(f"PASS selftest: 정적 관문에 심은 결함 {len(STATIC_CASES)}가지와 실행 명령 결함 3가지를 모두 잡고, 근거 있는 경우는 통과, 메타 줄 이스케이프 2가지 일치, 등급 이모지 10가지(빈 라벨·빈 이름·이름만 있는 라벨 포함)")
     return 0
 
 

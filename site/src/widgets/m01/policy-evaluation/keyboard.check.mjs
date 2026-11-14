@@ -1,7 +1,7 @@
 // 키보드만으로 M01 정책 평가 위젯을 끝까지 조작할 수 있는지 확인한다(GUIDE-SITE 5장). 공용 tests/keyboard.mjs와 같은 방식:
 // 조작은 전부 키 입력(Tab, Shift+Tab, 화살표, Space, Enter), DOM은 상태를 "읽기"만 한다.
 // 사용(site/에서, 빌드 뒤): node src/widgets/m01/policy-evaluation/keyboard.check.mjs --port <포트>
-import { offlineBrowser, portFromArgs, serve } from '../../../../tests/lib/harness.mjs';
+import { baseUrl, offlineBrowser, portFromArgs, serve, widgetOverflow } from '../../../../tests/lib/harness.mjs';
 
 const PAGE = '/curriculum/m01-iam-identity/03-policy-evaluation/';
 const port = portFromArgs(4321);
@@ -30,7 +30,7 @@ const expect = async (what, re) => {
 const stoppedAt = () => page.getAttribute('.pe-step[aria-current=step]', 'data-step');
 
 try {
-  await page.goto(`http://127.0.0.1:${port}${PAGE}`, { waitUntil: 'networkidle' }); // sitecheck-allow: 이 스크립트가 띄운 루프백 검사 서버
+  await page.goto(`${baseUrl(port)}${PAGE}`, { waitUntil: 'networkidle' });
   await page.locator('.pe').evaluate((e) => e.scrollIntoView());
   await page.waitForFunction(() => document.querySelector('.guide-widget[data-widget="m01/policy-evaluation"] astro-island:not([ssr])') !== null);
   await page.evaluate(() => document.activeElement?.blur());
@@ -91,6 +91,8 @@ try {
   await expect('예 "세션 정책 밖"', /암묵적 거부.*no session policy allows/);
   if ((await stoppedAt()) !== 'session') problems.push(`세션 정책 예의 끝난 단계: ${await stoppedAt()}`);
   if (blocked.length) problems.push(`외부 요청: ${blocked.join(', ')}`);
+  // 360px 가로 넘침(라이트·다크, 처음 상태와 미리 채우기마다) — --shots 없이도 늘 확인한다
+  problems.push(...(await widgetOverflow({ port, path: PAGE, widget: 'm01/policy-evaluation' })));
 } catch (e) {
   problems.push(`중단: ${e.message}`);
 } finally {

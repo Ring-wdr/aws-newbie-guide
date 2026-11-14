@@ -52,7 +52,7 @@ function badge(emoji) {
   const { label, meaning } = gradeLegend()[emoji];
   return html(
     `<span class="grade-badge grade-${CLASS[emoji]}" title="${esc(`${label}: ${meaning}`)}">` +
-      `<span class="grade-emoji" aria-hidden="true">${emoji}</span><span class="grade-label" data-label="${esc(label)}"></span></span>`, // 라벨은 생성 콘텐츠(복사되지 않음)
+      `<span class="grade-emoji" role="img" aria-label="${esc(label)}">${emoji}</span><span class="grade-label" data-label="${esc(label)}" aria-hidden="true"></span></span>`, // 이름은 이모지에, 보이는 라벨은 생성 콘텐츠(복사되지 않음)
   );
 }
 
@@ -81,7 +81,7 @@ function legendHtml() {
   const lg = gradeLegend();
   const items = EMOJI.map(
     (e) =>
-      `<li><span class="grade-badge grade-${CLASS[e]}"><span class="grade-emoji" aria-hidden="true">${e}</span><span class="grade-label" data-label="${esc(lg[e].label)}"></span></span> ${esc(lg[e].meaning)}</li>`,
+      `<li><span class="grade-badge grade-${CLASS[e]}"><span class="grade-emoji" role="img" aria-label="${esc(lg[e].label)}">${e}</span><span class="grade-label" data-label="${esc(lg[e].label)}" aria-hidden="true"></span></span> ${esc(lg[e].meaning)}</li>`,
   ).join('');
   return `<details class="grade-legend"><summary>${esc(ko.meta.legendTitle)}</summary><ul>${items}</ul><p class="grade-legend-src">${esc(ko.meta.legendSource)}</p></details>`;
 }

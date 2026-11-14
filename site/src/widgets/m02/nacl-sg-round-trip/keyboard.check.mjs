@@ -1,7 +1,7 @@
 // 키보드만으로 M02 NACL·SG 왕복 위젯을 끝까지 조작할 수 있는지 확인한다(GUIDE-SITE 5장). 공용 tests/keyboard.mjs와 같은 방식:
 // 조작은 전부 키 입력(Tab, Shift+Tab, 화살표, Space, Enter, 숫자·Backspace), DOM은 상태를 "읽기"만 한다.
 // 사용(site/에서, 빌드 뒤): node src/widgets/m02/nacl-sg-round-trip/keyboard.check.mjs --port <포트>
-import { offlineBrowser, portFromArgs, serve } from '../../../../tests/lib/harness.mjs';
+import { baseUrl, offlineBrowser, portFromArgs, serve, widgetOverflow } from '../../../../tests/lib/harness.mjs';
 
 const PAGE = '/curriculum/m02-vpc-networking/04-security-group-vs-nacl/';
 const port = portFromArgs(4321);
@@ -32,7 +32,7 @@ const expect = async (what, re) => {
 const decidedRows = () => page.$$eval('.nf-table tr[data-decided=true]', (rs) => rs.map((r) => r.cells[0].textContent + ' ' + r.cells[1].textContent));
 
 try {
-  await page.goto(`http://127.0.0.1:${port}${PAGE}`, { waitUntil: 'networkidle' }); // sitecheck-allow: 이 스크립트가 띄운 루프백 검사 서버
+  await page.goto(`${baseUrl(port)}${PAGE}`, { waitUntil: 'networkidle' });
   await page.locator('.nf').evaluate((e) => e.scrollIntoView());
   await page.waitForFunction(() => document.querySelector('.guide-widget[data-widget="m02/nacl-sg-round-trip"] astro-island:not([ssr])') !== null);
   await page.evaluate(() => document.activeElement?.blur());
@@ -72,6 +72,8 @@ try {
   await press('Enter');
   await expect('앱 a → DB:22', /요청 거부\(NACL\)/);
   if (blocked.length) problems.push(`외부 요청: ${blocked.join(', ')}`);
+  // 360px 가로 넘침(라이트·다크, 처음 상태와 미리 채우기마다) — --shots 없이도 늘 확인한다
+  problems.push(...(await widgetOverflow({ port, path: PAGE, widget: 'm02/nacl-sg-round-trip' })));
 } catch (e) {
   problems.push(`중단: ${e.message}`);
 } finally {

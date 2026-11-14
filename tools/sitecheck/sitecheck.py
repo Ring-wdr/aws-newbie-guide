@@ -147,22 +147,60 @@ GRADE_OK_CLASS = {"grade-mark", "grade-badge"}
 GRADE_SKIP_TAGS = {"pre", "code", "svg", "script", "style", "kbd", "template", "title"}
 
 
+GRADE_LABEL_CLASS = {"grade-mark-label", "grade-label"}
+
+
+def _grade_mark_problem(mark: "htmlbuilt.Node") -> str | None:
+    """등급 표시(.grade-mark·.grade-badge) 하나가 **보이는 글자 라벨**과 **접근 가능한 이름**을 둘 다 갖췄는지.
+    문제가 없으면 None. 라벨 칸이 비었거나(data-label="" 또는 속성 없음), role=img 의 이름이 비었거나,
+    보이는 라벨 없이 화면 낭독기 이름만 남았거나(색만으로 전달), 이름이 없으면 그 사유."""
+    named = visible = False
+    for n in mark.iter():
+        if n.cls() & GRADE_LABEL_CLASS:
+            if not n.attrs.get("data-label", "").strip():
+                return "글자 라벨이 비었다(data-label 없음·빈 값)"
+            visible = True
+            if n.attrs.get("aria-hidden") != "true":
+                named = True  # 생성 콘텐츠 라벨을 화면 낭독기가 읽는다(옛 구조)
+        if n.attrs.get("role") == "img":
+            if not n.attrs.get("aria-label", "").strip():
+                return "role=img 인데 aria-label 이 비었다"
+            named = True
+    # 바로 뒤에 라벨 글자가 원고에 이미 있는 경우("🟢 재현")는 이모지만 감싼다 — 그 글자가 보이는 라벨이자 이름이다
+    par = mark.parent
+    if par is not None and not visible:
+        kids = par.children
+        i = next(k for k, c in enumerate(kids) if c is mark)
+        nxt = kids[i + 1] if i + 1 < len(kids) else ""
+        if isinstance(nxt, str) and nxt.strip():
+            visible = named = True
+    if not visible:
+        return "보이는 글자 라벨이 없다(화면 낭독기 이름만 있어 화면에서는 색으로만 구분된다)" if named else "이름도 보이는 라벨도 없다"
+    if not named:
+        return "접근 가능한 이름이 없다(role=img·aria-label 없음)"
+    return None
+
+
 def bare_grade_emoji(content: "htmlbuilt.Node") -> list[str]:
-    """글자 라벨(.grade-mark·.grade-badge) 없이 색으로만 남은 등급 이모지가 있는 글 조각들."""
+    """글자 라벨·접근 가능한 이름 없이 색으로만 남은 등급 이모지가 있는 글 조각들(빈 라벨 포함)."""
     out: list[str] = []
 
-    def walk(n, ok: bool) -> None:
+    def walk(n) -> None:
         if n.tag in GRADE_SKIP_TAGS:
             return
-        ok = ok or bool(n.cls() & GRADE_OK_CLASS)
+        if n.cls() & GRADE_OK_CLASS:
+            why = _grade_mark_problem(n)
+            if why:
+                out.append(f"{n.text().strip()[:20]} — {why}")
+            return
         for c in n.children:
             if isinstance(c, str):
-                if not ok and GRADE_EMOJI.search(c):
+                if GRADE_EMOJI.search(c):
                     out.append(c.strip()[:40])
             else:
-                walk(c, ok)
+                walk(c)
 
-    walk(content, False)
+    walk(content)
     return out
 
 
@@ -505,9 +543,25 @@ INLINE_SCRIPT = re.compile(r"<script\b([^>]*)>([\s\S]*?)</script>", re.I)
 DIST_API_ALLOW = {("pagefind/pagefind.js", "new Worker(")}
 
 
+# 위젯 폴더의 검사·시험 스크립트(빌드 산출물에 들어가지 않고 Node 에서만 돈다)는 스스로 연 루프백 서버를 부른다.
+# 그런 파일에서는 루프백 주소(127.0.0.0/8, localhost, [::1])를 허용한다. 호스트 뒤에는 포트(숫자나 ${변수})와
+# 경로·끝만 올 수 있다 — '127.0.0.1.nip.io' 나 '127.0.0.1:1@다른호스트' 같은 꼴은 루프백이 아니다.
+NODE_ONLY_SRC = re.compile(r"\.(?:check|test)\.mjs$")
+LOOPBACK_URL = re.compile(
+    r"^(?:https?|wss?)://(?:127(?:\.\d{1,3}){3}|localhost|\[::1\])"
+    r"(?:(?::(?:\d{1,5}|\$\{\w+\}))(?:[/?#]|\$\{|$)|[/?#:]|$)",
+    re.I,
+)
+
+
+def is_loopback_url(u: str) -> bool:
+    return "@" not in u and bool(LOOPBACK_URL.match(u))
+
+
 def gate_static(dist: Path, verbose: bool = True) -> Gate:
     g = Gate("외부 리소스 정적 검사(site/src·빌드 산출물)")
-    # 1) site/src: 주소 자체가 없어야 한다(SVG 이름공간 제외, 줄에 'sitecheck-allow:' 표시가 있으면 예외)
+    # 1) site/src: 주소 자체가 없어야 한다(SVG 이름공간 제외, 줄에 'sitecheck-allow:' 표시가 있으면 예외).
+    #    위젯의 *.check.mjs·*.test.mjs 에서는 루프백 주소를 허용한다(NODE_ONLY_SRC).
     for p in sorted((SITE / "src").rglob("*")):
         if not p.is_file() or p.suffix in {".png", ".jpg", ".ico", ".woff", ".woff2"}:
             continue
@@ -516,9 +570,11 @@ def gate_static(dist: Path, verbose: bool = True) -> Gate:
             if "sitecheck-allow:" in line:
                 continue
             where = f"site/src/{p.relative_to(SITE / 'src')}:{i}"
+            node_only = bool(NODE_ONLY_SRC.search(p.name))
             for u in URL_RE.findall(line):
-                if not NAMESPACE_OK.match(u):
-                    g.fail(f"{where}: 외부 주소 {u}")
+                if NAMESPACE_OK.match(u) or (node_only and is_loopback_url(u)):
+                    continue
+                g.fail(f"{where}: 외부 주소 {u}")
             # 네트워크 API·연결 예고는 사이트 공용부에서 쓰지 않는다(쓰려면 줄에 sitecheck-allow: 이유)
             for m in NET_APIS.finditer(line):
                 g.fail(f"{where}: 네트워크 API {m.group(0)!r}")
@@ -562,6 +618,25 @@ def gate_static(dist: Path, verbose: bool = True) -> Gate:
                 g.fail(f"{rel}: 스크립트의 네트워크 API {m.group(0)!r}")
     if verbose:
         print(f"  (참고) 원고의 외부 하이퍼링크 <a href=\"http…\"> {nav_links}개 — 누를 때만 이동하는 탐색 링크이며 페이지가 불러오는 리소스가 아니다")
+    return g
+
+
+# ---------------------------------------------------------------- 위젯·진행 추적 단위 시험(Node, 브라우저 없음)
+def gate_widgets() -> Gate:
+    """site/package.json 의 test:widgets(위젯 폴더의 *.test.mjs 와 src/progress·src/lib 의 시험)를 돌린다.
+    위젯 폴더에 시험 파일이 하나도 없는 위젯도 실패로 본다(계약 4: 계산 로직의 단위 시험)."""
+    g = Gate("위젯·진행 추적 단위 시험(pnpm test:widgets)")
+    for d in sorted((SITE / "src/widgets").glob("m[0-9][0-9]/*/")):
+        if (d / "index.astro").exists() and not any(d.glob("*.test.mjs")):
+            g.fail(f"site/src/widgets/{d.parent.name}/{d.name}: 단위 시험(*.test.mjs)이 없다")
+    script = json.loads((SITE / "package.json").read_text(encoding="utf-8"))["scripts"]["test:widgets"]
+    p = subprocess.run(script, shell=True, capture_output=True, text=True, cwd=SITE)
+    g.checked = 1
+    summary = {k: v for k, v in re.findall(r"^ℹ (tests|pass|fail) (\d+)$", p.stdout, re.M)}
+    print(f"  test:widgets: 시험 {summary.get('tests', '?')}개, 통과 {summary.get('pass', '?')}, 실패 {summary.get('fail', '?')}")
+    if p.returncode != 0 or summary.get("fail", "1") != "0":
+        sys.stdout.write("\n".join(l for l in p.stdout.splitlines() if l.startswith(("not ok", "✖"))) + "\n" + p.stderr[-2000:])
+        g.fail(f"test:widgets 종료 코드 {p.returncode}")
     return g
 
 
@@ -616,7 +691,7 @@ def gate_browser(port: int, which: str, pages: str = "pilot") -> Gate:
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="가이드 사이트 검사기 (GUIDE-SITE 5장)")
-    ap.add_argument("check", choices=["all", "parity", "grades", "quiz", "exam", "links", "run-commands", "static", "selftest", "scanner", "offline", "a11y", "keyboard", "diagrams", "tables", "browser"])
+    ap.add_argument("check", choices=["all", "parity", "grades", "quiz", "exam", "links", "run-commands", "static", "selftest", "scanner", "widgets", "offline", "a11y", "keyboard", "diagrams", "tables", "browser"])
     ap.add_argument("--pages", default="all", help="all(기본, 전 페이지) | pilot(시범 14쪽, 빠른 확인) | 쉼표로 구분한 경로(/curriculum/.../)")
     ap.add_argument("--dist", default=None, help="빌드 산출물 폴더(기본: site/dist)")
     ap.add_argument("--site", default=None, help="site/ 폴더(기본: 저장소의 site/) — 검사기 자체를 시험할 때 사본을 가리킨다")
@@ -660,6 +735,8 @@ def main(argv: list[str] | None = None) -> int:
         gates.append(gate_run_commands(dist))
     if c in ("all", "static"):
         gates.append(gate_static(dist))
+    if c in ("all", "widgets"):
+        gates.append(gate_widgets())
     browser = list(BROWSER_SCRIPTS) if c in ("all", "browser") else ([c] if c in BROWSER_SCRIPTS else [])
     if browser and not args.port:
         print("브라우저 검사에는 --port 가 필요하다(에이전트 전용 포트, 127.0.0.1 에만 연다)", file=sys.stderr)

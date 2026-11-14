@@ -22,6 +22,7 @@ pnpm install --frozen-lockfile
 pnpm dev --port 4331          # 127.0.0.1 에만 연다. UI 저자는 자기 전용 포트(4331~)를 쓴다
 pnpm build                    # 전체(약 350쪽, 30초 안팎). GUIDE_SCOPE=pilot 이면 시범 페이지만: pnpm build:pilot
 pnpm report                   # 변환기 보고 모드: 원고 133개에 변환기를 돌려 해석 못 한 구조를 센다
+pnpm test:widgets             # 단위 시험 전부: src/widgets/**/*.test.mjs, src/progress, src/lib (node --test 에 파일 glob 을 넘긴다)
 ```
 
 원격 측정·업데이트 확인은 꺼져 있다(`ASTRO_TELEMETRY_DISABLED=1`, `ASTRO_DISABLE_UPDATE_CHECK=true` — `package.json` 스크립트와 `astro.config.mjs`).
@@ -62,12 +63,12 @@ pnpm report                   # 변환기 보고 모드: 원고 133개에 변환
 1. 위젯은 `site/src/widgets/mNN/<이름>/index.astro` 하나가 진입점이다. 등록 파일은 없다 — 빌드가 디렉터리를 찾는다. `<이름>`은 소문자·숫자·하이픈.
 2. 그 모듈 원고에 표시 줄을 넣는다: 빈 줄로 둘러싼 독립된 줄 `<!-- widget: <이름> -->`. `bash` 블록과 그 출력 블록 사이, 목록·인용 안에 넣으면 빌드가 실패한다(표 안에는 HTML 주석 줄을 둘 수 없다). 원고의 다른 부분은 고치지 않는다.
 3. 표시가 가리키는 디렉터리가 없어도 빌드가 실패한다. `node tests/widget-fixture.mjs`가 세 경우(찾음·없음·명령과 출력 사이)를 시험한다.
-4. 상호작용은 Preact로 만들고 `index.astro`에서 `client:visible`로 붙인다. 계산 로직은 화면과 분리한 순수 함수로 두고 같은 디렉터리에 단위 시험(`*.test.mjs`, `node --test`)을 둔다.
+4. 상호작용은 Preact로 만들고 `index.astro`에서 `client:visible`로 붙인다. 계산 로직은 화면과 분리한 순수 함수로 두고 같은 디렉터리에 단위 시험(`*.test.mjs`)을 둔다. 하나만 돌릴 때는 `site/`에서 `node --test src/widgets/mNN/<이름>/*.test.mjs`(Node 24는 `node --test <폴더>/`를 파일로 보고 실패한다), 전부는 `pnpm test:widgets` — `sitecheck`의 `widgets` 관문이 같은 것을 돌린다.
 5. 수치는 원고(레슨·치트시트의 표)에서 빌드 때 읽거나, 그럴 수 없으면 출처 줄을 주석으로 단다. 실제 실행이 아닌 설명용 동작이면 화면에 "모형"이라고 적는다.
 6. 저장은 `src/scripts/storage.ts`의 `load`/`save`(try/catch, 저장소가 막혀도 동작)를 쓰고, 키 앞에 `guide:`가 자동으로 붙는다. 진행 상태 내보내기/가져오기에 함께 담긴다.
 7. 외부 리소스(글꼴·CDN·이미지)를 쓰지 않는다. `site/src` 안에 외부 주소가 있으면 검사가 실패한다.
 8. 새 패키지가 필요하면 PR 본문에 요청한다(`package.json`·lockfile은 환경 구축 담당).
-9. 키보드 검사는 위젯 폴더에 `keyboard.check.mjs`로 둔다: 독립 실행(스스로 `tests/lib/harness.mjs`의 `serve`로 서버를 연다), `--port <포트>` 인자, 실패면 0이 아닌 종료 코드. `keyboard` 관문이 `src/widgets/**/keyboard.check.mjs`를 찾아, 그 위젯의 표시가 있는 페이지가 대상(`--pages`)일 때 자기 서버를 닫은 뒤 같은 포트로 하나씩 돌린다(`tests/lib/widget-checks.mjs`, 자체 시험 `tests/widget-checks-selftest.mjs`). 표시가 원고 어디에도 없는 위젯의 검사 파일은 관문 실패로 보고한다. `tests/keyboard.mjs`는 고치지 않아도 된다.
+9. 키보드 검사는 위젯 폴더에 `keyboard.check.mjs`로 둔다: 독립 실행(스스로 `tests/lib/harness.mjs`의 `serve`로 서버를 연다), `--port <포트>` 인자, 실패면 0이 아닌 종료 코드. `keyboard` 관문이 `src/widgets/**/keyboard.check.mjs`를 찾아, 그 위젯의 표시가 있는 페이지가 대상(`--pages`)일 때 자기 서버를 닫은 뒤 같은 포트로 하나씩 돌린다(`tests/lib/widget-checks.mjs`, 자체 시험 `tests/widget-checks-selftest.mjs`). 표시가 원고 어디에도 없는 위젯의 검사 파일은 관문 실패로 보고한다. `tests/keyboard.mjs`는 고치지 않아도 된다. 서버 주소는 `harness.mjs`의 `baseUrl(port)`를 쓰고, 360px 가로 넘침은 `widgetOverflow({ port, path, widget })`로 `--shots` 없이도 늘 단언한다(처음 상태와 `button[data-preset]`마다). 위젯 상자 스크린샷은 붙박이 머리글을 숨기고 찍는 `shootElement(page, selector, file)`을 쓴다. 맞춤 위젯이 붙기 전(`astro-island[ssr]`)에는 `guide-client.ts`가 위젯 안 입력을 받지 않고(Tab 이동만 된다) 위젯 상자에 `aria-busy="true"`를 두므로, 검사는 붙은 뒤(`astro-island:not([ssr])`)에 조작한다.
 
 ## 검사 (PR 관문, GUIDE-SITE 5장)
 
@@ -80,10 +81,10 @@ uv run python tools/sitecheck/sitecheck.py parity --pages all                 # 
 uv run python tools/sitecheck/sitecheck.py parity --pages /curriculum/m06-integration-messaging/02-sqs/
 uv run python tools/sitecheck/sitecheck.py a11y --port 4331                   # 하나만: parity·grades·quiz·exam·links·static·offline·a11y·keyboard·diagrams·tables
 uv run python tools/sitecheck/sitecheck.py tables --pages /curriculum/m01-iam-identity/ --port 4331
-node site/tests/screenshots.mjs --port 4331 --out <폴더> [--full]            # 라이트/다크 × 1280/360px
+node site/tests/screenshots.mjs --port 4331 --out <폴더> [--full]            # 라이트/다크 × 1280/360px (맞춤 위젯은 폴더·표시 줄에서 자동으로 찾아 widget-mNN-<이름>으로 찍는다)
 ```
 
-관문: `parity`(제목·코드 블록 바이트·표·메타 줄, 원고의 백슬래시 이스케이프는 CommonMark대로 풀어 비교), `grades`(본문·표 칸의 등급 이모지 🟢🟡🔴에 글자 라벨이나 접근 가능한 이름이 있는지 — 색만으로 전달 금지), `quiz`, `exam`(= grade.py), `links`, `run-commands`(소스 보기 실행 명령의 근거), `static`(외부 주소·네트워크 API, `site/src`와 산출물), `scanner`(`tools/probe/no_external_hosts.py`를 돌려 0건이 아니면 실패, 그리고 `site/tests`·`tools/sitecheck`에 심은 결함 주소가 `.invalid` 호스트나 루프백뿐인지), `selftest`(정적·실행 명령·등급 관문에 결함을 심어 잡는지), `offline`(먼저 `tests/offline-selftest.mjs`로 통로 30가지에 결함을 심어 잡는지 확인), `a11y`, `keyboard`, `diagrams`(Mermaid 라벨 잘림, 서브그래프·노드·간선 라벨 겹침, 노드 글자 명암비, 넓은 그림의 첫 화면에서 잘린 흐름의 시작. 원고 구조 때문에 배치로 못 고치는 것만 이유와 함께 `tests/diagrams-known.json`에 둔다 — 재현되지 않는 항목은 낡은 예외로 실패), `tables`(표 칸 내용이 칸 경계를 넘어 옆 칸과 겹치면 실패(1280·360px), 1280px에서 상자보다 넓은 표는 `tests/tables-known.json`의 목록과 같아야 하고, 넘치는 표에는 키보드 스크롤과 스크롤 표시가 있어야 한다). `diagrams`·`tables`·`offline`은 결함을 심은 페이지로 자체 시험을 먼저 한다.
+관문: `parity`(제목·코드 블록 바이트·표·메타 줄, 원고의 백슬래시 이스케이프는 CommonMark대로 풀어 비교), `grades`(본문·표 칸의 등급 이모지 🟢🟡🔴에 글자 라벨이나 접근 가능한 이름이 있는지 — 색만으로 전달 금지. 빈 라벨(`data-label` 없음·빈 값), 빈 `aria-label`, 보이는 라벨 없이 화면 낭독기 이름만 있는 것도 실패), `quiz`, `exam`(= grade.py), `links`, `run-commands`(소스 보기 실행 명령의 근거), `static`(외부 주소·네트워크 API, `site/src`와 산출물. 위젯의 `*.check.mjs`·`*.test.mjs`에서는 루프백 주소 — 127.0.0.0/8·`localhost`·`[::1]` — 를 허용한다), `scanner`(`tools/probe/no_external_hosts.py`를 돌려 0건이 아니면 실패, 그리고 `site/tests`·`tools/sitecheck`에 심은 결함 주소가 `.invalid` 호스트나 루프백뿐인지), `selftest`(정적·실행 명령·등급 관문에 결함을 심어 잡는지), `widgets`(`pnpm test:widgets` — 위젯 단위 시험·진행 추적·`src/lib` 시험, 시험 파일 없는 위젯도 실패), `offline`(먼저 `tests/offline-selftest.mjs`로 통로 30가지에 결함을 심어 잡는지 확인), `a11y`, `keyboard`, `diagrams`(Mermaid 라벨 잘림, 서브그래프·노드·간선 라벨 겹침, 노드 글자 명암비, 넓은 그림의 첫 화면에서 잘린 흐름의 시작. 원고 구조 때문에 배치로 못 고치는 것만 이유와 함께 `tests/diagrams-known.json`에 둔다 — 재현되지 않는 항목은 낡은 예외로 실패), `tables`(표 칸 내용이 칸 경계를 넘어 옆 칸과 겹치면 실패(1280·360px), 1280px에서 상자보다 넓은 표는 `tests/tables-known.json`의 목록과 같아야 하고, 넘치는 표에는 키보드 스크롤과 스크롤 표시가 있어야 한다). `diagrams`·`tables`·`offline`은 결함을 심은 페이지로 자체 시험을 먼저 한다.
 
 **`--pages`와 브라우저 관문**: `--pages`(기본 `all`)는 브라우저 관문(`offline`·`a11y`·`keyboard`·`diagrams`·`tables`)에도 그대로 넘어간다. 상호작용 단계는 그 페이지가 대상에 있을 때만 돈다 — 퀴즈는 대상의 퀴즈 페이지마다(전 페이지면 문항이 있는 14개 모듈 전부) 키보드로 풀고, M06 위젯은 그 페이지가, 모의고사는 `mock-exam/questions/`가 대상일 때만 조작한다. 경로 목록만 주면 그 페이지들만 연다.
 
@@ -99,12 +100,12 @@ node site/tests/screenshots.mjs --port 4331 --out <폴더> [--full]            #
 
 - **모의고사 정답은 페이지 소스에 들어 있다.** 시험 모드는 서버 없이 브라우저에서 채점하므로, 정답표(`#exam-data` JSON)와 65문항 해설(`<template>`)이 제출 전부터 HTML에 있다. 화면에는 제출 뒤에만 나온다. 혼자 공부하는 가이드라서 이렇게 두었다(소스를 열면 볼 수 있다는 점은 원고의 `answer-key.md`와 같다).
 - 시험 타이머는 페이지가 열려 있는 동안만 줄어든다. 0이 되면 자동 제출한다.
-- **시험 중(시작 뒤 제출 전)에는 정답·해설 페이지로 가는 길을 가린다**(`src/scripts/exam-guard.ts`): 사이드바와 이전/다음 페이지의 정답·해설 링크는 숨고, 본문 등의 다른 링크는 누르면 "그래도 열기/열지 않기" 확인이 뜬다. 시험 상태는 저장값(`guide:exam:m14-mock-exam`)으로 판단하므로 다른 페이지에서도 같다. **주소를 직접 입력해 여는 것은 막지 않는다**(그 페이지 위에 시험 중이라는 알림만 둔다) — 정답이 페이지 소스에 있는 것과 같은 이유다.
+- **시험 중(시작 뒤 제출 전)에는 정답·해설 페이지로 가는 길을 가린다**(`src/scripts/exam-guard.ts`): 사이드바와 이전/다음 페이지의 정답·해설 링크는 숨고, 본문 등의 다른 링크는 누르면 "그래도 열기/열지 않기" 확인이 뜬다. 시험 상태는 저장값(`guide:exam:m14-mock-exam`)으로 판단하므로 다른 페이지에서도 같다. **주소를 직접 입력해 여는 것은 막지 않는다**(그 페이지 위에 시험 중이라는 알림만 둔다) — 정답이 페이지 소스에 있는 것과 같은 이유다. 사이트 검색 결과의 정답·해설 링크도 같은 확인을 거친다. 시작만 하고 떠난 시험이 정답 링크를 끝없이 가리지 않도록, 마지막 저장 시각 + 남은 시간(종료 예정 시각)에서 24시간이 더 지난 진행 상태는 가리지 않는다(`src/lib/exam-live.mjs`, 단위 시험 `exam-live.test.mjs`). 시험 페이지를 다시 열면 그대로 이어서 풀 수 있다.
 - **지난 응시 기록**: 제출할 때마다(시간 종료 자동 제출 포함) 날짜·총점·판정·도메인별 점수·소요 시간을 `guide:exam:m14-mock-exam:history`에 최근 20회까지 쌓고, 시작 화면과 결과 화면에 표로 보인다. 점수는 화면 채점과 같은 `exam-core.gradeExam`(= `grade.py`) 결과를 그대로 담는다. 소요 시간은 타이머가 실제로 줄어든 시간(일시 정지 제외)이다. "응시 기록 지우기"는 확인을 거치고, 진행 상태 내보내기/가져오기에 함께 담긴다(`src/lib/exam-history.mjs`, 단위 시험 `exam-history.test.mjs`).
 - Mermaid 그림은 기본 배치에서 서브그래프·노드가 겹치면, 내용은 그대로 두고 간격을 넓힌 배치로 다시 그린다(`src/plugins/mermaid-render.mjs`).
 - 폭 2400px 이상·높이 600px 이상인 왼→오(LR·RL) 흐름도는 같은 원문을 위→아래(TB)로 한 벌 더 그려, 40rem 이하 화면에서는 그것을 대신 보인다(그 아래에 "다시 배치했다"는 안내, 원래 배치는 "원래 크기로 보기" 링크). 좁은 화면에서 80%로만 줄인 넓은 그림이 빈 곳만 보이는 띠가 되는 것을 막는다(지금은 M14 레슨 2의 전체 그림 하나). `diagrams` 관문은 이 배치도 같은 기준(라벨 잘림·겹침·명암비, 360px 첫 화면)으로 보고 순번을 `n1`처럼 적는다.
 - 폭이 640px를 넘는 그림은 가로 스크롤 상자 안에서 흐름의 시작(들어오는 간선이 없는 노드 중 가장 위·왼쪽)이 보이게 열린다 — 왼쪽 끝에서 그 노드가 다 보이면 왼쪽 끝부터, 아니면 그 노드를 가운데에. 아래에 같은 사이트의 원래 크기 SVG(`/diagrams/<id>.svg`)를 새 탭으로 여는 링크가 붙는다.
 - 원고가 `classDef`/`style`로 밝은 바탕(fill)만 주고 글자색(`color`)을 주지 않은 노드는 다크 테마로 그릴 때만 어두운 글자색을 더한다(원고는 그대로).
 - 표: 한국어 낱말은 중간에서 끊지 않고(keep-all), 칸 안의 인라인 코드는 구분 기호 뒤·낱말 경계(`<wbr>`)에서, 공백 없는 16자 이상 영문 토큰(API 이름·JSON·주소)은 아무 데서나 끊는다. 그래도 상자보다 넓은 표는 위에 "가로로 스크롤" 안내와 가장자리 그림자·점선 테두리가 붙고, Tab으로 고른 뒤 ←/→로 스크롤한다.
-- 본문·표 칸의 등급 이모지 🟢/🟡/🔴 옆에는 원고 README 등급 표의 라벨(재현/부분/개념)이 작은 배지로 붙는다(원고 글자는 그대로, 제목 안에서는 접근 가능한 이름만). 라벨 글자는 CSS 생성 콘텐츠(`::after { content: attr(data-label) }`, `user-select: none`)라서 화면과 화면 낭독기에는 나오지만 문단을 복사하면 원고 글자만 복사된다("🟢재현"처럼 섞이지 않는다). 메타 칩의 배지, 진행 추적 항목 이름의 이모지도 같다.
+- 본문·표 칸의 등급 이모지 🟢/🟡/🔴 옆에는 원고 README 등급 표의 라벨(재현/부분/개념)이 작은 배지로 붙는다(원고 글자는 그대로. 제목 안에서도 같다 — 라벨 칸은 글자 없는 빈 요소라 제목 글자·앵커가 바뀌지 않는다). 접근 가능한 이름은 이모지 자리에 직접 둔다(`<span role="img" aria-label="재현">🟢</span>`) — 스타일시트를 꺼도 등급이 남는다. 눈에 보이는 라벨 글자는 CSS 생성 콘텐츠(`::after { content: attr(data-label) }`, `user-select: none`, `aria-hidden="true"`)라서 화면에는 보이고 화면 낭독기에는 두 번 읽히지 않으며, 문단을 복사하면 원고 글자만 복사된다("🟢재현"처럼 섞이지 않는다). 메타 칩의 배지·범례, 진행 추적 항목 이름의 이모지도 같다.
 - 로컬 서버(`scripts/serve.mjs`, 검사 스크립트)는 경로를 실제 경로(realpath)로 풀어 `dist` 안인지 확인한다. `dist` 안의 심볼릭 링크가 밖을 가리키면 403을 돌려준다.

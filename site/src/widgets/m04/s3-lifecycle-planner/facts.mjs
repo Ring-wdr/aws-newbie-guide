@@ -97,8 +97,8 @@ export function readLifecycleFacts(text) {
   const restore = [rs.m[1], rs.m[2]].map((n) => byShort(n) ?? fail(`복원 문장의 "${n}"`));
   const restoreLine = rs.line;
 
-  // 7) 0일 만료 거부: "존재하지 않는 클래스, 중복 규칙 ID, 0일 만료도 거부한다"
-  const z = findLine(lines, /(\d+)일 만료도 거부한다/, '0일 만료 거부 문장');
+  // 7) 0일 만료 거부: lab02 해설 "… 존재하지 않는 클래스, 중복 규칙 ID, 0일 만료는 거부한다"
+  const z = findLine(lines, /중복 규칙 ID, (\d+)일 만료[는도] 거부한다/, '0일 만료 거부 문장');
   const expirationMin = { days: Number(z.m[1]) + 1, line: z.line };
 
   // 8) lab02 8단계 출력의 영수증 규칙(JSON 배열)

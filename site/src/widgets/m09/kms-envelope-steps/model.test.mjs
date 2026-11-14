@@ -1,4 +1,4 @@
-// node --test src/widgets/m09/kms-envelope-steps/*.test.mjs
+// node --test src/widgets/m09/kms-envelope-steps/*.test.mjs   (site/ 에서. 위젯 시험 전부: pnpm test:widgets)
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -45,7 +45,8 @@ test('평문 데이터 키는 S3에 한 번도 없고, KMS에는 평문 데이�
     for (const s of r.steps) {
       assert.ok(!s.s3.some((i) => i.kind === 'pdk' || i.kind === 'plain'), `${s.n} S3`);
       assert.ok(!s.kms.some((i) => i.kind !== 'cmk'), `${s.n} KMS`);
-      if (s.wire) assert.ok(!s.wire.includes('평문 데이터 '), s.wire);
+      // 오가는 것은 데이터 키(평문·암호화된 것)뿐 — '평문 데이터 키'가 아닌 '평문 데이터'는 없어야 한다
+      if (s.wire) assert.ok(!/평문 데이터(?! 키)/.test(s.wire), s.wire);
     }
     // 저장 단계 뒤 S3에는 암호문·암호화된 데이터 키·컨텍스트
     assert.deepEqual(r.steps[4].s3.map((i) => i.kind), ['ct', 'edk', 'ctx']);

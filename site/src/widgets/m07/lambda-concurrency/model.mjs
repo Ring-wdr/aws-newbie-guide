@@ -16,6 +16,20 @@
 //  A4. 프로비저닝된 환경은 요청이 없어도 자리를 차지한다(예약이 없으면 미예약 몫에서, 있으면 예약 몫 안에서).
 //      프로비저닝된 동시성은 예약 동시성을 넘을 수 없게 맞춘다.
 //  A5. 나머지 함수들(B)은 동기 호출로 두고 콜드 스타트는 따지지 않는다.
+//
+// AWS 문서에서 가져온 규칙(원고에 없음):
+//  D1. 예약 동시성과 (예약 없이 거는) 프로비저닝된 동시성은 "미예약 계정 동시성 − 100"까지만 설정할 수 있다 — 남은 100은
+//      예약 동시성이 없는 함수들의 몫이다. 출처: AWS Lambda 개발자 안내서 "Configuring reserved concurrency for a Lambda function"
+//      ("You can reserve up to the Unreserved account concurrency value minus 100.")와
+//      "Configuring provisioned concurrency for a function"("You can configure up to the Unreserved account concurrency
+//      in your account, minus 100. … a maximum of 900 provisioned concurrency units for a single function").
+//      모형은 다른 함수에 예약·프로비저닝이 없다고 두므로 상한은 둘 다 limit − 100 이다. 예약이 있으면 프로비저닝은 예약 이하.
+
+/** D1: 예약 동시성이 없는 함수들을 위해 남겨 둬야 하는 미예약 동시성(AWS 문서). */
+export const UNRESERVED_MIN = 100;
+
+/** D1: 함수 A 하나에 설정할 수 있는 예약·(예약 없는) 프로비저닝 동시성의 상한. */
+export const settableMax = (limit) => Math.max(0, limit - UNRESERVED_MIN);
 
 /** 화면에서 받는 요청 수의 상한(모형 화면의 범위, AWS 한도가 아니다). */
 export const MODEL_MAX_DEMAND = 5000;
@@ -34,8 +48,8 @@ const int = (v, lo, hi, dflt) => {
 /** 입력을 모형이 다룰 수 있는 정수 범위로 맞춘다. limit = 원고의 계정 동시성(1,000). */
 export function normalize(input, limit) {
   const reservedOn = Boolean(input.reservedOn);
-  const reserved = int(input.reserved, 0, limit, 0);
-  const cap = reservedOn ? reserved : limit;
+  const reserved = int(input.reserved, 0, settableMax(limit), 0);
+  const cap = reservedOn ? reserved : settableMax(limit);
   return {
     reservedOn,
     reserved,

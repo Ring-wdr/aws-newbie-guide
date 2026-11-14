@@ -26,6 +26,8 @@ type State = {
   remainingMs: number;
   paused: boolean;
   filter: 'all' | 'wrong' | 'flagged';
+  /** 마지막으로 저장한 벽시계 시각(ms). 버려진 시험을 가리는 판단에 쓴다(lib/exam-live.mjs). */
+  lastActiveAt?: number;
 };
 
 const STORE = 'exam:m14-mock-exam';
@@ -75,7 +77,10 @@ function init(app: HTMLElement) {
     requestAnimationFrame(() => (live.textContent = t));
   };
 
-  const persist = () => save(STORE, state);
+  const persist = () => {
+    state.lastActiveAt = Date.now();
+    save(STORE, state);
+  };
   const answered = (n: number) => (state.answers[n]?.length ?? 0) > 0;
   const flagged = (n: number) => state.flags.includes(n);
 
