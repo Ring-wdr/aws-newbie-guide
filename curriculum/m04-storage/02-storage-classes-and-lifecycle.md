@@ -79,6 +79,8 @@ AWS가 **거부하는** 규칙(`InvalidArgument`):
 
 그리고 2024년 9월부터 **128 KB 미만 객체는 기본적으로 어떤 클래스로도 전환되지 않는다**. 작은 객체는 전환 요청 요금이 절감액보다 크기 때문이다. 필요하면 필터에 `ObjectSizeGreaterThan`/`ObjectSizeLessThan`을 직접 쓴다. 에뮬레이터 응답의 `"TransitionDefaultMinimumObjectSize": "all_storage_classes_128K"`가 이 기본값이다.
 
+<!-- widget: s3-lifecycle-planner -->
+
 ### Glacier 복원(Restore)
 
 Glacier Flexible Retrieval·Deep Archive 객체는 바로 `GET`할 수 없다. `RestoreObject`로 **임시 사본**을 N일 동안 만들어 달라고 요청하고, 사본이 준비되면 읽는다. 객체의 클래스는 여전히 Glacier다. 원래 클래스를 바꾸려면 복원 후 `CopyObject`로 덮어쓴다. Glacier Instant Retrieval은 이름 그대로 복원 없이 바로 읽힌다.
