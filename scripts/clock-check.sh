@@ -25,7 +25,8 @@
 # 되돌아감. 관찰: 맥 시계가 2초 틀어진 45분 동안 270번). 서명은 15분까지 허용되므로 위의 기본 모드로는 보이지 않는다. 이 모드는 VM 저널에서 게스트 에이전트의 보정 기록("SyncTime: ... drift was X")을 센다.
 #   --last <초>  최근 몇 초를 볼지 (기본 180)
 #   --summary    검증 스크립트의 요약용: 불안정할 때만 "이번 실행 동안 …"을 출력하고, 언제나 0 으로 끝난다
-#                (확인하지 못해도 조용히 0). 모듈 verify.sh 는 실패 요약 바로 앞에 한 줄로 부른다:
+#                (확인하지 못해도 조용히 0). 문구는 통과한 실행 뒤에 나와도 맞게 쓴다(M00 은 통과할 때에도 부른다).
+#                모듈 verify.sh 는 "MODULE mNN FAIL"(M00 은 결과 줄) 바로 앞에 한 줄로 부른다:
 #                  bash "$ROOT/scripts/clock-check.sh" --stability --summary --last "$SECONDS" || true
 #                ($SECONDS = bash 가 그 스크립트를 시작한 뒤 지난 초 → "이번 실행 동안". --summary 는 0 으로 끝나지만
 #                 set -e 인 verify.sh 가 어떤 경우에도 여기서 멈추지 않게 || true 를 붙인다)
@@ -123,7 +124,7 @@ stability() {
   lastt="$(printf '%s\n' "$rows" | awk '{a = $2 < 0 ? -$2 : $2} NF == 2 && a >= 0.5 && a < 60 {t = $1} END {print t}')"
   typ="$(printf '%s\n' "$rows" | awk '{a = $2 < 0 ? -$2 : $2} NF == 2 && a >= 0.5 && a < 60 {print a}' | sort -n | awk '{v[NR] = $1} END {print v[int((NR + 1) / 2)]}')"
   if [ "$summary" -eq 1 ]; then
-    printf '\033[33m[clock-check] 참고: 이번 실행 동안(%s초) Colima VM 시계가 %s번 옮겨졌습니다 (한 번에 약 %s초). 위 실패가 "준비됨(ACTIVE) 직후 ResourceNotFoundException" 또는 "ACTIVE 였다가 CREATING" 이라면 이것 때문일 수 있습니다.\033[0m\n' \
+    printf '\033[33m[clock-check] 참고: 이번 실행 동안(%s초) Colima VM 시계가 %s번 옮겨졌습니다 (한 번에 약 %s초). 이번 실행에 "준비됨(ACTIVE) 직후 ResourceNotFoundException" 또는 "ACTIVE 였다가 CREATING" 실패가 있었다면 이것 때문일 수 있습니다(모두 통과했다면 영향이 없었던 것입니다).\033[0m\n' \
       "$last" "$n_unstable" "$typ" >&2
   else
     printf '\033[33m[clock-check] VM 시계 불안정: 최근 %s초 동안 Colima VM 시계가 %s번 옮겨졌습니다 (한 번에 약 %s초, 마지막 %s초 전).\033[0m\n' \
