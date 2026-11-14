@@ -1,0 +1,135 @@
+---
+// M01 레슨 3 — IAM 정책 평가 순서 따라가기(설명용 모형).
+// 평가 순서·오류 문구·원고 예의 줄은 빌드 때 원고에서 읽는다(facts.mjs). 읽지 못하면 빌드가 실패한다.
+import fs from 'node:fs';
+import path from 'node:path';
+import { REPO_ROOT } from '../../../lib/repo.mjs';
+import { readPolicyFacts, LESSON, ROLES, CHEATSHEET } from './facts.mjs';
+import PolicyEval from './PolicyEval.jsx';
+
+const read = (rel: string) => fs.readFileSync(path.join(REPO_ROOT, rel), 'utf8');
+const facts = readPolicyFacts({ lesson: read(LESSON), roles: read(ROLES), cheatsheet: read(CHEATSHEET) });
+---
+
+<PolicyEval client:visible facts={facts} />
+
+<style is:global>
+  .pe {
+    margin: 1.5rem 0;
+    padding: 1rem;
+    border: 1px solid var(--guide-border);
+    border-left: 4px solid var(--sl-color-accent);
+    border-radius: var(--guide-radius);
+    background: var(--guide-surface);
+    font-size: 0.9375rem;
+    overflow-wrap: anywhere;
+  }
+  .pe :is(p, ul, ol, fieldset, details, table) { margin: 0; }
+  .pe > * + * { margin-top: 0.85rem; }
+  .pe-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+  .pe-head h4 { margin: 0; font-size: 1.05rem; }
+  .pe-model {
+    display: inline-block;
+    padding: 0 0.5rem;
+    border: 1px dashed currentColor;
+    border-radius: 999px;
+    font-size: 0.8125rem;
+    font-weight: 700;
+    color: var(--guide-y-fg);
+    background: var(--guide-y-bg);
+  }
+  .pe-intro, .pe-hint, .pe small { color: var(--guide-muted); }
+  .pe small { display: block; font-size: 0.8125rem; line-height: 1.5; }
+  .pe fieldset { border: 0; padding: 0; min-width: 0; }
+  .pe legend { font-weight: 700; padding: 0; margin-bottom: 0.3rem; }
+  .pe-row { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+  .pe-hint { margin-top: 0.35rem !important; font-size: 0.8125rem; }
+  .pe button {
+    font: inherit;
+    font-size: 0.875rem;
+    padding: 0.3rem 0.8rem;
+    min-height: 2.25rem;
+    border-radius: 0.4rem;
+    border: 1px solid var(--guide-border);
+    background: var(--guide-surface-2);
+    color: var(--sl-color-text);
+    cursor: pointer;
+    text-align: left;
+  }
+  .pe button:hover { border-color: var(--sl-color-accent); }
+  .pe button[aria-pressed='true'] { border-color: var(--sl-color-accent); box-shadow: inset 0 0 0 1px var(--sl-color-accent); font-weight: 700; }
+  .pe button[aria-pressed='true']::before { content: '✓ '; }
+  .pe :is(button, input, summary):focus-visible { outline: 2px solid var(--sl-color-accent); outline-offset: 2px; }
+  .pe-controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: 0.85rem 1.25rem; }
+  .pe-field { display: flex; flex-direction: column; gap: 0.2rem; }
+  .pe-field label { display: flex; gap: 0.4rem; align-items: baseline; }
+  .pe-result {
+    padding: 0.6rem 0.75rem;
+    border: 1px solid var(--guide-border);
+    border-radius: var(--guide-radius);
+    background: var(--sl-color-bg);
+  }
+  .pe-result > p + p { margin-top: 0.4rem; }
+  .pe-tag { font-weight: 700; }
+  .pe-result[data-decision='allowed'] .pe-tag { color: var(--guide-ok); }
+  .pe-result:is([data-decision='explicitDeny'], [data-decision='implicitDeny']) .pe-tag { color: var(--guide-bad); }
+  .pe-phrase { font-size: 0.875rem; }
+  .pe-caveat { font-size: 0.875rem; padding: 0.4rem 0.55rem; border: 1px dashed var(--guide-y-bd); background: var(--guide-y-bg); color: var(--guide-y-fg); border-radius: 0.3rem; }
+  .pe-flow { list-style: none; padding: 0 !important; display: flex; flex-direction: column; gap: 0.9rem; }
+  .pe-step {
+    margin: 0 !important;
+    display: grid;
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+    gap: 0.25rem 0.75rem;
+    padding: 0.4rem 0.6rem;
+    border: 2px solid var(--guide-border);
+    border-radius: 0.4rem;
+    background: var(--sl-color-bg);
+    position: relative;
+  }
+  /* 단계 사이 화살표(장식) */
+  .pe-step + .pe-step::before {
+    content: '↓';
+    position: absolute;
+    top: -0.95rem;
+    height: 0.9rem;
+    display: grid;
+    place-items: center;
+    left: 1rem;
+    font-size: 0.75rem;
+    line-height: 1;
+    color: var(--guide-muted);
+  }
+  .pe-step[data-outcome='skip'] { border-style: dashed; color: var(--guide-muted); }
+  .pe-step[aria-current='step'] { border-color: var(--sl-color-accent); box-shadow: inset 0 0 0 1px var(--sl-color-accent); }
+  .pe-q { display: flex; gap: 0.45rem; align-items: baseline; }
+  .pe-n {
+    flex: none;
+    display: inline-grid;
+    place-items: center;
+    width: 1.4rem;
+    height: 1.4rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    border: 1.5px solid currentColor;
+    border-radius: 999px;
+  }
+  .pe-badge { font-weight: 700; }
+  .pe-here { color: var(--sl-color-accent-high); }
+  .pe-final { border-width: 3px; font-weight: 700; }
+  .pe-final[data-decision='allowed'] .pe-a { color: var(--guide-ok); }
+  .pe-final:not([data-decision='allowed']) .pe-a { color: var(--guide-bad); }
+  @media (max-width: 40rem) {
+    .pe-step { grid-template-columns: minmax(0, 1fr); }
+  }
+  .pe details > summary { cursor: pointer; font-weight: 700; width: fit-content; }
+  .pe-table-scroll { overflow-x: auto; margin-top: 0.5rem; }
+  .pe-table { width: 100%; border-collapse: collapse; font-size: 0.8125rem; display: table; }
+  .pe-table :is(th, td) { border: 1px solid var(--guide-border); padding: 0.3rem 0.45rem; text-align: left; vertical-align: top; }
+  .pe-table :is(td, th):first-child { white-space: nowrap; }
+  .pe-table tr[aria-current='step'] { background: var(--sl-color-accent-low); font-weight: 700; }
+  .pe-assume ul { margin-top: 0.4rem !important; padding-left: 1.2rem; }
+  @media (prefers-reduced-motion: reduce) {
+    .pe * { transition: none !important; animation: none !important; }
+  }
+</style>
