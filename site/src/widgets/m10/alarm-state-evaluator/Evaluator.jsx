@@ -14,7 +14,7 @@ const MODEL_SPIKE_POINTS = [300, 900, 300, 300, 800, 850];
 const MODEL_SPIKE_N = 3;
 const MODEL_SPIKE_M = 2;
 // 하트비트: 정상일 때 1분마다 1을 보내다가 끊긴다(값 1과 임계값 1·LessThanThreshold는 모형 값).
-const MODEL_HEARTBEAT_POINTS = [1, 1, 1, null, null, null];
+const MODEL_HEARTBEAT_POINTS = [1, 1, 1, null, null, null, null];
 
 function basis(s) {
   if (s.unknown) return '문서로 정해지지 않음(이른 ALARM 후보가 최근 N개 밖)';
@@ -186,7 +186,7 @@ export default function Evaluator({ facts }) {
             <li>CloudWatch는 N개보다 넓은 <strong>평가 범위</strong>를 가져온다. 그 안 실제 데이터가 N개 이상이면 가장 최근 실제 N개로 판정하고 TreatMissingData는 쓰지 않는다.</li>
             <li>실제 데이터가 N개보다 적을 때만 모자란 개수를 TreatMissingData로 채운다. 범위 안이 모두 누락이면 missing은 INSUFFICIENT_DATA, ignore는 직전 상태 유지.</li>
             <li>"이른 ALARM": 평가 범위의 실제 포인트가 모두 위반이고 가장 오래된 위반이 M번째 이상 오래되었으면(그 뒤는 누락뿐) missing에서도 ALARM, ignore는 상태 유지. 그 위반이 최근 N개 밖이면 문서로 정해지지 않아 판정하지 않는다.</li>
-            <li>평가 범위의 길이는 기간·해상도에 따라 달라 문서가 정하지 않는다. 모형은 N+1개 이상의 모든 길이로 따져 결과가 하나일 때만 판정하고, 갈리면 <strong>"판정하지 않음"</strong>과 가능한 결과만 보여 준다. 첫 구간 앞에는 데이터가 없다고 둔다.</li>
+            <li>평가 범위 길이: <strong>N+1 또는 N+2(모형 값 — 문서의 예: 평가 기간 3 → 평가 범위 5. 실제 길이는 문서가 밝히지 않는다)</strong>. 두 길이의 결과가 같을 때만 판정하고, 갈리면 <strong>"판정하지 않음"</strong>과 가능한 결과만 보여 준다. 범위가 유한하므로 데이터가 끊기고 N+2구간이 지나면 예전 값은 범위에서 빠진다. 첫 구간 앞에는 데이터가 없다고 둔다.</li>
             <li>구간마다 데이터 포인트는 통계 값 하나(lab02는 세 값의 평균 {labPoint} — {src(lab.reason.line)})이거나 누락. 구간이 끝나면 곧바로 평가한다(실제는 분 단위로 늦을 수 있다).</li>
           </ul>
         </div>

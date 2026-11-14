@@ -91,8 +91,9 @@ try {
   console.log(`키 입력 ${keys}번`);
   await browser.close();
 
-  if (shots) {
-    fs.mkdirSync(shots, { recursive: true });
+  // 가로 넘침 검사는 --shots 없이도 늘 돈다(스크린샷만 --shots 때)
+  {
+    if (shots) fs.mkdirSync(shots, { recursive: true });
     for (const colorScheme of ['light', 'dark']) {
       for (const width of [1280, 360]) {
         const o = await open({ colorScheme, viewport: { width, height: 900 }, reducedMotion: 'reduce' });
@@ -112,9 +113,11 @@ try {
         if (over > 0) problems.push(`${colorScheme} ${width}px: 가로 넘침 ${over}px`);
         const wide = await o.page.$$eval(`${ROOT} *`, (els, w) => els.filter((e) => e.getBoundingClientRect().right > w + 0.5).map((e) => e.className || e.tagName).slice(0, 5), width);
         if (wide.length) problems.push(`${colorScheme} ${width}px: 화면 밖으로 나간 요소 ${wide.join(', ')}`);
-        const file = path.join(shots, `m11-athena-${colorScheme}-${width}.png`);
-        await o.page.locator(ROOT).screenshot({ path: file });
-        console.log(`  스크린샷 ${path.basename(file)}`);
+        const file = shots && path.join(shots, `m11-athena-${colorScheme}-${width}.png`);
+        if (shots) {
+          await o.page.locator(ROOT).screenshot({ path: file });
+          console.log(`  스크린샷 ${path.basename(file)}`);
+        }
         await o.browser.close();
       }
     }

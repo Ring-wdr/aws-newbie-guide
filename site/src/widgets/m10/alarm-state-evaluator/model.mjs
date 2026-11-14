@@ -17,8 +17,10 @@
 // 모형의 가정·한계(화면의 판정 옆에도 적는다):
 //  1. 구간(Period)마다 데이터 포인트는 하나(그 구간의 통계 값)이거나 없다(누락). 첫 구간 앞에는 데이터가 없다.
 //  2. 구간이 끝날 때마다 곧바로 평가한다(실제 평가 지연 없음). 슬라이딩 평가 창(기본값)만 다룬다.
-//  3. 평가 범위 길이를 문서가 정하지 않으므로 N+1개 이상의 모든 길이로 판정해 보고, 길이에 따라 결과가
-//     달라지면 "모형이 판정하지 않는다"고 하고 가능한 결과만 보여 준다.
+//  3. 평가 범위 길이는 문서가 밝히지 않는다(예: Evaluation Periods 3 → 평가 범위 5). 범위는 유한하다(문서 표 1의
+//     2행 설명: 다음 평가에도 누락이면 "that non-breaching data point will no longer be in the evaluation range").
+//     모형은 문서의 예를 근거로 상한을 N+2(모형 값)로 두고 길이 N+1과 N+2로 판정해, 둘이 갈리면
+//     "모형이 판정하지 않는다"고 하고 가능한 결과만 보여 준다.
 //  4. 문서의 표·문장으로 정해지지 않는 경우(이른 ALARM 규칙에서 위반 포인트가 최근 N개 밖에 있는 경우,
 //     ignore가 이른 ALARM 대신 상태를 유지하는 것 외의 해석)는 판정하지 않는다.
 
@@ -35,6 +37,9 @@ export const OPS = {
 
 /** 화면 범위(AWS 한도가 아니다): 평가 구간 수 N, 보여 줄 구간 수. */
 export const MODEL_LIMITS = { maxN: 10, maxPoints: 12 };
+
+/** 평가 범위 길이 후보(모형 값): N+1 ~ N+2. 근거는 AWS 문서의 예(Evaluation Periods 3 → 평가 범위 5). 실제 길이는 문서가 밝히지 않는다. */
+export const MODEL_RANGE_EXTRA = { min: 1, max: 2 };
 
 /** 평균(Average 통계). lab02에서 게시한 값들을 구간 값 하나로 요약할 때 쓴다. */
 export function average(values) {
@@ -126,8 +131,8 @@ export function evaluateRange(range, n, m, tmd) {
 }
 
 /**
- * 구간마다 알람을 평가한다. 평가 범위 길이 R을 N+1부터 "모든 구간을 덮는 길이"까지 바꿔 가며 판정하고
- * (첫 구간 앞은 누락이라 그보다 길어도 결과가 같다), 결과가 하나로 모이면 판정, 아니면 판정하지 않는다.
+ * 구간마다 알람을 평가한다. 평가 범위 길이 R을 N+1과 N+2(모형 값)로 판정해 결과가 하나로 모이면 판정,
+ * 갈리면 판정하지 않는다. 첫 구간 앞은 누락으로 채운다.
  * @param cfg normalize 된 입력
  */
 export function evaluate(cfg) {
@@ -138,7 +143,7 @@ export function evaluate(cfg) {
   for (let i = 0; i < cfg.points.length; i++) {
     const history = cls.slice(0, i + 1);
     const outcomes = [];
-    for (let R = cfg.n + 1; R <= Math.max(cfg.n + 1, i + 1); R++) {
+    for (let R = cfg.n + MODEL_RANGE_EXTRA.min; R <= cfg.n + MODEL_RANGE_EXTRA.max; R++) {
       const range = R > history.length ? [...new Array(R - history.length).fill(null), ...history] : history.slice(-R);
       outcomes.push({ R, ...evaluateRange(range, cfg.n, cfg.m, cfg.tmd) });
     }
@@ -149,7 +154,7 @@ export function evaluate(cfg) {
       else if (o.result === 'retain') for (const p of prevSet) set.add(p);
       else set.add(o.result);
     }
-    const decided = !unknown && set.size === 1 && prevDecided !== false;
+    const decided = !unknown && set.size === 1;
     const state = decided ? [...set][0] : null;
     const prev = prevSet.size === 1 && prevDecided ? [...prevSet][0] : null;
     const usesPrev = outcomes.some((o) => o.result === 'retain');
@@ -217,12 +222,12 @@ export function explain(step, cfg) {
   if (step.state === null) {
     const poss = step.possible.join(' 또는 ');
     return step.dependsOnRange
-      ? `모형이 판정하지 않는다: 평가 범위 길이(문서가 정하지 않음 — 기간·해상도에 따라 다름)에 따라 ${poss}가 될 수 있다. 예를 들어 오래된 실제 값이 범위 안에 남아 있느냐에 따라 달라진다.`
+      ? `모형이 판정하지 않는다: 평가 범위 길이(모형 값 N+1 또는 N+2 — 실제 길이는 문서가 밝히지 않는다)에 따라 ${poss}가 될 수 있다. 오래된 실제 값이 범위 안에 남아 있느냐에 따라 달라진다.`
       : `모형이 판정하지 않는다: 직전 상태를 정하지 못해 이번 결과도 ${poss} 중 하나다.`;
   }
   const o = step.longest;
   const why = WHY[o.why](o, cfg);
-  const range = step.dependsOnRange ? '' : ' 평가 범위 길이와 상관없이 같은 결과다.';
+  const range = step.dependsOnRange ? '' : ' 평가 범위 길이(모형 값 N+1·N+2) 어느 쪽이든 같은 결과다.';
   let change;
   if (step.changed === null) change = ' 직전 상태를 정하지 못해 바뀌었는지는 알 수 없다.';
   else if (step.changed) change = ` 상태가 ${step.prev} → ${step.state}로 바뀐다(그 상태에 걸어 둔 액션이 실행된다).`;

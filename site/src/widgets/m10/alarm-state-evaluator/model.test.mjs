@@ -47,9 +47,10 @@ for (const t of DOC_TABLES) {
   }
 }
 
-test('문서의 이른 ALARM 설명: N=M=3에서 - - - - X, - - - X - 는 ALARM이 아니다(missing)', () => {
-  assert.equal(evaluateRange(toRange('- - - - X'), 3, 3, 'missing').result, 'OK');
-  assert.equal(evaluateRange(toRange('- - - X -'), 3, 3, 'missing').result, 'OK');
+test('문서의 이른 ALARM 설명: N=M=3에서 - - - - X, - - - X - 는 곧바로 ALARM이 되지 않는다(missing)', () => {
+  // 문서는 "ALARM이 아니다"라고만 말한다 — 그 밖의 상태는 단언하지 않는다
+  assert.notEqual(evaluateRange(toRange('- - - - X'), 3, 3, 'missing').result, 'ALARM');
+  assert.notEqual(evaluateRange(toRange('- - - X -'), 3, 3, 'missing').result, 'ALARM');
 });
 
 test('문서로 정해지지 않는 경우: 이른 ALARM 후보 위반이 최근 N개 밖이면 판정하지 않음', () => {
@@ -102,20 +103,37 @@ test('처음 상태는 INSUFFICIENT_DATA, 데이터가 계속 없으면(missing)
   assert.equal(run({ points: [] }).final, 'INSUFFICIENT_DATA');
 });
 
-test('하트비트(N=M=1, LessThanThreshold 1)가 끊기면: 평가 범위에 따라 갈리는 동안은 판정하지 않는다', () => {
-  const base = { threshold: 1, op: 'LessThanThreshold', n: 1, m: 1, points: [1, 1, 1, null, null, null] };
-  // 첫 누락 구간: 범위(2 이상)에 실제 값 1이 남아 있어 모든 길이에서 OK
+test('하트비트(N=M=1, LessThanThreshold 1)가 끊기면: 범위 상한(N+2)을 지나 TreatMissingData대로 정착한다', () => {
+  const base = { threshold: 1, op: 'LessThanThreshold', n: 1, m: 1, points: [1, 1, 1, null, null, null, null] };
+  // 첫 누락 구간: 범위(2·3)에 실제 값 1이 남아 있어 OK
   for (const tmd of ['missing', 'ignore', 'breaching', 'notBreaching']) assert.equal(run({ ...base, tmd }).steps[3].state, 'OK', tmd);
-  // 그다음: 범위 길이에 따라 실제 값이 들어가기도(OK) 빠지기도 한다
-  const miss = run({ ...base, tmd: 'missing' }).steps[4];
-  assert.equal(miss.state, null);
-  assert.deepEqual(miss.possible.sort(), ['INSUFFICIENT_DATA', 'OK']);
-  const br = run({ ...base, tmd: 'breaching' }).steps[4];
-  assert.deepEqual(br.possible.sort(), ['ALARM', 'OK']);
-  // notBreaching은 어느 길이에서도 OK
-  assert.deepEqual(states(run({ ...base, tmd: 'notBreaching' })), ['OK', 'OK', 'OK', 'OK', 'OK', 'OK']);
-  // ignore: 실제 값이 범위에 있으면 OK, 없으면 직전 상태(OK) 유지 → 모두 OK
-  assert.deepEqual(states(run({ ...base, tmd: 'ignore' })), ['OK', 'OK', 'OK', 'OK', 'OK', 'OK']);
+  // 둘째 누락 구간: 범위 2에는 실제 값이 없고 범위 3에는 있다 → missing·breaching은 갈려서 판정하지 않음
+  assert.equal(run({ ...base, tmd: 'missing' }).steps[4].state, null);
+  assert.deepEqual(run({ ...base, tmd: 'missing' }).steps[4].possible.sort(), ['INSUFFICIENT_DATA', 'OK']);
+  assert.deepEqual(run({ ...base, tmd: 'breaching' }).steps[4].possible.sort(), ['ALARM', 'OK']);
+  // 셋째 누락 구간부터: 범위 상한(3)을 지나 실제 값이 빠진다 → 정착
+  assert.deepEqual(states(run({ ...base, tmd: 'breaching' })).slice(5), ['ALARM', 'ALARM']);
+  assert.deepEqual(states(run({ ...base, tmd: 'missing' })).slice(5), ['INSUFFICIENT_DATA', 'INSUFFICIENT_DATA']);
+  assert.deepEqual(states(run({ ...base, tmd: 'notBreaching' })), ['OK', 'OK', 'OK', 'OK', 'OK', 'OK', 'OK']);
+  // ignore: 직전 상태(OK)를 유지한다
+  assert.deepEqual(states(run({ ...base, tmd: 'ignore' })), ['OK', 'OK', 'OK', 'OK', 'OK', 'OK', 'OK']);
+});
+
+test('1·1·1 뒤 누락 9구간: 상한을 지난 뒤로는 모두 판정한다(영영 미판정이 아니다)', () => {
+  const pts = [1, 1, 1, ...new Array(9).fill(null)];
+  for (const [tmd, want] of [['breaching', 'ALARM'], ['missing', 'INSUFFICIENT_DATA'], ['notBreaching', 'OK'], ['ignore', 'OK']]) {
+    const r = run({ threshold: 1, op: 'LessThanThreshold', n: 1, m: 1, tmd, points: pts });
+    assert.ok(r.steps.slice(5).every((s) => s.state === want), tmd);
+    assert.ok(r.undecided <= 1, `${tmd}: 미판정 ${r.undecided}`);
+  }
+  // N=3, M=3이어도 상한(5)을 지나면 정착
+  const r3 = run({ n: 3, m: 3, tmd: 'missing', points: [900, 900, 900, ...new Array(6).fill(null)] });
+  assert.equal(r3.final, 'INSUFFICIENT_DATA');
+});
+
+test('ignore: 미판정 구간 뒤에도 직전 상태가 하나로 모이면 판정한다', () => {
+  const r = run({ n: 1, m: 1, tmd: 'ignore', points: [900, null, null, null] });
+  assert.deepEqual(states(r), ['ALARM', 'ALARM', 'ALARM', 'ALARM']);
 });
 
 test('처음부터 누락만 있으면 breaching은 ALARM, notBreaching은 OK, ignore는 처음 상태 유지', () => {

@@ -59,15 +59,15 @@ try {
   await tabUntil(`${ROOT} button[data-preset=heartbeat]`);
   await press('Enter');
   await noHScroll(`미리 채우기 heartbeat`);
-  await expect('하트비트 + missing(평가 범위에 따라 갈림)', '판정하지 않음');
+  await expect('하트비트 + missing(범위 상한을 지나 INSUFFICIENT_DATA)', '? INSUFFICIENT_DATA');
   // 3) TreatMissingData를 화살표로: notBreaching → OK, breaching → ALARM, ignore → OK(직전 상태 유지)
   await tabUntil(`${ROOT} input[name=cwa-tmd]`);
   await press('ArrowDown');
-  await expect('하트비트 + notBreaching', 'OK');
+  await expect('하트비트 + notBreaching', '● OK');
   await press('ArrowDown');
-  await expect('하트비트 + breaching(ALARM 가능)', '가능한 결과: ALARM 또는 OK');
+  await expect('하트비트 + breaching(원고의 답 — 범위 상한을 지나 ALARM)', '▲ ALARM');
   await press('ArrowDown');
-  await expect('하트비트 + ignore', '● OK');
+  await expect('하트비트 + ignore(직전 상태 OK 유지)', '● OK');
   // 규칙·한계 문구는 접힌 영역이 아니라 판정 바로 옆에 보여야 한다
   const rulesShown = await page.$eval(`${ROOT} .cwa-verdict .cwa-rules`, (e) => !e.closest('details') && e.getBoundingClientRect().height > 0 && e.textContent.includes('판정하지 않음'));
   if (!rulesShown) problems.push('판정 규칙과 한계 문구가 판정 옆에 보이지 않음');
@@ -113,8 +113,9 @@ try {
   console.log(`키 입력 ${keys}번`);
   await browser.close();
 
-  if (shots) {
-    fs.mkdirSync(shots, { recursive: true });
+  // 가로 넘침 검사는 --shots 없이도 늘 돈다(스크린샷만 --shots 때)
+  {
+    if (shots) fs.mkdirSync(shots, { recursive: true });
     for (const colorScheme of ['light', 'dark']) {
       for (const width of [1280, 360]) {
         const o = await open({ colorScheme, viewport: { width, height: 900 }, reducedMotion: 'reduce' });
@@ -134,9 +135,11 @@ try {
         if (over > 0) problems.push(`${colorScheme} ${width}px: 가로 넘침 ${over}px`);
         const wide = await o.page.$$eval(`${ROOT} *`, (els, w) => els.filter((e) => e.getBoundingClientRect().right > w + 0.5 && !e.closest('.cwa-table-scroll')).map((e) => e.className || e.tagName).slice(0, 5), width);
         if (wide.length) problems.push(`${colorScheme} ${width}px: 화면 밖으로 나간 요소 ${wide.join(', ')}`);
-        const file = path.join(shots, `m10-alarm-${colorScheme}-${width}.png`);
-        await o.page.locator(ROOT).screenshot({ path: file });
-        console.log(`  스크린샷 ${path.basename(file)}`);
+        const file = shots && path.join(shots, `m10-alarm-${colorScheme}-${width}.png`);
+        if (shots) {
+          await o.page.locator(ROOT).screenshot({ path: file });
+          console.log(`  스크린샷 ${path.basename(file)}`);
+        }
         await o.browser.close();
       }
     }
