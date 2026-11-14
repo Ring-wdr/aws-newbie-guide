@@ -25,8 +25,28 @@ const SHOTS = [
   { name: 'source-view', path: '/files/curriculum/m06-integration-messaging/labs/lab01-sqs-basics.sh/' },
   { name: 'source-helper', path: '/files/scripts/lab-wait.sh/' },
   { name: 'diagram-m14-02', path: '/curriculum/m14-capstone-exam/02-capstone-requirements-and-design/', prepare: (p) => p.locator('.diagram').first().evaluate((e) => e.scrollIntoView({ block: 'start' })) },
+  // M06 맞춤 위젯(element: 위젯 상자만 찍는다)
+  { name: 'widget-sqs-timeline', path: '/curriculum/m06-integration-messaging/02-sqs/', element: '.vt', prepare: timelineMid },
+  { name: 'widget-progress', path: '/curriculum/m06-integration-messaging/', element: '.pt-wrap', prepare: progressSome },
   { name: 'diagram-m02', path: '/curriculum/m02-vpc-networking/02-vpc-subnet-route-igw/', prepare: (p) => p.locator('.diagram').first().evaluate((e) => e.scrollIntoView({ block: 'start' })) },
 ];
+
+async function timelineMid(page) {
+  // lab02 예(독 메시지 → DLQ)를 고르고 3단계까지 넘긴 상태
+  await page.locator('.vt').scrollIntoViewIfNeeded();
+  await page.waitForSelector('.vt button[data-preset=lab02]:not([disabled])');
+  await page.waitForFunction(() => document.querySelector('.guide-widget astro-island:not([ssr])') !== null);
+  await page.click('.vt button[data-preset=lab02]');
+  await page.click('.vt button[data-step=first]');
+  await page.click('.vt button[data-step=next]');
+  await page.click('.vt button[data-step=next]');
+}
+
+async function progressSome(page) {
+  await page.locator('.pt-wrap').scrollIntoViewIfNeeded();
+  await page.waitForSelector('.pt input[data-item]:not([disabled])');
+  for (const id of ['lesson:01-why-decoupling', 'lesson:02-sqs', 'lab:labs/lab01-sqs-basics.sh']) await page.check(`.pt input[data-item="${id}"]`);
+}
 
 async function examResult(page) {
   await page.click('[data-act=start]');
@@ -77,7 +97,23 @@ try {
         if (s.prepare) await s.prepare(page);
         await page.waitForTimeout(300); // 스크롤 직후 붙박이(sticky) 요소가 다 그려지기를 기다린다
         const file = path.join(out, `${s.name}-${theme}-${width}.png`);
-        await page.screenshot({ path: file, fullPage: full });
+        if (s.element) {
+          // 붙박이 머리글이 위젯을 가리지 않게, 전체 페이지에서 위젯 상자만 잘라 찍는다.
+          await page.evaluate((sel) => {
+            const target = document.querySelector(sel);
+            for (const el of document.querySelectorAll('body *')) {
+              const pos = getComputedStyle(el).position;
+              if ((pos === 'fixed' || pos === 'sticky') && !el.contains(target) && !target.contains(el)) el.style.visibility = 'hidden';
+            }
+          }, s.element);
+          const box = await page.locator(s.element).evaluate((e) => {
+            const r = e.getBoundingClientRect();
+            return { x: r.left + scrollX, y: r.top + scrollY, width: r.width, height: r.height };
+          });
+          const pad = 8;
+          await page.screenshot({ path: file, fullPage: true, clip: { x: Math.max(0, box.x - pad), y: Math.max(0, box.y - pad), width: box.width + 2 * pad, height: box.height + 2 * pad } });
+        }
+        else await page.screenshot({ path: file, fullPage: full });
         written.push(file);
         // 페이지 가로 넘침(360px에서 본문이 밀리는지)
         const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
