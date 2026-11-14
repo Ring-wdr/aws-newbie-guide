@@ -836,6 +836,10 @@ section.exam-q {
   gap: 0.5rem;
   justify-content: space-between;
 }
+/* Starlight 본문의 형제 요소 간격(첫 요소 뒤 1rem)이 둘째 단추부터 위 여백을 줘 단추 높이가 달라 보였다 */
+.exam-controls-row > * {
+  margin: 0 !important;
+}
 .exam-controls button {
   white-space: nowrap;
   font: inherit;
