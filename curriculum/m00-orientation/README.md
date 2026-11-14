@@ -47,6 +47,8 @@ curriculum/m00-orientation/labs/verify.sh
 
 정리 자료: [cheatsheet.md](./cheatsheet.md) · [quiz.md](./quiz.md)
 
+<!-- widget: progress-tracker -->
+
 ## 이 모듈이 만든 공용 환경
 
 | 경로 | 내용 |

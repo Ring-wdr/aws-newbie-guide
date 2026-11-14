@@ -49,6 +49,8 @@ curriculum/m13-cost-optimization/labs/verify.sh
 
 정리 자료: [cheatsheet.md](./cheatsheet.md) · [quiz.md](./quiz.md)
 
+<!-- widget: progress-tracker -->
+
 ## 에뮬레이터 제약
 
 | 오퍼레이션 / 동작 | 증상 | 이 모듈의 대응 |

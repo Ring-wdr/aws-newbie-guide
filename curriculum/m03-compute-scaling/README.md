@@ -52,6 +52,8 @@ curriculum/m03-compute-scaling/labs/verify.sh
 
 정리 자료: [cheatsheet.md](./cheatsheet.md) · [quiz.md](./quiz.md)
 
+<!-- widget: progress-tracker -->
+
 ## 에뮬레이터 제약
 
 에뮬레이터 1.0.322에서 이 모듈의 저자가 직접 확인한 것이다. 대부분은 재생성된 [FIDELITY.md](../../docs/FIDELITY.md)의 M03 사실 표·저자 관찰 표에도 있다. ★는 그 보고서에 아직 없는 관찰(이 행의 일부 오퍼레이션 포함)이다.

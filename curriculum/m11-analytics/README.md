@@ -46,6 +46,8 @@ curriculum/m11-analytics/labs/verify.sh
 
 정리 자료: [cheatsheet.md](./cheatsheet.md) · [quiz.md](./quiz.md)
 
+<!-- widget: progress-tracker -->
+
 ## 에뮬레이터 제약
 
 에뮬레이터 1.0.322, 포트 9310에서 직접 확인한 것.

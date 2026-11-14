@@ -53,6 +53,8 @@ curriculum/m09-security-encryption/labs/verify.sh
 
 정리 자료: [cheatsheet.md](./cheatsheet.md) · [quiz.md](./quiz.md)
 
+<!-- widget: progress-tracker -->
+
 ## 봉투 암호화의 로컬 암호 (lab03, sdk/envelope_encryption.py)
 
 둘 다 프로젝트 의존성 `cryptography`의 **AES-256-GCM**을 쓴다(메시지마다 96비트 무작위 nonce, KMS 암호화 컨텍스트를 AAD로 묶음, 변조 시 `InvalidTag`). 대체 구현은 없다 — `import cryptography`가 실패하면 저장소 루트에서 **`uv sync`를 다시 실행**한다(의존성이 추가되기 전에 만든 환경이면 필요하다).

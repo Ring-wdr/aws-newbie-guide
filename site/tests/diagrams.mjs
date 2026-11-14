@@ -17,7 +17,7 @@ function startVisible(theme) {
   const out = [];
   [...document.querySelectorAll('.diagram-scroll')].forEach((box, i) => {
     if (box.scrollWidth <= box.clientWidth + 1) return;
-    const svg = box.querySelector(`.diagram-${theme} svg`);
+    const svg = box.querySelector(`.diagram-${theme} svg, .diagram-n-${theme} svg`); // 좁은 화면용 TB 배치(diagram-n-*)도
     if (!svg) return;
     const nodes = [...svg.querySelectorAll('g.node')];
     const idOf = (n) => /flowchart-(.+)-\d+$/.exec(n.id)?.[1];
@@ -139,6 +139,7 @@ const svgFail = [];
 const startFail = [];
 let selfOk = false;
 let svgChecked = 0;
+let narrowChecked = 0;
 try {
   for (const colorScheme of ['light', 'dark']) {
     const { browser, context } = await offlineBrowser({ colorScheme, viewport: { width: 1280, height: 900 } });
@@ -148,6 +149,13 @@ try {
       await page.goto(`http://127.0.0.1:${port}${p}`, { waitUntil: 'load' });
       const found = await page.evaluate(analyze, colorScheme);
       for (const f of found.out) results.push({ page: p, theme: colorScheme, ...f });
+      // 좁은 화면용 TB 배치(아주 넓은 LR 그림만, 40rem 이하에서 보임): 잠깐 보이게 해서 같은 기준으로 잰다. 순번은 n1, n2…
+      if (await page.$('.diagram-scroll-narrow')) {
+        await page.addStyleTag({ content: '.diagram-scroll-narrow{display:block!important}' });
+        const nf = await page.evaluate(analyze, `n-${colorScheme}`);
+        for (const f of nf.out) results.push({ page: p, theme: colorScheme, ...f, index: `n${f.index}` });
+        narrowChecked += nf.count;
+      }
       for (const f of await page.evaluate(startVisible, colorScheme)) startFail.push(`${p} 그림 ${f.index} (${colorScheme} 1280px): ${f.msg}`);
       for (const href of await page.$$eval(`.diagram-open-${colorScheme}`, (as) => as.map((a) => a.getAttribute('href')))) opens.add(href);
     }
@@ -168,6 +176,11 @@ try {
     for (const p of pages) {
       await page.goto(`http://127.0.0.1:${port}${p}`, { waitUntil: 'load' });
       for (const f of await page.evaluate(startVisible, 'light')) startFail.push(`${p} 그림 ${f.index} (light 360px): ${f.msg}`);
+      // 좁은 화면용 배치가 있는 그림은 360px에서 원래 그림 대신 그것이 보여야 한다
+      for (const bad of await page.$$eval('.diagram.has-narrow', (fs) =>
+        fs.filter((f) => f.querySelector('.diagram-scroll-wide').getClientRects().length > 0 || f.querySelector('.diagram-scroll-narrow').getClientRects().length === 0).map((f, i) => i + 1),
+      ))
+        startFail.push(`${p} 좁은 화면용 배치 ${bad}: 360px에서 원래 그림이 보이거나 TB 배치가 숨어 있음`);
     }
     await browser.close();
   }
@@ -189,7 +202,7 @@ for (const k of stale) console.log(`낡은 예외(재현되지 않음 — diagra
 for (const r of fresh.sort((a, b) => b.issues.length - a.issues.length)) console.log(`${r.issues.length}건 ${r.page} 그림 ${r.index} (${r.theme}): ${r.issues.slice(0, 4).join('; ')}`);
 for (const f of svgFail) console.log(`단독 SVG 실패 ${f}`);
 for (const f of startFail) console.log(`첫 화면 ${f}`);
-console.log(`단독 SVG(원래 크기 보기) ${svgChecked}개 확인, 실패 ${svgFail.length}개`);
+console.log(`단독 SVG(원래 크기 보기) ${svgChecked}개 확인, 실패 ${svgFail.length}개 · 좁은 화면용 TB 배치 ${narrowChecked}개(라이트·다크) 검사`);
 const total = fresh.reduce((s, r) => s + r.issues.length, 0) + svgFail.length + stale.length + startFail.length + (selfOk ? 0 : 1);
 console.log(`${total ? 'FOUND' : 'PASS'} diagrams: 페이지 ${pages.length}개, 새 문제 ${total - stale.length - startFail.length}건(그림 ${fresh.length}개), 첫 화면에서 시작이 잘린 그림 ${startFail.length}개, 알려진 원고 문제 ${known.length}건, 낡은 예외 ${stale.length}건, 자체 시험 ${selfOk ? '통과' : '실패'}`);
 if (total && process.argv.includes('--fail')) process.exit(1);

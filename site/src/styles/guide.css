@@ -189,6 +189,16 @@ kbd {
   font-weight: 700;
   vertical-align: 0.1em;
 }
+/* 라벨 글자는 생성 콘텐츠다: 보이고 화면 낭독기가 읽지만, 복사한 글에는 들어가지 않는다(원고에 없는 글자) */
+.grade-mark-label::after,
+.grade-label::after {
+  content: attr(data-label);
+}
+.grade-mark-label,
+.grade-label {
+  -webkit-user-select: none;
+  user-select: none;
+}
 .grade-mark-g .grade-mark-label { background: var(--guide-g-bg); color: var(--guide-g-fg); border-color: var(--guide-g-bd); }
 .grade-mark-y .grade-mark-label { background: var(--guide-y-bg); color: var(--guide-y-fg); border-color: var(--guide-y-bd); }
 .grade-mark-r .grade-mark-label { background: var(--guide-r-bg); color: var(--guide-r-fg); border-color: var(--guide-r-bd); }
@@ -325,6 +335,22 @@ kbd {
 .diagram-dark { display: none; }
 :root[data-theme='dark'] .diagram-light { display: none; }
 :root[data-theme='dark'] .diagram-dark { display: block; }
+/* 아주 넓은 LR 그림의 좁은 화면용 TB 배치(mermaid-render.mjs narrowSource): 40rem 이하에서만 원래 그림 대신 보인다 */
+.diagram-scroll-narrow,
+.diagram-narrow-note { display: none; }
+.diagram-n-dark { display: none; }
+:root[data-theme='dark'] .diagram-n-light { display: none; }
+:root[data-theme='dark'] .diagram-n-dark { display: block; }
+.diagram-narrow-note {
+  margin: 0.4rem 0 0 !important;
+  font-size: 0.8125rem;
+  color: var(--guide-muted);
+}
+@media (max-width: 40rem) {
+  .diagram.has-narrow > .diagram-scroll-wide { display: none; }
+  .diagram.has-narrow > .diagram-scroll-narrow,
+  .diagram.has-narrow > .diagram-narrow-note { display: block; }
+}
 .diagram-src {
   margin-top: 0.5rem !important;
   font-size: 0.8125rem;
@@ -957,8 +983,96 @@ section.exam-q {
   color: var(--guide-muted);
 }
 
+/* 표 칸의 모듈·레슨 참조(M07-03)는 한 덩어리(rehype-guide.mjs MODULE_REF) */
+.nobr {
+  white-space: nowrap;
+}
+
+/* 지난 응시 기록(시작 화면·결과 화면) */
+.exam-history {
+  margin-top: 1.25rem;
+}
+.exam-history h3 {
+  font-size: 1.05rem;
+  margin: 0 0 0.25rem;
+}
+.exam-history :is(p) {
+  margin: 0.25rem 0;
+}
+.exam-history-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+/* 표 이름은 바로 위 제목과 같으므로 화면 낭독기에만 */
+.exam-history-table caption {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.exam-history-table :is(th, td) {
+  padding: 0.35rem 0.5rem;
+  border-bottom: 1px solid var(--guide-border);
+  text-align: left;
+  vertical-align: top;
+}
+.exam-history-table tbody th {
+  font-weight: 400;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+/* 판정은 글자(통과/미달)로 쓰고, 색은 덧붙일 뿐이다 */
+.exam-history-table tr[data-pass='true'] td:nth-child(3) { color: var(--guide-ok); font-weight: 700; }
+.exam-history-table tr[data-pass='false'] td:nth-child(3) { color: var(--guide-bad); font-weight: 700; }
+.exam-history-msg:empty { display: none; }
+/* 좁은 화면: 기록 한 회를 한 덩어리로(열 이름은 생성 콘텐츠라 복사되지 않는다) */
+@media (max-width: 40rem) {
+  .exam-history-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .exam-history-table tr {
+    display: block;
+    padding: 0.4rem 0;
+    border-bottom: 1px solid var(--guide-border);
+  }
+  .exam-history-table :is(th, td) {
+    display: block;
+    border: 0;
+    padding: 0.05rem 0;
+  }
+  .exam-history-table tbody th { font-weight: 700; }
+  .exam-history-table td[data-col]::before {
+    content: attr(data-col) ' ';
+    color: var(--guide-muted);
+    font-size: 0.8125rem;
+  }
+}
+
+/* 시험 중(제출 전)에는 사이드바·이전/다음의 정답·해설 링크를 숨긴다(exam-guard.ts) */
+.exam-key-hidden {
+  display: none !important;
+}
+.exam-key-warning {
+  padding: 0.6rem 0.9rem;
+  border: 1px solid var(--guide-y-bd);
+  border-left-width: 4px;
+  border-radius: var(--guide-radius);
+  background: var(--guide-y-bg);
+  color: var(--guide-y-fg);
+  font-weight: 700;
+}
+
 /* 확인 상자 */
 .guide-dialog {
+  margin: auto; /* 모달 상자를 화면 가운데에(테마의 margin 초기화를 되돌린다) */
   max-width: min(28rem, calc(100vw - 2rem));
   border: 1px solid var(--guide-border);
   border-radius: var(--guide-radius);

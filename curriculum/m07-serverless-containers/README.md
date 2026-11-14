@@ -51,6 +51,8 @@ curriculum/m07-serverless-containers/labs/verify.sh
 
 정리 자료: [cheatsheet.md](./cheatsheet.md) · [quiz.md](./quiz.md)
 
+<!-- widget: progress-tracker -->
+
 ## 에뮬레이터 제약
 
 저자가 포트 9306(에뮬레이터 1.0.322)에서 직접 확인한 내용이다.

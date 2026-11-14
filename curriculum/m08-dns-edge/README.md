@@ -47,6 +47,8 @@ curriculum/m08-dns-edge/labs/verify.sh
 
 정리 자료: [cheatsheet.md](./cheatsheet.md) · [quiz.md](./quiz.md)
 
+<!-- widget: progress-tracker -->
+
 ## 에뮬레이터 제약
 
 에뮬레이터 1.0.322, 포트 9308에서 직접 실행해 확인했다.

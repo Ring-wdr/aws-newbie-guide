@@ -53,6 +53,8 @@ curriculum/m05-databases/labs/verify.sh
 
 정리 자료: [cheatsheet.md](./cheatsheet.md) · [quiz.md](./quiz.md)
 
+<!-- widget: progress-tracker -->
+
 ## 에뮬레이터 제약
 
 이 모듈에서 직접 확인한 차이(에뮬레이터 1.0.322). 레슨의 "실제 AWS에서는"에도 같은 내용을 적었다.
