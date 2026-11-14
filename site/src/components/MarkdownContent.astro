@@ -4,7 +4,7 @@
 //   <div data-guide-widget="mNN/이름">  → 모듈 폴더에 없고 공용 위젯(src/lib/shared-widgets.mjs)이면 공용 구현에 모듈을 넘겨 그린다
 //   <div data-guide-component="exam">   → 모의고사 시험 모드(ExamApp)
 // 그 밖에 진행 추적이 붙이는 것(원고에는 표시가 없다): 홈의 "전체 진행" 요약(첫 H2 앞), 추적되는 레슨 페이지 끝의 "이 레슨 완료".
-// 위젯 상자(.guide-widget)는 공용 틀이다: JavaScript가 꺼진 경우의 안내(<noscript>, 문구는 i18n/ko.mjs widget.noscript)를 여기서 한 번만 단다.
+// 위젯 상자(.guide-widget)는 공용 틀이다: JavaScript가 꺼진 경우의 안내(<noscript>, 문구는 i18n/ko.mjs widget.noscript — 위젯 종류별)를 여기서 한 번만 단다.
 // 자리 표시가 없으면 Starlight가 넘겨 준 본문(slot)을 그대로 보인다.
 import '@astrojs/starlight/style/markdown.css';
 import ExamApp from './ExamApp.astro';
@@ -45,6 +45,8 @@ type Part =
   | { kind: 'exam' | 'progress-overview' | 'lesson-done' };
 let parts: Part[] | null = null;
 const MARK = /<div data-guide-(widget|component)="([^"]+)"><\/div>/g;
+// <noscript> 문구: 진행 추적 계열은 그 이름의 문구, 그 밖의 맞춤 위젯은 "모형" 문구(모듈 폴더가 공용 위젯 이름을 덮어써도 같은 종류로 본다).
+const noscriptText = (name: string) => (ko.widget.noscript as Record<string, string>)[name] ?? ko.widget.noscript.model;
 if (html && /data-guide-(widget|component)=/.test(html)) {
   parts = [];
   let last = 0;
@@ -80,17 +82,17 @@ if (html && /data-guide-(widget|component)=/.test(html)) {
             <ExamApp />
           ) : p.kind === 'progress-overview' ? (
             <div class="guide-widget not-content" data-widget="progress-overview">
-              <noscript><p class="guide-noscript">{ko.widget.noscript}</p></noscript>
+              <noscript><p class="guide-noscript">{noscriptText('progress-overview')}</p></noscript>
               <ProgressOverview />
             </div>
           ) : p.kind === 'lesson-done' ? (
             <div class="guide-widget not-content" data-widget="lesson-done">
-              <noscript><p class="guide-noscript">{ko.widget.noscript}</p></noscript>
+              <noscript><p class="guide-noscript">{noscriptText('lesson-done')}</p></noscript>
               <LessonDone module={lesson!.module} item={lesson!.item} />
             </div>
           ) : (
             <div class="guide-widget not-content" data-widget={p.name}>
-              <noscript><p class="guide-noscript">{ko.widget.noscript}</p></noscript>
+              <noscript><p class="guide-noscript">{noscriptText(p.name.split('/')[1])}</p></noscript>
               <p.Comp {...p.props} />
             </div>
           ),
