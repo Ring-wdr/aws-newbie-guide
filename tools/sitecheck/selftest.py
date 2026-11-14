@@ -140,12 +140,26 @@ def main() -> int:
             print(f"{'ok  ' if ok else 'BAD '} 등급 이모지 관문: {name} → {'잡음' if got else '통과'}")
             if not ok:
                 failures.append(f"grades {name}")
+        # 목차·사이드바: 본문은 라벨이 붙었는데 Starlight 가 같은 제목을 목차·사이드바에 이모지만으로 실은 경우를 잡는다
+        body_ok = '<div class="sl-markdown-content"><h2 id="x">BPA <span class="grade-mark"><span role="img" aria-label="개념">\U0001F534</span><span class="grade-mark-label" data-label="개념" aria-hidden="true"></span></span></h2></div>'
+        toc_ok = '<a href="#x"><span>BPA <span class="grade-mark"><span role="img" aria-label="개념">\U0001F534</span><span class="grade-mark-label" data-label="개념" aria-hidden="true"></span></span></span></a>'
+        for name, html, want in [
+            ("목차의 맨 이모지", f'{body_ok}<starlight-toc><nav><ul><li><a href="#x"><span>BPA \U0001F534</span></a></li></ul></nav></starlight-toc>', "목차"),
+            ("좁은 화면 목차의 맨 이모지", f'{body_ok}<mobile-starlight-toc><nav><ul><li><a href="#x"><span>BPA \U0001F534</span></a></li></ul></nav></mobile-starlight-toc>', "좁은 화면 목차"),
+            ("사이드바의 맨 이모지", f'{body_ok}<nav class="sidebar" aria-label="메인"><ul><li><a href="/a/"><span>실습 \U0001F7E2</span></a></li></ul></nav>', "사이드바"),
+            ("라벨 붙은 목차·사이드바", f'{body_ok}<starlight-toc><nav><ul><li>{toc_ok}</li></ul></nav></starlight-toc><nav class="sidebar"><ul><li>{toc_ok}</li></ul></nav>', None),
+        ]:
+            hit = [w for w, n in sitecheck.grade_regions(htmlbuilt.parse(html)) if sitecheck.bare_grade_emoji(n)]
+            ok = hit == ([want] if want else [])
+            print(f"{'ok  ' if ok else 'BAD '} 등급 이모지 관문(목차·사이드바): {name} → {hit or '통과'}")
+            if not ok:
+                failures.append(f"grades {name}")
     finally:
         sitecheck.SITE = original_site
     if failures:
         print(f"FAIL selftest: {failures}")
         return 1
-    print(f"PASS selftest: 정적 관문에 심은 결함 {len(STATIC_CASES)}가지와 실행 명령 결함 3가지를 모두 잡고, 근거 있는 경우는 통과, 메타 줄 이스케이프 2가지 일치, 등급 이모지 10가지(빈 라벨·빈 이름·이름만 있는 라벨 포함)")
+    print(f"PASS selftest: 정적 관문에 심은 결함 {len(STATIC_CASES)}가지와 실행 명령 결함 3가지를 모두 잡고, 근거 있는 경우는 통과, 메타 줄 이스케이프 2가지 일치, 등급 이모지 10가지(빈 라벨·빈 이름·이름만 있는 라벨 포함)와 목차·사이드바 4가지")
     return 0
 
 

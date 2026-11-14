@@ -60,6 +60,10 @@ export default defineConfig({
         MarkdownContent: './src/components/MarkdownContent.astro',
         ThemeProvider: './src/components/ThemeProvider.astro',
         ThemeSelect: './src/components/ThemeSelect.astro',
+        // 목차·사이드바의 등급 이모지에 본문과 같은 글자 라벨(원칙 6) — 기본 컴포넌트를 감싸기만 한다
+        TableOfContents: './src/components/TableOfContents.astro',
+        MobileTableOfContents: './src/components/MobileTableOfContents.astro',
+        Sidebar: './src/components/Sidebar.astro',
       },
       expressiveCode: false,
       pagefind: true,

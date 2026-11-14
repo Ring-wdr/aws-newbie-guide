@@ -357,8 +357,25 @@ initHydrationGuard();
 // 건너뛸 수 있어 서버가 그린 내용(진행 목록·처음 계산 결과)까지 가려졌다. 서버가 그린 내용은 그대로 읽을 수 있는 정상 내용이고,
 // 붙기 전 입력은 위의 막기가 받지 않으므로 busy 표시 없이 둔다. 검사: tests/widget-busy.mjs(sitecheck a11y 관문).
 
+/* ---------- 좁은 화면 목차의 "지금 읽는 곳" 표시에도 등급 라벨 ---------- */
+// Starlight 는 현재 절 링크의 textContent 를 .display-current 에 그대로 넣어 등급 라벨(생성 콘텐츠·role=img)이 빠진다.
+// 링크 안(GradeMarks.astro 가 라벨을 붙인 것)을 그대로 옮겨 이모지만 남지 않게 한다.
+function initMobileTocGrades() {
+  const toc = document.querySelector('mobile-starlight-toc');
+  const display = toc?.querySelector<HTMLElement>('.display-current');
+  if (!toc || !display) return;
+  const fix = () => {
+    if (!/🟢|🟡|🔴/u.test(display.textContent || '') || display.querySelector('.grade-mark')) return;
+    const span = toc.querySelector('a[aria-current="true"] > span');
+    if (span?.querySelector('.grade-mark')) display.innerHTML = span.innerHTML;
+  };
+  new MutationObserver(fix).observe(display, { childList: true, characterData: true, subtree: true });
+  fix();
+}
+
 function init() {
   document.documentElement.classList.add('guide-js');
+  initMobileTocGrades();
   initCopy();
   initQuiz();
   initChecklist();
