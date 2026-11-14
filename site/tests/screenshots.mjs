@@ -74,13 +74,13 @@ async function progressSome(page) {
 const seedHistory = (page) =>
   page.evaluate(() => {
     const rec = (at, ok, pass, ms, auto = false) => ({ at, ok, total: 65, pct: ((100 * ok) / 65).toFixed(1), pass, blank: 0, domains: [{ domain: 'D1', ok: Math.round(ok * 0.31), total: 20 }, { domain: 'D2', ok: Math.round(ok * 0.26), total: 17 }, { domain: 'D3', ok: Math.round(ok * 0.23), total: 15 }, { domain: 'D4', ok: ok - Math.round(ok * 0.31) - Math.round(ok * 0.26) - Math.round(ok * 0.23), total: 13 }], elapsedMs: ms, auto });
-    localStorage.setItem('guide:exam:m14-mock-exam:history', JSON.stringify({ v: 1, records: [rec('2026-11-13T05:10:00Z', 51, true, 6_480_000), rec('2026-11-06T01:02:00Z', 44, false, 7_800_000, true)] }));
+    localStorage.setItem('aws-newbie-guide:exam:m14-mock-exam:history', JSON.stringify({ v: 1, records: [rec('2026-11-13T05:10:00Z', 51, true, 6_480_000), rec('2026-11-06T01:02:00Z', 44, false, 7_800_000, true)] }));
   });
 
 async function homeProgress(page) {
   await page.evaluate(() => {
-    localStorage.setItem('guide:progress:m00', JSON.stringify({ v: 1, done: { 'lesson:01-cloud-and-global-infrastructure': true, 'lesson:02-what-is-aws-emulator': true, quiz: true } }));
-    localStorage.setItem('guide:progress:m06', JSON.stringify({ v: 1, done: { 'lesson:02-sqs': true } }));
+    localStorage.setItem('aws-newbie-guide:progress:m00', JSON.stringify({ v: 1, done: { 'lesson:01-cloud-and-global-infrastructure': true, 'lesson:02-what-is-aws-emulator': true, quiz: true } }));
+    localStorage.setItem('aws-newbie-guide:progress:m06', JSON.stringify({ v: 1, done: { 'lesson:02-sqs': true } }));
   });
   await page.reload({ waitUntil: 'networkidle' });
   await page.waitForFunction(() => /3항목|4항목/.test(document.querySelector('[data-overview-text]')?.textContent || ''));
@@ -88,7 +88,7 @@ async function homeProgress(page) {
 
 async function m14Progress(page) {
   await seedHistory(page);
-  await page.evaluate(() => localStorage.setItem('guide:progress:m14', JSON.stringify({ v: 1, done: { 'lesson:01-well-architected-review': true, 'exam:mock-exam': true } })));
+  await page.evaluate(() => localStorage.setItem('aws-newbie-guide:progress:m14', JSON.stringify({ v: 1, done: { 'lesson:01-well-architected-review': true, 'exam:mock-exam': true } })));
   await page.reload({ waitUntil: 'networkidle' });
   await page.locator('.pt-wrap').scrollIntoViewIfNeeded();
   await page.waitForSelector('.pt [data-exam-last]');

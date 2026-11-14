@@ -1,5 +1,5 @@
 // 모의고사 지난 응시 기록 — 순수 함수(브라우저·시험 공용). 단위 시험: exam-history.test.mjs
-// 저장은 exam.ts가 storage.ts로 "exam:m14-mock-exam:history"(→ localStorage "guide:exam:m14-mock-exam:history")에 한다.
+// 저장은 exam.ts가 storage.ts로 "exam:m14-mock-exam:history"(→ localStorage "aws-newbie-guide:exam:m14-mock-exam:history")에 한다.
 // 점수는 제출 때 exam-core.gradeExam(= grade.py 규칙)이 낸 값을 그대로 담는다. 여기서는 다시 채점하지 않는다.
 
 export const HISTORY_MAX = 20;

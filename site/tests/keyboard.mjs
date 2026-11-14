@@ -195,7 +195,7 @@ try {
     await tabUntil(focusIs, '.ld input');
     await press('Space');
     if ((await page.isChecked('.ld input')) === before) problems.push('이 레슨 완료: Space로 바뀌지 않음');
-    const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('guide:progress:m06') || '{}'));
+    const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('aws-newbie-guide:progress:m06') || '{}'));
     if (Boolean(stored.done?.['lesson:02-sqs']) === before) problems.push(`이 레슨 완료: 저장값이 진행 추적과 같은 키에 없음 ${JSON.stringify(stored)}`);
     if (!before && leftDone[M06_PAGE] !== undefined) leftDone[M06_PAGE] += 1;
     done.push('이 레슨 완료(M06 레슨 2)');
@@ -215,6 +215,21 @@ try {
     await page.evaluate(() => document.activeElement?.blur());
     await tabUntil(focusIs, '.po a.po-name');
     done.push('홈 전체 진행 요약');
+    // 예전 접두사(guide:)의 키 옮기기: 이 사이트가 만든 꼴은 새 키로 옮겨 홈 요약에 보이고, 다른 guide:* 키는 그대로 남는다
+    await page.evaluate(() => {
+      localStorage.clear();
+      localStorage.setItem('guide:progress:m13', JSON.stringify({ v: 1, done: { 'lesson:01-billing-and-data-transfer': true, quiz: true } }));
+      localStorage.setItem('guide:other-site', '"x"');
+    });
+    await page.reload({ waitUntil: 'networkidle' });
+    await page.locator('.po').evaluate((e) => e.scrollIntoView());
+    await page.waitForFunction(() => document.querySelector('.guide-widget[data-widget="progress-overview"] astro-island:not([ssr])') !== null);
+    const mig = await page.evaluate(() => ({ keys: Object.keys(localStorage).sort(), count: document.querySelector('.po li[data-module="m13"] .po-count')?.textContent.trim() }));
+    const wantKeys = ['aws-newbie-guide:progress:m13', 'guide:other-site'];
+    if (JSON.stringify(mig.keys.filter((k) => k !== 'aws-newbie-guide:theme')) !== JSON.stringify(wantKeys) || !mig.count?.startsWith('2/'))
+      problems.push(`예전 키 옮기기: 기대 키 ${JSON.stringify(wantKeys)}·M13 2개 완료, 실제 ${JSON.stringify(mig)}`);
+    await page.evaluate(() => localStorage.clear());
+    done.push('예전 저장 키 옮기기');
   }
 
   if (pages.includes(EXAM_PAGE)) {
@@ -308,7 +323,7 @@ try {
     const histRows = await page.$$eval('.exam-result [data-exam-history] tbody tr', (rs) => rs.map((r) => r.textContent));
     const tm = /전체 (\d+)\/(\d+) = ([\d.]+)%/.exec(totalText);
     if (histRows.length !== 1 || !histRows[0].includes(`${tm[1]}/${tm[2]} = ${tm[3]}%`)) problems.push(`응시 기록이 결과와 다름: ${JSON.stringify(histRows)} / ${totalText}`);
-    const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('guide:exam:m14-mock-exam:history') || 'null'));
+    const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('aws-newbie-guide:exam:m14-mock-exam:history') || 'null'));
     if (stored?.records?.length !== 1 || stored.records[0].domains.length !== 4) problems.push(`응시 기록 저장값: ${JSON.stringify(stored)?.slice(0, 200)}`);
     console.log(`모의고사(키보드): ${totalText} / ${verdictText} / 표시 ${flagged.length}개`);
     // 검토: 첫 번째 틀린 문항을 키보드로 열어 해설이 보이는지

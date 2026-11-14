@@ -2,11 +2,18 @@
 // 저장소가 막힌 환경(사생활 보호 모드, 차단된 사이트 데이터)에서도 페이지는 그대로 동작해야 하므로
 // 모든 읽기·쓰기를 try/catch로 감싸고, 실패하면 이번 방문 동안만 메모리에 둔다.
 import { ko } from '../i18n/ko.mjs';
+import { PREFIX, migrateLegacy } from '../lib/storage-keys.mjs';
 
-const PREFIX = 'guide:';
+// 키 접두사는 "aws-newbie-guide:"(storage-keys.mjs — 같은 출처의 다른 사이트와 섞이지 않게). 내보내기·가져오기는 이 접두사만.
+// 예전 접두사("guide:")로 이 사이트가 만든 키는 처음 한 번 새 키로 옮긴다(새 키가 없을 때만, 꼴이 맞는 것만).
+try {
+  migrateLegacy(window.localStorage);
+} catch {
+  /* 저장소가 막혀 있으면 옮길 것도 없다 */
+}
 /** 같은 창 안에서 저장값이 바뀌었음을 알린다(브라우저의 storage 이벤트는 다른 창에만 간다).
- *  detail.key: 바뀐 키("guide:" 뺀 것), 백업을 가져왔으면 null. 진행 추적·퀴즈·체크리스트·시험 모드가 듣고 다시 읽는다. */
-export const CHANGE_EVENT = 'guide:storage-change';
+ *  detail.key: 바뀐 키(접두사 뺀 것), 백업을 가져왔으면 null. 진행 추적·퀴즈·체크리스트·시험 모드가 듣고 다시 읽는다. */
+export const CHANGE_EVENT = 'aws-newbie-guide:storage-change';
 function notify(key: string | null): void {
   try {
     window.dispatchEvent(new CustomEvent(CHANGE_EVENT, { detail: { key } }));
@@ -152,7 +159,7 @@ export function mountStoragePanels(): void {
     exp.textContent = ko.storage.export;
     exp.addEventListener('click', () => {
       const data = { format: 'aws-newbie-guide-progress', version: 1, exportedAt: new Date().toISOString(), entries: allEntries() };
-      download('guide-progress.json', `${JSON.stringify(data, null, 2)}\n`);
+      download('aws-newbie-guide-progress.json', `${JSON.stringify(data, null, 2)}\n`);
     });
     const imp = document.createElement('button');
     imp.type = 'button';
@@ -163,6 +170,7 @@ export function mountStoragePanels(): void {
       try {
         const data = JSON.parse(text);
         if (data?.format !== 'aws-newbie-guide-progress' || typeof data.entries !== 'object') throw new Error('format');
+        // 항목 키는 접두사를 뺀 이름("progress:m06")이라 예전(guide:) 시절의 백업 파일도 그대로 새 접두사로 들어간다.
         for (const [k, v] of Object.entries(data.entries)) setQuiet(k, v);
         notify(null); // 같은 창의 진행 표시·퀴즈·체크리스트가 바로 다시 읽는다
         note.textContent = ko.storage.imported;
