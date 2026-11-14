@@ -8,6 +8,7 @@ import { Code } from 'astro:components';
 import { REPO_ROOT, fileViewRoute, routeForRepoPath, readTitle, builtContentFiles } from '../../lib/repo.mjs';
 import { collectLinkedFiles, langFor, runInfo } from '../../lib/linked-files.mjs';
 import { ko } from '../../i18n/ko.mjs';
+import { withBase } from '../../lib/base.mjs';
 
 export function getStaticPaths() {
   const { files, dirs } = collectLinkedFiles();
@@ -30,7 +31,7 @@ else
     .filter((e) => !e.name.startsWith('.'))
     .map((e) => {
       const child = `${rel}/${e.name}`;
-      const href = e.isDirectory() ? null : built.has(child) ? routeForRepoPath(child) : files.has(child) ? fileViewRoute(child) : null;
+      const href = e.isDirectory() ? null : built.has(child) ? withBase(routeForRepoPath(child)) : files.has(child) ? withBase(fileViewRoute(child)) : null;
       return { name: e.isDirectory() ? `${e.name}/` : e.name, href };
     });
 const lines = code ? code.split('\n').length - (code.endsWith('\n') ? 1 : 0) : 0;
@@ -59,7 +60,7 @@ const title = kind === 'dir' ? `${rel}/` : rel.split('/').pop()!;
           {info.basis === 'manuscript' ? (
             <>
               {ko.source.basisManuscript}{' '}
-              {built.has(info.from!) ? <a href={routeForRepoPath(info.from!)}>{readTitle(info.from!)}</a> : <code>{info.from}</code>}
+              {built.has(info.from!) ? <a href={withBase(routeForRepoPath(info.from!))}>{readTitle(info.from!)}</a> : <code>{info.from}</code>}
             </>
           ) : (
             ko.source.basisEntry(rel)
@@ -90,7 +91,7 @@ const title = kind === 'dir' ? `${rel}/` : rel.split('/').pop()!;
         <ul>
           {from.map((f) => (
             <li>
-              {built.has(f) ? <a href={routeForRepoPath(f)}>{readTitle(f)}</a> : <code>{f}</code>}
+              {built.has(f) ? <a href={withBase(routeForRepoPath(f))}>{readTitle(f)}</a> : <code>{f}</code>}
             </li>
           ))}
         </ul>

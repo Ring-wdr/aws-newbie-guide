@@ -3,12 +3,12 @@
 // 사용: node tests/a11y.mjs --port <포트> [--pages pilot|all|/a/,/b/]
 // 상호작용 뒤 상태(퀴즈 채점·시험)는 그 페이지가 대상에 있을 때만 본다.
 import { createRequire } from 'node:module';
-import { eachPage, EXAM_PAGE, isQuizPage, offlineBrowser, pagesFromArgs, portFromArgs, serve } from './lib/harness.mjs';
+import { eachPage, EXAM_PAGE, isQuizPage, offlineBrowser, pagesFromArgs, portFromArgs, serve, baseUrl } from './lib/harness.mjs';
 
 const require = createRequire(import.meta.url);
 const AXE = require.resolve('axe-core/axe.min.js');
 const port = portFromArgs(4321);
-const base = `http://127.0.0.1:${port}`;
+const base = baseUrl(port); // 하위 경로(base)로 빌드한 산출물이면 그 경로까지
 const pages = pagesFromArgs();
 const quizPage = pages.find(isQuizPage);
 const hasExam = pages.includes(EXAM_PAGE);

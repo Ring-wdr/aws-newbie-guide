@@ -7,6 +7,7 @@ import { getEntry } from 'astro:content';
 import { REPO_ROOT } from '../lib/repo.mjs';
 import { parseGradeConstants, parseKey, parseQuestions, parseTimerMinutes } from '../lib/exam-core.mjs';
 import { ko } from '../i18n/ko.mjs';
+import { withBase } from '../lib/base.mjs';
 import { HISTORY_MAX } from '../lib/exam-history.mjs';
 
 const dir = path.join(REPO_ROOT, 'curriculum/m14-capstone-exam/mock-exam');
@@ -36,7 +37,7 @@ const data = {
   minutes,
   key,
   questions: Object.fromEntries(nums.map((n) => [n, { choose: qs[n].choose, options: qs[n].options }])),
-  keyRoute: '/curriculum/m14-capstone-exam/mock-exam/answer-key/',
+  keyRoute: withBase('/curriculum/m14-capstone-exam/mock-exam/answer-key/'),
 };
 // 지난 응시 기록 상자(시작 화면과 결과 화면에 하나씩). 내용은 exam.ts가 채운다.
 const historyBoxes = ['start', 'result'];

@@ -23,10 +23,12 @@ import Select from '@astrojs/starlight/components/Select.astro';
 </script>
 
 <script>
+	import { THEME_KEY } from '../lib/storage-keys.mjs';
+
 	type Theme = 'auto' | 'dark' | 'light';
 
 	/** Key in `localStorage` to store color theme preference at. */
-	const storageKey = 'starlight-theme';
+	const storageKey = THEME_KEY; // "aws-newbie-guide:theme" — ThemeProvider.astro 의 인라인 스크립트와 같다
 
 	/** Get a typesafe theme string from any JS value (unknown values are coerced to `'auto'`). */
 	const parseTheme = (theme: unknown): Theme =>

@@ -6,7 +6,7 @@
 export const ko = {
   site: {
     title: 'AWS SAA-C03 실습 가이드',
-    description: 'aws-emulator로 직접 만져 보며 배우는 AWS SAA-C03 — 저장소의 Markdown 원고로 빌드한 로컬 사이트',
+    description: 'aws-emulator로 직접 만져 보며 배우는 AWS SAA-C03 학습 가이드 — 저장소의 Markdown 원고로 빌드한 정적 사이트(계정·요금 없이 내 컴퓨터에서 실습)',
     homeLabel: '처음 읽기',
     refDocsGroup: '참고 문서',
     sourceGroup: '소스 파일',
@@ -35,8 +35,14 @@ export const ko = {
     fullTitle: '다이어그램 원래 크기',
   },
   widget: {
-    // 위젯 공용 틀(MarkdownContent.astro)의 <noscript> — JavaScript 가 꺼지면 조작부만 보이고 동작하지 않는다
-    noscript: '이 모형은 JavaScript가 필요하다(지금은 꺼져 있어 조작해도 바뀌지 않는다). 같은 내용은 위아래 본문과 표에 있다.',
+    // 위젯 공용 틀(MarkdownContent.astro)의 <noscript> — JavaScript 가 꺼지면 조작부만 보이고 동작하지 않는다.
+    // 위젯 종류마다 문구가 다르다: 맞춤 위젯(설명용 모형)과 진행 추적·홈의 전체 진행·"이 레슨 완료"(모형이 아니고, 본문에 같은 내용이 없다).
+    noscript: {
+      model: '이 모형은 JavaScript가 필요하다(지금은 꺼져 있어 조작해도 바뀌지 않는다). 같은 내용은 위아래 본문과 표에 있다.',
+      'progress-tracker': '진행 추적은 JavaScript가 필요하다(지금은 꺼져 있어 완료 표시를 바꾸거나 저장할 수 없다). 레슨·실습 목록은 이 페이지의 표에 있다.',
+      'progress-overview': '전체 진행 요약은 JavaScript가 필요하다(지금은 꺼져 있어 이 브라우저에 저장된 진행 상태를 읽지 못한다). 모듈 목록은 아래 로드맵 표에 있다.',
+      'lesson-done': '"이 레슨 완료" 표시는 JavaScript가 필요하다(지금은 꺼져 있어 누를 수 없다).',
+    },
   },
   table: {
     region: (n) => `표 ${n} (넓으면 이 상자 안에서 가로로 스크롤)`,

@@ -5,7 +5,7 @@
 // 를 찾는다. 실제 화면 폭(1280px)에서 본다.
 // 사용: node tests/diagrams.mjs --port <포트> [--pages all(기본)|pilot|/a/,/b/] [--fail]   (--fail: 하나라도 있으면 종료 코드 1)
 import fs from 'node:fs';
-import { offlineBrowser, pagesFromArgs, portFromArgs, serve } from './lib/harness.mjs';
+import { offlineBrowser, pagesFromArgs, portFromArgs, serve, baseUrl, siteRoute } from './lib/harness.mjs';
 
 // 원고 구조 때문에 배치로는 고칠 수 없어 편집자에게 넘긴 겹침(이유와 함께). 여기 없는 것은 실패.
 const KNOWN = JSON.parse(fs.readFileSync(new URL('./diagrams-known.json', import.meta.url), 'utf8')).known;
@@ -108,7 +108,7 @@ const server = await serve(port);
 
 /** 자체 시험: 결함을 심은 그림(밝은 바탕 + 밝은 글자 노드, 겹친 노드, 시작 노드가 오른쪽 끝에 있는 넓은 그림)을 잡는지. */
 async function selftest(page) {
-  await page.goto(`http://127.0.0.1:${port}/curriculum/m06-integration-messaging/cheatsheet/`, { waitUntil: 'load' });
+  await page.goto(`${baseUrl(port)}/curriculum/m06-integration-messaging/cheatsheet/`, { waitUntil: 'load' });
   await page.evaluate(() => {
     const host = document.querySelector('.sl-markdown-content');
     const node = (id, x, fill, color) =>
@@ -146,7 +146,7 @@ try {
     const page = await context.newPage();
     if (colorScheme === 'light') selfOk = await selftest(page);
     for (const p of pages) {
-      await page.goto(`http://127.0.0.1:${port}${p}`, { waitUntil: 'load' });
+      await page.goto(`${baseUrl(port)}${p}`, { waitUntil: 'load' });
       const found = await page.evaluate(analyze, colorScheme);
       for (const f of found.out) results.push({ page: p, theme: colorScheme, ...f });
       // 좁은 화면용 TB 배치(아주 넓은 LR 그림만, 40rem 이하에서 보임): 잠깐 보이게 해서 같은 기준으로 잰다. 순번은 n1, n2…
@@ -161,8 +161,14 @@ try {
     }
     // '원래 크기로 보기' 링크가 가리키는 단독 SVG 가 XML 로 읽히고 그림이 그려지는지
     for (const href of opens) {
-      if (!href.startsWith('/diagrams/') || !href.endsWith(`-${colorScheme}.svg`)) continue;
-      const res = await page.goto(`http://127.0.0.1:${port}${href}`, { waitUntil: 'load' });
+      // 링크는 base 를 붙여 나온다(하위 경로 빌드). base 밖을 가리키면 siteRoute 가 null — 실패로 남긴다.
+      const route = siteRoute(href);
+      if (route === null) {
+        svgFail.push(`${href}: 사이트 base 밖을 가리킴`);
+        continue;
+      }
+      if (!route.startsWith('/diagrams/') || !href.endsWith(`-${colorScheme}.svg`)) continue;
+      const res = await page.goto(`${baseUrl(port)}${route}`, { waitUntil: 'load' });
       const ok = await page.evaluate(() => document.documentElement.localName === 'svg' && !document.querySelector('parsererror') && (() => { const b = document.documentElement.getBBox(); return b.width > 50 && b.height > 20 && document.documentElement.textContent.trim().length > 0; })());
       if (!res || res.status() !== 200 || !ok) svgFail.push(`${href}: ${res ? res.status() : '응답 없음'}${ok ? '' : ', SVG 로 그려지지 않음'}`);
       svgChecked++;
@@ -174,7 +180,7 @@ try {
     const { browser, context } = await offlineBrowser({ colorScheme: 'light', viewport: { width: 360, height: 800 } });
     const page = await context.newPage();
     for (const p of pages) {
-      await page.goto(`http://127.0.0.1:${port}${p}`, { waitUntil: 'load' });
+      await page.goto(`${baseUrl(port)}${p}`, { waitUntil: 'load' });
       for (const f of await page.evaluate(startVisible, 'light')) startFail.push(`${p} 그림 ${f.index} (light 360px): ${f.msg}`);
       // 좁은 화면용 배치가 있는 그림은 360px에서 원래 그림 대신 그것이 보여야 한다
       for (const bad of await page.$$eval('.diagram.has-narrow', (fs) =>

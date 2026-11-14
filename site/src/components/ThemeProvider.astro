@@ -1,5 +1,7 @@
 ---
 // Starlight ThemeProvider 를 그대로 옮기고, 저장소가 막힌 브라우저에서 예외로 멈추지 않게 읽기를 try/catch 로 감쌌다.
+// 테마 키는 Starlight 기본 "starlight-theme" 대신 사이트 접두사의 "aws-newbie-guide:theme"(src/lib/storage-keys.mjs THEME_KEY —
+// 인라인 스크립트라 가져올 수 없어 글자로 둔다. ThemeSelect.astro 와 같아야 한다). 공개 배포본은 같은 출처를 다른 사이트와 나눠 쓴다.
 import { Icon } from '@astrojs/starlight/components';
 ---
 
@@ -8,7 +10,7 @@ import { Icon } from '@astrojs/starlight/components';
 	window.StarlightThemeProvider = (() => {
 		let storedTheme = null;
 		try {
-			storedTheme = typeof localStorage !== 'undefined' && localStorage.getItem('starlight-theme');
+			storedTheme = typeof localStorage !== 'undefined' && localStorage.getItem('aws-newbie-guide:theme');
 		} catch {
 			storedTheme = null;
 		}

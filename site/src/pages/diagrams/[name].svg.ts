@@ -1,4 +1,4 @@
-// 넓은 다이어그램을 원래 크기로 보는 SVG 파일(/diagrams/<id>.svg). 페이지에 넣은 것과 같은 SVG를 그대로 꺼내 쓴다.
+// 넓은 다이어그램을 원래 크기로 보는 SVG 파일(/diagrams/<id>.svg — 하위 경로 배포면 그 아래). 페이지에 넣은 것과 같은 SVG를 그대로 꺼내 쓴다.
 // 다크 그림은 바탕색을 넣어 단독으로 열어도 읽히게 한다. 외부 리소스는 없다(빌드 시점 SVG).
 import { getCollection } from 'astro:content';
 import type { APIRoute } from 'astro';
@@ -21,7 +21,7 @@ export async function getStaticPaths() {
   const out = new Map<string, string>();
   for (const entry of await getCollection('docs')) {
     const html = (entry as any).rendered?.html ?? '';
-    for (const m of html.matchAll(/href="\/diagrams\/(mmd-[0-9a-f]+-(?:light|dark))\.svg"/g)) {
+    for (const m of html.matchAll(/href="[^"]*?\/diagrams\/(mmd-[0-9a-f]+-(?:light|dark))\.svg"/g)) {
       if (out.has(m[1])) continue;
       const svg = extractSvg(html, m[1]);
       if (svg) out.set(m[1], svg);

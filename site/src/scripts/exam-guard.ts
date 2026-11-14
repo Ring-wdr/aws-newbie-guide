@@ -9,9 +9,10 @@ import { ko } from '../i18n/ko.mjs';
 import { load, onStorageChange } from './storage';
 import { confirmDialog } from './dialog';
 import { examLiveState } from '../lib/exam-live.mjs';
+import { siteRoute } from './base';
 
 export const EXAM_STORE = 'exam:m14-mock-exam';
-export const ANSWER_KEY_PATH = '/curriculum/m14-capstone-exam/mock-exam/answer-key/';
+export const ANSWER_KEY_PATH = '/curriculum/m14-capstone-exam/mock-exam/answer-key/'; // base 를 뺀 사이트 경로(base.ts)
 
 const NAV_SELECTOR = 'nav.sidebar, .pagination-links';
 
@@ -23,7 +24,7 @@ export function examRunning(): boolean {
 function isKeyLink(a: HTMLAnchorElement): boolean {
   try {
     const u = new URL(a.href, location.href);
-    return u.origin === location.origin && u.pathname.replace(/\/?$/, '/') === ANSWER_KEY_PATH;
+    return u.origin === location.origin && siteRoute(u.pathname).replace(/\/?$/, '/') === ANSWER_KEY_PATH;
   } catch {
     return false;
   }
@@ -70,7 +71,7 @@ export function installExamGuard(): void {
     true,
   );
   // 정답·해설 페이지를 시험 중에 (주소로) 열었으면 위에 알림만 둔다.
-  if (running && location.pathname.replace(/\/?$/, '/') === ANSWER_KEY_PATH) {
+  if (running && siteRoute(location.pathname).replace(/\/?$/, '/') === ANSWER_KEY_PATH) {
     const main = document.querySelector('.sl-markdown-content');
     if (main) {
       const p = document.createElement('p');
