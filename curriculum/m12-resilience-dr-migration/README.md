@@ -53,7 +53,7 @@ curriculum/m12-resilience-dr-migration/labs/verify.sh
 | boto3 | `emulator_site(real_aws_region="ap-northeast-2")` (또는 `require_emulator()` 후 평소처럼) | `emulator_site("DR_", real_aws_region="ap-northeast-1")` — 그 사이트의 변수만으로 검사하고, 그 사이트로 고정된 `.client()`를 돌려준다 |
 | 안전 장치 | env.sh: 계정 `000000000000` 확인 / `emulator_site()` | dr-env.sh: 다른 포트인지·계정 확인, 실패 시 `DR_AWS_*` 해제 / `emulator_site("DR_")` |
 
-두 에뮬레이터 모두 **기술적으로는 `us-east-1`**이다. "서울/도쿄"는 이름일 뿐이며, 리전 간 네트워크·관리형 복제(CRR, Aurora Global 등)는 재현하지 않는다. 장애 조치는 `EMULATOR_PORT`를 바꿔 `source scripts/env.sh`를 다시 하는 것으로 흉내 낸다(레슨 2의 런북).
+두 에뮬레이터 모두 **기술적으로는 `us-east-1` 리전**이다. "서울/도쿄"는 이름일 뿐이며, 리전 간 네트워크·관리형 복제(CRR, Aurora Global 등)는 재현하지 않는다. 장애 조치는 `EMULATOR_PORT`를 바꿔 `source scripts/env.sh`를 다시 하는 것으로 흉내 낸다(레슨 2의 런북).
 
 정리 자료: [cheatsheet.md](./cheatsheet.md) · [quiz.md](./quiz.md)
 

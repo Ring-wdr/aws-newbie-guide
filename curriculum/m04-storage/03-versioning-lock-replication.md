@@ -45,7 +45,7 @@ WORM(Write Once Read Many): 한 번 쓰면 정해진 기간 동안 **수정·삭
 | 누가 해제·단축 | `s3:BypassGovernanceRetention` 권한 + 우회 헤더를 가진 사용자 | **아무도 못 함(루트 포함)**. 기한을 늘리는 것만 가능 | `s3:PutObjectLegalHold` 권한이 있는 사용자 |
 | 언제 | 실수 방지, 테스트, 내부 정책 | 금융·의료 규정(SEC 17a-4 등) | 소송·조사 중 보존 |
 
-버킷에 **기본 보존(Default Retention)**을 걸면 새 객체 버전에 자동으로 적용된다.
+버킷에 **기본 보존**(Default Retention)을 걸면 새 객체 버전에 자동으로 적용된다.
 
 ### 복제(Replication) — CRR과 SRR
 

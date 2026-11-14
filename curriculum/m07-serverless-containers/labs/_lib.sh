@@ -6,7 +6,7 @@ ACCOUNT=000000000000
 REGION=us-east-1
 
 # CLI waiter(`aws dynamodb wait table-not-exists`, 20초 간격) 대신 같은 조건을 1초 간격으로 확인하는
-# 함수(wait_dynamodb_table_gone). 이유는 scripts/lab-wait.sh 머리말.
+# 함수(wait_dynamodb_table_gone)와, table-exists 에 "준비 직후 재확인"을 더한 wait_dynamodb_table_active. 이유는 scripts/lab-wait.sh.
 source "$(git rev-parse --show-toplevel)/scripts/lab-wait.sh"
 
 fail() { echo "FAIL: $*" >&2; exit 1; }

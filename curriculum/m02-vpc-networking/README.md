@@ -73,7 +73,7 @@ curriculum/m02-vpc-networking/labs/verify.sh
 |---|---|---|
 | `todayorder-vpc` | `10.0.0.0/16` | DNS 확인(`enableDnsSupport`) 기본 켜짐, DNS 호스트 이름(`enableDnsHostnames`) **켬** |
 
-**서브넷 6개** (AZ당 티어 하나씩. 3번째 옥텟: 0~9 퍼블릭, 10~19 앱, 20~29 DB, 30 이후 예비)
+**서브넷 6개** (AZ당 티어 하나씩. 3번째 옥텟: 0\~9 퍼블릭, 10\~19 앱, 20\~29 DB, 30 이후 예비)
 
 | 이름 | CIDR | AZ | 티어 | 퍼블릭 IP 자동 할당 | 라우팅 테이블 |
 |---|---|---|---|---|---|

@@ -190,6 +190,89 @@ clock_check_cannot_measure() {
   [ "$rc" -eq 2 ] && grep -q "측정하지 못했습니다" <<<"$out"
 }
 
+# clock-check.sh --stability: VM 저널 대신 가짜 기록(EMULATOR_CLOCK_FAKE_JOURNAL)을 읽힌다 (실제 VM 시계는 건드리지 않음).
+# 기록 형식은 'journalctl -t lima-guestagent -o short-unix' 그대로이고, 보정량은 실제로 관찰한 값의 형태를 따른다.
+fake_synctime() {  # $1=파일 $2=첫 시각(epoch) $3=개수 $4=간격(초) $5=보정량(Go 표기, 예: 2.05s·100.06ms·-15m5.9s)
+  local i
+  for ((i = 0; i < $3; i++)); do
+    printf '%s.443075 colima lima-guestagent[436]: time="x" level=info msg="SyncTime: system time synchronized with host (drift was %s)"\n' \
+      "$(($2 + i * $4))" "$5" >>"$1"
+  done
+}
+clock_stability_fires() {
+  local f out rc now
+  f="$(mktemp)"; now="$(date -u +%s)"
+  fake_synctime "$f" "$((now - 125))" 12 10 2.054861792s   # 2초씩, 10초마다 (관찰된 형태)
+  out="$(EMULATOR_CLOCK_FAKE_JOURNAL="$f" bash "$ROOT/scripts/clock-check.sh" --stability 2>&1)"; rc=$?
+  rm -f "$f"
+  echo "rc=$rc $out"
+  [ "$rc" -eq 4 ] && grep -q "VM 시계 불안정: 최근 180초 동안 Colima VM 시계가 12번" <<<"$out" \
+    && grep -q "systemctl stop systemd-timesyncd" <<<"$out" && grep -q "systemctl start systemd-timesyncd" <<<"$out"
+}
+clock_stability_quiet() {
+  local f out rc now
+  f="$(mktemp)"; now="$(date -u +%s)"
+  fake_synctime "$f" "$((now - 1000))" 20 10 2.03s        # 창(180초) 밖의 불안정 — 지금은 멈춤
+  fake_synctime "$f" "$((now - 170))" 15 10 100.6ms       # 문턱(0.5초) 아래의 작은 보정
+  fake_synctime "$f" "$((now - 60))" 1 10 -15m5.947595153s # 잠자기 뒤 한 번 크게 따라잡기
+  fake_synctime "$f" "$((now - 30))" 2 10 1.5s            # 0.5초 이상이지만 2번뿐
+  out="$(EMULATOR_CLOCK_FAKE_JOURNAL="$f" bash "$ROOT/scripts/clock-check.sh" --stability 2>&1)"; rc=$?
+  rm -f "$f"
+  echo "rc=$rc $out"
+  # 따라잡기는 정확히 1번이어야 한다 — 100.6ms 를 100.6초로 잘못 읽으면 "16번"이 된다
+  [ "$rc" -eq 0 ] && ! grep -q "불안정" <<<"$out" && grep -q "크게(1분 이상) 맞춘 기록이 1번 있습니다" <<<"$out"
+}
+clock_stability_summary() {
+  local f out rc now
+  f="$(mktemp)"; now="$(date -u +%s)"
+  fake_synctime "$f" "$((now - 250))" 20 10 -2.2s          # 맥 시계가 NTP 보다 앞선 경우(반대 방향)도 센다
+  out="$(EMULATOR_CLOCK_FAKE_JOURNAL="$f" bash "$ROOT/scripts/clock-check.sh" --stability --summary --last 300 2>&1)"; rc=$?
+  rm -f "$f"
+  echo "unstable: rc=$rc $out"
+  [ "$rc" -eq 0 ] && grep -q "이번 실행 동안(300초) Colima VM 시계가 20번" <<<"$out" || return 1
+  out="$(EMULATOR_CLOCK_FAKE_JOURNAL=/nonexistent/journal bash "$ROOT/scripts/clock-check.sh" --stability --summary --last 300 2>&1)"; rc=$?
+  echo "cannot measure + --summary: rc=$rc '$out'"
+  [ "$rc" -eq 0 ] && [ -z "$out" ] || return 1
+  out="$(EMULATOR_CLOCK_FAKE_JOURNAL=/nonexistent/journal bash "$ROOT/scripts/clock-check.sh" --stability 2>&1)"; rc=$?
+  echo "cannot measure: rc=$rc"
+  [ "$rc" -eq 2 ]
+}
+
+# colima ssh 가 멈춰도(잠자기 뒤 낡은 ssh 연결 등) clock-check·emulator-up·status 가 같이 멈추지 않는지:
+# TERM 을 무시하고 오래 자는 가짜 colima(자식도 TERM 무시)와 'colima' 컨텍스트를 답하는 가짜 docker 를 앞에 둔다.
+# 제한 시간 2초(EMULATOR_CLOCK_SSH_TIMEOUT) — 세 번 불러도 이 시험은 15초 안에 끝난다.
+clock_stability_ssh_timeout() {
+  local fake out rc t0 el rc_all=0
+  fake="$(mktemp -d)"
+  printf '#!/bin/sh
+trap "" TERM
+sleep 619 &
+wait
+sleep 619
+' >"$fake/colima"
+  printf '#!/bin/sh
+echo colima
+' >"$fake/docker"
+  chmod +x "$fake/colima" "$fake/docker"
+  t0=$SECONDS
+  out="$(PATH="$fake:$PATH" EMULATOR_CLOCK_SSH_TIMEOUT=2 bash "$ROOT/scripts/clock-check.sh" --stability 2>&1)"; rc=$?; el=$((SECONDS - t0))
+  echo "직접: rc=$rc ${el}초 $out"
+  { [ "$rc" -eq 2 ] && [ "$el" -le 5 ] && grep -q "2초 안에 응답하지 않았습니다" <<<"$out"; } || rc_all=1
+  t0=$SECONDS
+  out="$(PATH="$fake:$PATH" EMULATOR_CLOCK_SSH_TIMEOUT=2 bash "$ROOT/scripts/clock-check.sh" --stability --summary 2>&1)"; rc=$?; el=$((SECONDS - t0))
+  echo "--summary: rc=$rc ${el}초 '$out'"
+  { [ "$rc" -eq 0 ] && [ "$el" -le 5 ] && [ -z "$out" ]; } || rc_all=1
+  # emulator-up·status 가 부르는 경고 함수 (docker 없이 시험하려고 함수만 부른다)
+  t0=$SECONDS
+  out="$(PATH="$fake:$PATH" EMULATOR_CLOCK_SSH_TIMEOUT=2 bash -c ". '$ROOT/scripts/_common.sh'; warn_if_clock_unstable; echo rc=\$?" 2>&1)"; el=$((SECONDS - t0))
+  echo "warn_if_clock_unstable: ${el}초 '$out'"
+  { [ "$out" = "rc=0" ] && [ "$el" -le 5 ]; } || rc_all=1
+  sleep 1
+  if pgrep -f "sleep 619" >/dev/null 2>&1; then echo "남은 프로세스: $(pgrep -fl 'sleep 619')"; pkill -KILL -f "sleep 619"; rc_all=1; fi
+  rm -rf "$fake"
+  return "$rc_all"
+}
+
 # 두 번째 사이트(dr-env.sh + emulator_site("DR_")) 실시간 시험은 DR_EMULATOR_PORT 에 에뮬레이터가 떠 있을 때만.
 # 하위 셸에서 실행해, dr-env.sh 가 실패해도(bash 3.2 의 set -e 처리 포함) verify.sh 전체가 아니라 이 항목만 FAIL 이 되게 한다.
 guard_selftest() (
@@ -219,6 +302,10 @@ run "emulator-up.sh: 잘못된 EMULATOR_DNS(999.999.999.999·127.0.0.01 등) →
 run "env.sh: 거부·Ctrl-C·연결 상태에서 HTTP 요청이 실제 AWS에 전달되지 않음 — ~/.boto 무시, MRAP 로컬 거부, Kinesis stream-id 는 TLS 에서 끊김, dr-env 거부 (임시 HOME, bash·zsh)" envsh_refusal_disconnects
 run "env.sh·dr-env.sh: if 조건 안에서 source 해 거부돼도 호출한 셸이 끝나지 않음 (macOS bash 3.2)" sourced_refusal_is_contained
 run "clock-check.sh: 에뮬레이터 없음 → '측정하지 못했습니다' + 종료 코드 2" clock_check_cannot_measure
+run "clock-check.sh --stability: 10초마다 2초씩 보정 12번 → 불안정(종료 코드 4) + 해결·되돌리기 명령" clock_stability_fires
+run "clock-check.sh --stability: 창 밖·0.5초 미만·잠자기 따라잡기·2번뿐 → 안정(0), 따라잡기는 참고만" clock_stability_quiet
+run "clock-check.sh --stability --summary: 불안정이면 '이번 실행 동안' 안내 + 0, 확인 못 하면 조용히 0 (--summary 없으면 2)" clock_stability_summary
+run "clock-check.sh --stability: colima ssh 가 멈추면(TERM 무시) 제한 시간 뒤 '확인하지 못함'(2)·--summary·경고 함수는 조용히, 남는 프로세스 없음" clock_stability_ssh_timeout
 for py in "$MOD_DIR"/sdk/*.py; do
   run "안전 장치: env.sh 없이 sdk/$(basename "$py") 실행 → 네트워크 호출 전 거부" guard_refuses "$py"
 done
@@ -236,6 +323,8 @@ done
 
 echo "----"
 echo "통과 $pass · 실패 $fail"
+# 이번 실행 동안 VM 시계가 반복해서 옮겨졌다면 알린다 (안정·확인 불가면 아무것도 출력하지 않음, 언제나 0)
+bash "$ROOT/scripts/clock-check.sh" --stability --summary --last "$SECONDS" || true
 if [ "$fail" -ne 0 ]; then
   echo "MODULE m00 FAIL"
   exit 1
