@@ -25,6 +25,7 @@ export function rehypeGuide() {
     };
     walk(tree);
     gradeMarks(tree, false);
+    labelTaskCheckboxes(tree);
     keepMiddleDotRuns(tree);
     breakableTokensInCells(tree, false);
   };
@@ -160,4 +161,19 @@ function gradeMarks(node, inHeading) {
     });
   }
   node.children = out;
+}
+
+// GFM 작업 목록(- [ ] 항목)의 체크 상자는 글자 라벨이 없어 스크린 리더에 이름 없이 읽힌다(axe label 규칙).
+// 그 항목의 글을 접근 가능한 이름으로 준다(화면은 그대로).
+const textOf = (n) => (n.type === 'text' ? n.value : (n.children || []).map(textOf).join(''));
+function labelTaskCheckboxes(node) {
+  if (!node.children) return;
+  if (node.type === 'element' && node.tagName === 'li' && (node.properties?.className || []).includes('task-list-item')) {
+    const box = node.children.find((c) => c.type === 'element' && c.tagName === 'input' && c.properties?.type === 'checkbox');
+    if (box && !box.properties.ariaLabel) {
+      const label = textOf(node).replace(/\s+/g, ' ').trim().slice(0, 120);
+      if (label) box.properties.ariaLabel = label;
+    }
+  }
+  for (const c of node.children) labelTaskCheckboxes(c);
 }
