@@ -1,0 +1,117 @@
+---
+// M09 레슨 1 — KMS 봉투 암호화 단계(설명용 모형).
+// 크기와 오류 이름은 빌드 때 원고(01-kms.md)에서 읽는다(facts.mjs). 읽지 못하면 빌드가 실패한다.
+import fs from 'node:fs';
+import path from 'node:path';
+import { REPO_ROOT } from '../../../lib/repo.mjs';
+import { readEnvelopeFacts, LESSON } from './facts.mjs';
+import Envelope from './Envelope.jsx';
+
+const facts = readEnvelopeFacts(fs.readFileSync(path.join(REPO_ROOT, LESSON), 'utf8'));
+---
+
+<Envelope client:visible facts={facts} />
+
+<style is:global>
+  .ev {
+    margin: 1.5rem 0;
+    padding: 1rem;
+    border: 1px solid var(--guide-border);
+    border-left: 4px solid var(--sl-color-accent);
+    border-radius: var(--guide-radius);
+    background: var(--guide-surface);
+    font-size: 0.9375rem;
+    overflow-wrap: anywhere;
+  }
+  .ev :is(p, ul, fieldset, details, table) { margin: 0; }
+  .ev > * + * { margin-top: 0.85rem; }
+  .ev-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+  .ev-head h4 { margin: 0; font-size: 1.05rem; }
+  .ev-model {
+    display: inline-block;
+    padding: 0 0.5rem;
+    border: 1px dashed currentColor;
+    border-radius: 999px;
+    font-size: 0.8125rem;
+    font-weight: 700;
+    color: var(--guide-y-fg);
+    background: var(--guide-y-bg);
+  }
+  .ev-intro, .ev-hint, .ev small, .ev-empty { color: var(--guide-muted); }
+  .ev small { display: block; font-size: 0.8125rem; line-height: 1.5; }
+  .ev fieldset { border: 0; padding: 0; min-width: 0; }
+  .ev legend, .ev-label { font-weight: 700; padding: 0; margin-bottom: 0.3rem; }
+  .ev-row { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+  .ev-hint { margin-top: 0.35rem !important; font-size: 0.8125rem; }
+  .ev button {
+    font: inherit;
+    font-size: 0.875rem;
+    padding: 0.3rem 0.8rem;
+    min-height: 2.25rem;
+    border-radius: 0.4rem;
+    border: 1px solid var(--guide-border);
+    background: var(--guide-surface-2);
+    color: var(--sl-color-text);
+    cursor: pointer;
+    text-align: left;
+  }
+  .ev button:hover:not(:disabled) { border-color: var(--sl-color-accent); }
+  .ev button:disabled { opacity: 0.55; cursor: not-allowed; }
+  .ev button[aria-pressed='true'] { border-color: var(--sl-color-accent); box-shadow: inset 0 0 0 1px var(--sl-color-accent); font-weight: 700; }
+  .ev button[aria-pressed='true']::before { content: '✓ '; }
+  .ev :is(button, input, summary, .ev-table-scroll):focus-visible { outline: 2px solid var(--sl-color-accent); outline-offset: 2px; }
+  .ev-controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 0.85rem 1.25rem; }
+  .ev-field { display: flex; flex-direction: column; gap: 0.25rem; }
+  .ev-field > span { font-weight: 700; }
+  .ev input[type='number'] {
+    font: inherit;
+    width: 100%;
+    max-width: 12rem;
+    padding: 0.3rem 0.5rem;
+    border: 1px solid var(--guide-border);
+    border-radius: 0.4rem;
+    background: var(--sl-color-bg);
+    color: var(--sl-color-text);
+  }
+  .ev-radios label, .ev-check { display: flex; gap: 0.4rem; align-items: baseline; }
+  .ev-result {
+    padding: 0.6rem 0.75rem;
+    border: 1px solid var(--guide-border);
+    border-radius: var(--guide-radius);
+    background: var(--sl-color-bg);
+  }
+  .ev-tag { font-weight: 700; }
+  .ev-result[data-result='ok'] .ev-tag { color: var(--guide-ok); }
+  .ev-result[data-result='fail'] .ev-tag { color: var(--guide-bad); }
+  .ev-now {
+    margin-top: 0.5rem;
+    padding: 0.55rem 0.75rem;
+    border: 1px solid var(--guide-border);
+    border-left: 4px solid var(--sl-color-accent);
+    border-radius: var(--guide-radius);
+    background: var(--sl-color-bg);
+  }
+  .ev-now[data-ok='false'] { border: 2px dashed var(--guide-bad); }
+  .ev-now > * + * { margin-top: 0.25rem !important; }
+  .ev-now-title { font-weight: 700; }
+  .ev-now[data-ok='false'] .ev-now-title { color: var(--guide-bad); }
+  .ev-wire { font-size: 0.875rem; }
+  .ev-boxes { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: 0.6rem; }
+  .ev-box { padding: 0.5rem 0.65rem; border: 1px solid var(--guide-border); border-radius: var(--guide-radius); background: var(--sl-color-bg); }
+  .ev-box-title { font-weight: 700; margin-bottom: 0.3rem !important; }
+  .ev-box ul { list-style: none; padding: 0 !important; font-size: 0.875rem; }
+  .ev-box li { margin: 0 0 0.25rem !important; }
+  /* 평문(비밀) 항목: 점선 테두리 + "평문(비밀)" 글자 */
+  .ev-secret { border: 1px dashed var(--guide-bad); border-radius: 0.25rem; padding: 0.1rem 0.3rem; }
+  .ev-tag-secret { font-weight: 700; color: var(--guide-bad); font-size: 0.8125rem; }
+  .ev details > summary { cursor: pointer; font-weight: 700; width: fit-content; }
+  .ev-table-scroll { overflow-x: auto; margin-top: 0.5rem; }
+  .ev-table { width: 100%; min-width: 40rem; border-collapse: collapse; font-size: 0.8125rem; display: table; overflow-wrap: normal; word-break: keep-all; }
+  .ev-table :is(th, td) { border: 1px solid var(--guide-border); padding: 0.3rem 0.45rem; text-align: left; vertical-align: top; }
+  .ev-table td:first-child { white-space: nowrap; }
+  .ev-table tr[aria-current='step'] { background: var(--sl-color-accent-low); font-weight: 700; }
+  .ev-assume ul { margin-top: 0.4rem !important; padding-left: 1.2rem; }
+  @media (prefers-reduced-motion: reduce) {
+    .ev * { transition: none !important; animation: none !important; }
+  }
+</style>
