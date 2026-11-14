@@ -1,0 +1,10 @@
+---
+// 감싼 Starlight 기본 컴포넌트(목차·사이드바)가 그린 HTML 의 등급 이모지에 본문과 같은 라벨을 붙인다(src/lib/grade-marks.mjs).
+// 원고 제목 글자·앵커는 그대로다(라벨 글자는 CSS 생성 콘텐츠). grades 관문이 목차·사이드바도 본다.
+import { gradeMarksInHtml } from '../lib/grade-marks.mjs';
+import { gradeLegend } from '../plugins/meta.mjs';
+
+const html = await Astro.slots.render('default');
+---
+
+<Fragment set:html={gradeMarksInHtml(html, gradeLegend())} />

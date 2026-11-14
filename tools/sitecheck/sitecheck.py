@@ -204,19 +204,36 @@ def bare_grade_emoji(content: "htmlbuilt.Node") -> list[str]:
     return out
 
 
+def grade_regions(doc: "htmlbuilt.Node") -> list[tuple[str, "htmlbuilt.Node"]]:
+    """등급 이모지를 보는 영역: 본문, 페이지 안 목차(넓은 화면 starlight-toc·좁은 화면 mobile-starlight-toc), 사이드바(nav.sidebar).
+    목차·사이드바는 원고 제목을 그대로 싣기 때문에 본문만 보면 놓친다."""
+    out: list[tuple[str, htmlbuilt.Node]] = []
+    content = htmlbuilt.content_root(doc)
+    if content is not None:
+        out.append(("본문", content))
+    for name, pred in (
+        ("목차", lambda n: n.tag == "starlight-toc"),
+        ("좁은 화면 목차", lambda n: n.tag == "mobile-starlight-toc"),
+        ("사이드바", lambda n: n.tag == "nav" and "sidebar" in n.cls()),
+    ):
+        out += [(name, n) for n in doc.find_all(pred)]
+    return out
+
+
 def gate_grades(dist: Path, files: list[str]) -> Gate:
-    g = Gate("등급 이모지 🟢🟡🔴 에 글자 라벨·접근 가능한 이름(색만으로 전달 금지)")
+    g = Gate("등급 이모지 🟢🟡🔴 에 글자 라벨·접근 가능한 이름(본문·목차·사이드바, 색만으로 전달 금지)")
     for rel in files:
         html_path = html_for_route(dist, route_for(rel))
         if not html_path.exists():
             continue
-        content = htmlbuilt.content_root(htmlbuilt.parse(html_path.read_text(encoding="utf-8")))
-        if content is None:
+        regions = grade_regions(htmlbuilt.parse(html_path.read_text(encoding="utf-8")))
+        if not regions:
             continue
         g.checked += 1
-        bare = bare_grade_emoji(content)
-        if bare:
-            g.fail(f"{rel}: 라벨 없는 등급 이모지 {len(bare)}곳 — 예: {bare[:3]}")
+        for where, node in regions:
+            bare = bare_grade_emoji(node)
+            if bare:
+                g.fail(f"{rel} {where}: 라벨 없는 등급 이모지 {len(bare)}곳 — 예: {bare[:3]}")
     return g
 
 
@@ -677,6 +694,13 @@ def gate_browser(port: int, which: str, pages: str = "pilot") -> Gate:
             sys.stdout.write(p.stderr[-3000:])
             g.fail(f"{script} 종료 코드 {p.returncode}")
         g.checked = 1
+        if which == "a11y":
+            # 위젯 상자에 aria-busy="true" 가 남지 않는지(끝까지 스크롤·Tab 만). 스스로 결함을 심어 잡는지 먼저 확인한다.
+            b = subprocess.run(["node", "tests/widget-busy.mjs", "--port", str(port), "--pages", browser_pages_arg(pages)], capture_output=True, text=True, cwd=SITE, env=env)
+            sys.stdout.write(b.stdout)
+            if b.returncode != 0:
+                sys.stdout.write(b.stderr[-3000:])
+                g.fail(f"tests/widget-busy.mjs 종료 코드 {b.returncode}")
         if which == "keyboard" and p.returncode == 0 and (Path(d) / "keyboard-answers.txt").exists():
             # 키보드로 끝까지 푼 모의고사 답안을 grade.py 로도 채점해 화면 결과와 맞춘다.
             sheet = Path(d) / "keyboard-answers.txt"

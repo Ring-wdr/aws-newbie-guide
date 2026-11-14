@@ -34,6 +34,10 @@ export const ko = {
     openFull: '그림을 원래 크기로 보기(새 탭)',
     fullTitle: '다이어그램 원래 크기',
   },
+  widget: {
+    // 위젯 공용 틀(MarkdownContent.astro)의 <noscript> — JavaScript 가 꺼지면 조작부만 보이고 동작하지 않는다
+    noscript: '이 모형은 JavaScript가 필요하다(지금은 꺼져 있어 조작해도 바뀌지 않는다). 같은 내용은 위아래 본문과 표에 있다.',
+  },
   table: {
     region: (n) => `표 ${n} (넓으면 이 상자 안에서 가로로 스크롤)`,
     scrollHint: '▸ 표가 화면보다 넓습니다. 가로로 스크롤하세요(표를 누르거나 Tab으로 고른 뒤 ←/→ 키).',
