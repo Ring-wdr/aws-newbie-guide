@@ -721,6 +721,13 @@ def gate_browser(port: int, which: str, pages: str = "pilot") -> Gate:
             if b.returncode != 0:
                 sys.stdout.write(b.stderr[-3000:])
                 g.fail(f"tests/widget-busy.mjs 종료 코드 {b.returncode}")
+        if which == "keyboard":
+            # 위젯이 붙기 전(스크립트를 일부러 늦춤)에 Tab 으로 들어가 누른 첫 키가 붙은 뒤 반영되는지. 결함을 심은 자체 시험 먼저.
+            e = subprocess.run(["node", "tests/widget-early-input.mjs", "--port", str(port), "--pages", browser_pages_arg(pages)], capture_output=True, text=True, cwd=SITE, env=env)
+            sys.stdout.write(e.stdout)
+            if e.returncode != 0:
+                sys.stdout.write(e.stderr[-3000:])
+                g.fail(f"tests/widget-early-input.mjs 종료 코드 {e.returncode}")
         if which == "keyboard" and p.returncode == 0 and (Path(d) / "keyboard-answers.txt").exists():
             # 키보드로 끝까지 푼 모의고사 답안을 grade.py 로도 채점해 화면 결과와 맞춘다.
             sheet = Path(d) / "keyboard-answers.txt"
