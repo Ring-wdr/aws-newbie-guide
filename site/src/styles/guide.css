@@ -1158,6 +1158,17 @@ section.exam-q {
 .guide-widget {
   margin-top: 1.5rem;
 }
+/* JavaScript 가 꺼졌을 때만 보이는 안내(MarkdownContent.astro 의 <noscript>) — 색이 아닌 글자와 테두리로 구분 */
+.guide-noscript {
+  margin: 0 0 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px dashed var(--guide-border);
+  border-left: 4px solid var(--guide-y-bd);
+  border-radius: var(--guide-radius);
+  background: var(--guide-y-bg);
+  color: var(--guide-y-fg);
+  font-size: 0.875rem;
+}
 
 /* Starlight 검색 단추의 단축키 표시(⌘K)는 보이는 글자가 접근 이름("검색")과 달라져(axe label-content-name-mismatch) 숨긴다.
    단축키 자체(⌘K / Ctrl+K)는 그대로 동작한다. */
