@@ -12,6 +12,10 @@
 //    (2) 평가 범위 안 실제 데이터 포인트가 N개 이상이면 가장 최근 실제 N개로 판정한다(TreatMissingData 안 씀).
 //    (3) N개보다 적으면 모자란 만큼만 TreatMissingData 값으로 채우고, 범위 안 실제 포인트는 모두 넣어 판정한다.
 //    (4) 이른 ALARM 규칙: 가장 오래된 위반 포인트가 M번째 이상 오래되었고 그보다 최근은 위반이거나 누락이면 ALARM.
+//        문서의 두 문장이 "가장 오래된 위반"을 찾는 폭을 다르게 적는다 — 첫 문단은 "during the Evaluation Periods number of
+//        data points"(최근 N개), M of N 문단은 "during the evaluation range"(평가 범위 전체). 모형은 뒤의 것(평가 범위)을 따른다.
+//        두 해석은 최근 N개에 위반이 없고 그보다 오래된 범위 안에만 위반이 있을 때 갈린다(예: N=M=3, "X - - -").
+//        문서의 표(model.test.mjs의 40칸)는 두 해석 모두에서 같다.
 //    시험(model.test.mjs)이 문서의 예시 표 두 개의 모든 행 × TreatMissingData 네 값을 그대로 확인한다.
 //
 // 모형의 가정·한계(화면의 판정 옆에도 적는다):
@@ -21,8 +25,9 @@
 //     2행 설명: 다음 평가에도 누락이면 "that non-breaching data point will no longer be in the evaluation range").
 //     모형은 문서의 예를 근거로 상한을 N+2(모형 값)로 두고 길이 N+1과 N+2로 판정해, 둘이 갈리면
 //     "모형이 판정하지 않는다"고 하고 가능한 결과만 보여 준다.
-//  4. 문서의 표·문장으로 정해지지 않는 경우(이른 ALARM 규칙에서 위반 포인트가 최근 N개 밖에 있는 경우,
-//     ignore가 이른 ALARM 대신 상태를 유지하는 것 외의 해석)는 판정하지 않는다.
+//  4. 이른 ALARM 규칙의 "가장 오래된 위반"은 평가 범위 전체에서 찾는다(위 (4)의 해석). 그래서 N=M=3에서 900·900·900 뒤
+//     데이터가 끊겨도 위반이 범위 안에 남아 있는 동안 missing은 ALARM, ignore는 직전 상태(ALARM)를 유지한다
+//     (ignore는 이른 ALARM 대신 상태를 유지한다 — 문서 표의 "Retain current state").
 
 export const STATES = ['OK', 'ALARM', 'INSUFFICIENT_DATA'];
 export const TMD_KEYS = ['missing', 'notBreaching', 'breaching', 'ignore'];
@@ -122,8 +127,7 @@ export function evaluateRange(range, n, m, tmd) {
     const oldest = range.findIndex((p) => p === 'breach');
     const age = range.length - oldest;
     if (age >= m) {
-      // 문서 예는 그 포인트가 최근 N개 안에 있는 경우뿐이다. 밖이면 문서로 정해지지 않는다.
-      if (age > n) return { result: 'unknown', why: 'premature-far', real: real.length, fill, breaches: realBreaches };
+      // 가장 오래된 위반은 평가 범위 전체에서 찾는다(머리 주석 (4)·가정 4 — 문서의 "during the evaluation range").
       return { result: tmd === 'ignore' ? 'retain' : 'ALARM', why: 'premature', real: real.length, fill, breaches: realBreaches };
     }
   }
