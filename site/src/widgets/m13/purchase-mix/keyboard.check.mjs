@@ -48,13 +48,21 @@ try {
     else console.log(`  ✓ ${what}: ${res.slice(0, 80)}`);
   };
 
+  // 가로 스크롤 금지: 문서 폭이 화면 폭을 넘으면 실패(시작 상태와 미리 채우기마다)
+  const noHScroll = async (label) => {
+    const [sw, cw] = await page.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.clientWidth]);
+    if (sw > cw) problems.push(`1280px ${label}: 가로 스크롤(scrollWidth ${sw} > clientWidth ${cw})`);
+  };
   await page.evaluate(() => document.activeElement?.blur());
+  await noHScroll('시작 상태');
   await expect('처음(워크시트 안 2)', '443.40', '가장 싼 약정 대수');
   await tabUntil(`${ROOT} button[data-preset="1"]`);
   await press('Enter');
+  await noHScroll(`미리 채우기 1`);
   await expect('워크시트 안 1', '642.00', '같다');
   await tabUntil(`${ROOT} button[data-preset="3"]`);
   await press('Enter');
+  await noHScroll(`미리 채우기 3`);
   await expect('워크시트 안 3', '642.00', '쓰지 않았지만');
   // 약정 슬라이더: Home → 0대, 화살표 6번 → 6대
   await tabUntil(`${ROOT} input[data-field=commit]`);
@@ -85,6 +93,15 @@ try {
     for (const colorScheme of ['light', 'dark']) {
       for (const width of [1280, 360]) {
         const o = await open({ colorScheme, viewport: { width, height: 900 }, reducedMotion: 'reduce' });
+        const chk = async (label) => {
+          const [sw, cw] = await o.page.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.clientWidth]);
+          if (sw > cw) problems.push(`${colorScheme} ${width}px ${label}: 가로 스크롤(scrollWidth ${sw} > clientWidth ${cw})`);
+        };
+        await chk('시작 상태');
+        for (const id of await o.page.$$eval(`${ROOT} button[data-preset]`, (bs) => bs.map((b) => b.dataset.preset))) {
+          await o.page.locator(`${ROOT} button[data-preset="${id}"]`).click();
+          await chk(`미리 채우기 ${id}`);
+        }
         await o.page.locator(`${ROOT} button[data-preset="3"]`).click();
         await o.page.locator(`${ROOT} .pmx-table-box > summary`).click();
         const over = await o.page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);

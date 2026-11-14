@@ -95,6 +95,11 @@ const facts = readAlarmFacts(fs.readFileSync(path.join(REPO_ROOT, LESSON), 'utf8
   .cwa-badge[data-state='OK'] { color: var(--guide-g-fg); background: var(--guide-g-bg); border-color: var(--guide-g-bd); }
   .cwa-badge[data-state='ALARM'] { color: var(--guide-r-fg); background: var(--guide-r-bg); border-color: var(--guide-r-bd); }
   .cwa-badge[data-state='INSUFFICIENT_DATA'] { color: var(--guide-y-fg); background: var(--guide-y-bg); border-color: var(--guide-y-bd); border-style: dashed; }
+  .cwa-badge[data-state='UNDECIDED'] { color: var(--sl-color-text); background: var(--guide-surface-2); border-color: var(--guide-border); border-style: dotted; border-width: 2px; }
+  .cwa-verdict { display: flex; flex-direction: column; gap: 0.5rem; }
+  .cwa-rules { padding: 0.5rem 0.75rem; border: 1px dashed var(--guide-y-bd); border-radius: var(--guide-radius); background: var(--guide-y-bg); color: var(--guide-y-fg); font-size: 0.8125rem; line-height: 1.55; }
+  .cwa-rules ul { margin: 0.3rem 0 0 !important; padding-left: 1.1rem; }
+  .cwa-rules li { margin: 0.15rem 0 0 !important; }
   .cwa-small { font-size: 0.75rem; white-space: normal; }
   .cwa-at input[type='range'] { width: 100%; max-width: 22rem; accent-color: var(--sl-color-accent); }
   .cwa-now { margin-top: 0.4rem !important; }

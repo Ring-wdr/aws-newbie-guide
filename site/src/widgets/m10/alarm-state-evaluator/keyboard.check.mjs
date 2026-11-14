@@ -46,24 +46,35 @@ try {
     else console.log(`  ✓ ${what}: ${t.slice(0, 70)}`);
   };
 
+  // 가로 스크롤 금지: 문서 폭이 화면 폭을 넘으면 실패(시작 상태와 미리 채우기마다)
+  const noHScroll = async (label) => {
+    const [sw, cw] = await page.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.clientWidth]);
+    if (sw > cw) problems.push(`1280px ${label}: 가로 스크롤(scrollWidth ${sw} > clientWidth ${cw})`);
+  };
   await page.evaluate(() => document.activeElement?.blur());
+  await noHScroll('시작 상태');
   // 1) 처음(lab02 예): ALARM
   await expect('lab02 예(처음 값)', 'ALARM');
   // 2) 하트비트 예 → missing: INSUFFICIENT_DATA
   await tabUntil(`${ROOT} button[data-preset=heartbeat]`);
   await press('Enter');
-  await expect('하트비트 + missing', 'INSUFFICIENT_DATA');
+  await noHScroll(`미리 채우기 heartbeat`);
+  await expect('하트비트 + missing(평가 범위에 따라 갈림)', '판정하지 않음');
   // 3) TreatMissingData를 화살표로: notBreaching → OK, breaching → ALARM, ignore → OK(직전 상태 유지)
   await tabUntil(`${ROOT} input[name=cwa-tmd]`);
   await press('ArrowDown');
   await expect('하트비트 + notBreaching', 'OK');
   await press('ArrowDown');
-  await expect('하트비트 + breaching(원고의 답)', 'ALARM');
+  await expect('하트비트 + breaching(ALARM 가능)', '가능한 결과: ALARM 또는 OK');
   await press('ArrowDown');
   await expect('하트비트 + ignore', '● OK');
+  // 규칙·한계 문구는 접힌 영역이 아니라 판정 바로 옆에 보여야 한다
+  const rulesShown = await page.$eval(`${ROOT} .cwa-verdict .cwa-rules`, (e) => !e.closest('details') && e.getBoundingClientRect().height > 0 && e.textContent.includes('판정하지 않음'));
+  if (!rulesShown) problems.push('판정 규칙과 한계 문구가 판정 옆에 보이지 않음');
   // 4) M of N 예 → ALARM, 평가 시점 Home → 구간 1, End → 마지막
   await tabUntil(`${ROOT} button[data-preset=spike]`, { back: true });
   await press('Enter');
+  await noHScroll(`미리 채우기 spike`);
   await expect('M of N 예', 'ALARM');
   await tabUntil(`${ROOT} input[data-field=at]`);
   await press('Home');
@@ -82,14 +93,14 @@ try {
   await press('1');
   await expect('N=1', 'ALARM');
   const need = await page.textContent(`${ROOT} .cwa-table tbody tr:last-child td:nth-child(3)`);
-  if (need.trim() !== '1 / 1') problems.push(`N=1일 때 표의 위반/필요: "${need}"`);
+  if (!/실제 6개 중 최근 N개 · 위반 1$/.test(need.trim())) problems.push(`N=1일 때 표의 판정 근거: "${need}"`);
   // 6) 값 덧붙이기: 정상 값 → OK, 누락 → (missing) INSUFFICIENT_DATA, 마지막 지우기 → OK
   await tabUntil(`${ROOT} button[data-add=ok]`);
   await press('Enter');
   await expect('정상 값 덧붙임', '● OK');
   await tabUntil(`${ROOT} button[data-add=missing]`);
   await press('Enter');
-  await expect('누락 덧붙임(missing)', 'INSUFFICIENT_DATA');
+  await expect('누락 덧붙임(missing — 범위 안 실제 값으로 OK 유지)', '● OK');
   await tabUntil(`${ROOT} button[data-add=drop]`);
   await press('Enter');
   await expect('마지막 구간 지우기', '● OK');
@@ -107,6 +118,15 @@ try {
     for (const colorScheme of ['light', 'dark']) {
       for (const width of [1280, 360]) {
         const o = await open({ colorScheme, viewport: { width, height: 900 }, reducedMotion: 'reduce' });
+        const chk = async (label) => {
+          const [sw, cw] = await o.page.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.clientWidth]);
+          if (sw > cw) problems.push(`${colorScheme} ${width}px ${label}: 가로 스크롤(scrollWidth ${sw} > clientWidth ${cw})`);
+        };
+        await chk('시작 상태');
+        for (const id of await o.page.$$eval(`${ROOT} button[data-preset]`, (bs) => bs.map((b) => b.dataset.preset))) {
+          await o.page.locator(`${ROOT} button[data-preset="${id}"]`).click();
+          await chk(`미리 채우기 ${id}`);
+        }
         await o.page.evaluate((s) => document.documentElement.setAttribute('data-theme', s), colorScheme);
         await o.page.locator(`${ROOT} button[data-preset=spike]`).click();
         await o.page.locator(`${ROOT} input[data-field=at]`).fill('3');

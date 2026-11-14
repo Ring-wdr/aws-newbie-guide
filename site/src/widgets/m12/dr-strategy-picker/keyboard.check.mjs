@@ -48,15 +48,23 @@ try {
     else console.log(`  ✓ ${what}: ${got}${hasSplit ? ' (두 축 나눠 보기)' : ''}`);
   };
 
+  // 가로 스크롤 금지: 문서 폭이 화면 폭을 넘으면 실패(시작 상태와 미리 채우기마다)
+  const noHScroll = async (label) => {
+    const [sw, cw] = await page.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.clientWidth]);
+    if (sw > cw) problems.push(`1280px ${label}: 가로 스크롤(scrollWidth ${sw} > clientWidth ${cw})`);
+  };
   await page.evaluate(() => document.activeElement?.blur());
+  await noHScroll('시작 상태');
   await expect('처음(워크시트 b)', '파일럿 라이트', false);
   for (const [id, want] of [['a', '백업·복원'], ['c', '웜 스탠바이'], ['d', '다중 사이트 액티브-액티브']]) {
     await tabUntil(`${ROOT} button[data-preset="${id}"]`);
     await press('Enter');
+    await noHScroll(`미리 채우기 ${id}`);
     await expect(`워크시트 ${id}`, want, false);
   }
   await tabUntil(`${ROOT} button[data-preset="selfCheck"]`);
   await press('Enter');
+  await noHScroll(`미리 채우기 selfCheck`);
   await expect('스스로 확인 1', '파일럿 라이트', true);
   // RPO 라디오(지금 "초~분") → ArrowUp = "시간"(목록이 넉넉한 단계부터) → 백업·복원
   await tabUntil(`${ROOT} input[name=drp-rpo]`);
@@ -85,6 +93,15 @@ try {
     for (const colorScheme of ['light', 'dark']) {
       for (const width of [1280, 360]) {
         const o = await open({ colorScheme, viewport: { width, height: 900 }, reducedMotion: 'reduce' });
+        const chk = async (label) => {
+          const [sw, cw] = await o.page.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.clientWidth]);
+          if (sw > cw) problems.push(`${colorScheme} ${width}px ${label}: 가로 스크롤(scrollWidth ${sw} > clientWidth ${cw})`);
+        };
+        await chk('시작 상태');
+        for (const id of await o.page.$$eval(`${ROOT} button[data-preset]`, (bs) => bs.map((b) => b.dataset.preset))) {
+          await o.page.locator(`${ROOT} button[data-preset="${id}"]`).click();
+          await chk(`미리 채우기 ${id}`);
+        }
         await o.page.locator(`${ROOT} button[data-preset=selfCheck]`).click();
         await o.page.locator(`${ROOT} .drp-table-box > summary`).click();
         const over = await o.page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);

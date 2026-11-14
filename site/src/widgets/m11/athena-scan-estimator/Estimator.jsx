@@ -44,7 +44,10 @@ export default function Estimator({ facts: f }) {
     setState((s) => ({ ...s, ...patch }));
     setPreset('');
   };
-  const logW = (b) => `${Math.max(1.5, (Math.log10(b + 1) / Math.log10(r.total + 1)) * 100)}%`;
+  // 막대 길이(로그 눈금, 0~100%). 원래 크기가 축의 끝(100%)이다.
+  const logPct = (b) => Math.min(100, Math.max(0, (Math.log10(b + 1) / Math.log10(r.total + 1)) * 100));
+  const logW = (b) => `${Math.max(1.5, logPct(b))}%`;
+  const cutOnAxis = q.cutoff != null && q.cutoff <= r.total;
   const dataLabel = state.data === 'lab' ? `lab05 파티션 ${labParts.length}개(${lab.files.map((x) => x.dt.slice(5)).join(', ')})` : `${f.selfCheck.tb} TB를 파티션 ${MODEL_DAYS_PER_YEAR}개로`;
 
   return (
@@ -137,12 +140,14 @@ export default function Estimator({ facts: f }) {
               </span>
               <span class="asc-track" aria-hidden="true">
                 <span class="asc-fill" style={{ width: logW(s.bytes) }}></span>
-                {q.cutoff != null ? <span class="asc-cut" style={{ left: logW(lab.cutoffBytes) }}></span> : null}
+                {cutOnAxis ? <span class="asc-cut" style={{ left: `${logPct(lab.cutoffBytes)}%` }}></span> : null}
               </span>
             </li>
           ))}
         </ol>
-        {q.cutoff != null ? <p class="asc-legend" aria-hidden="true">세로 점선 = 스캔 상한</p> : null}
+        {q.cutoff != null ? (
+          <p class="asc-legend">{cutOnAxis ? '세로 점선 = 스캔 상한.' : `스캔 상한 ${formatBytes(lab.cutoffBytes)}은 이 축(최대 ${formatBytes(r.total)})보다 커서 축 밖에 있다 — 어느 단계도 상한에 닿지 않는다.`}</p>
+        ) : null}
       </figure>
 
       <details class="asc-assume">

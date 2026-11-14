@@ -47,13 +47,21 @@ try {
     else console.log(`  ✓ ${what}: ${res.slice(0, 80)}`);
   };
 
+  // 가로 스크롤 금지: 문서 폭이 화면 폭을 넘으면 실패(시작 상태와 미리 채우기마다)
+  const noHScroll = async (label) => {
+    const [sw, cw] = await page.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.clientWidth]);
+    if (sw > cw) problems.push(`1280px ${label}: 가로 스크롤(scrollWidth ${sw} > clientWidth ${cw})`);
+  };
   await page.evaluate(() => document.activeElement?.blur());
+  await noHScroll('시작 상태');
   await expect("처음(lab05 WHERE dt)", '665바이트', '실행된다');
   await tabUntil(`${ROOT} button[data-preset="lab05-all"]`);
   await press('Enter');
+  await noHScroll(`미리 채우기 lab05-all`);
   await expect('lab05 필터 없음 = ScannedBytes 1595', '1.56 KB', '100%');
   await tabUntil(`${ROOT} button[data-preset="self-check"]`);
   await press('Enter');
+  await noHScroll(`미리 채우기 self-check`);
   await expect('스스로 확인 1 출발점', '10.0 TB', '차단');
   // ① 파티션 필터 켜기(Space) → 최근 7일
   await tabUntil(`${ROOT} input[data-field=filter]`);
@@ -88,6 +96,15 @@ try {
     for (const colorScheme of ['light', 'dark']) {
       for (const width of [1280, 360]) {
         const o = await open({ colorScheme, viewport: { width, height: 900 }, reducedMotion: 'reduce' });
+        const chk = async (label) => {
+          const [sw, cw] = await o.page.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.clientWidth]);
+          if (sw > cw) problems.push(`${colorScheme} ${width}px ${label}: 가로 스크롤(scrollWidth ${sw} > clientWidth ${cw})`);
+        };
+        await chk('시작 상태');
+        for (const id of await o.page.$$eval(`${ROOT} button[data-preset]`, (bs) => bs.map((b) => b.dataset.preset))) {
+          await o.page.locator(`${ROOT} button[data-preset="${id}"]`).click();
+          await chk(`미리 채우기 ${id}`);
+        }
         await o.page.locator(`${ROOT} button[data-preset="self-check"]`).click();
         await o.page.locator(`${ROOT} input[data-field=filter]`).check();
         await o.page.locator(`${ROOT} input[name=asc-format][value=parquet]`).check();
