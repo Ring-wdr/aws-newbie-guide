@@ -307,6 +307,9 @@ wait_cloudfront_invalidation_completed() {
 #     아니라 되풀이에도 통한다. 단, 간격 d 가 그대로이고(옮김이 쌓이지 않고 돌아오고) 기다림보다 작을 때만이다.
 #     기본 3초는 관찰된 d(최대 2.26초)보다 약 0.7초 길다(시험: ACTIVE 직후 2초 되돌림 → PutItem 3/3 실패,
 #     3초 기다린 뒤 0/3 실패, 4초 기다린 뒤 2초 되돌림도 성공).
+#   - 위 보장은 조회(DescribeTable 의 ACTIVE, Kinesis 는 DescribeStream 의 ACTIVE)가 준비됐다고 본 뒤 데이터 호출
+#     (PutItem·Scan, PutRecord·GetRecords)이 그보다 늦게 준비되지 않는다는 가정에 기댄다. 데이터 호출의 준비 경계가
+#     더 늦으면 기다림이 d 보다 길어도 막지 못한다(Kinesis 재확인은 데이터 호출이 아니라 DescribeStream 으로 한다).
 #   - d 는 맥 시계가 틀린 정도라 정해진 값이 아니다. d 가 기다림보다 크면(예: 맥 시계가 5초 틀림) 이 기다림은
 #     실패 구간을 줄일 뿐 없애지 못한다. 마지막 확인은 한 번 조회일 뿐이라, 그 순간이 0.2~0.3초짜리 되돌림과
 #     겹칠 때만 잡는다(10초에 한 번이면 대략 3%). 이 확인을 통과한 뒤 lab 의 다음 호출이 같은 이유로 실패할 수 있고,
@@ -348,13 +351,18 @@ wait_kinesis_stream_active() {
   if out="$(aws kinesis describe-stream --stream-name "$1" --query 'StreamDescription.StreamStatus' --output text 2>&1)"; then
     out="$(printf '%s\n' "$out" | _lw_clean)"
     [ "$out" = ACTIVE ] && return 0
-    _lw_flip_report "스트림 $1 ACTIVE" "$settle" "상태가 '$out' 다" "$out"
+    # VM 시계 되돌림에서 관찰된 Kinesis 증상은 ACTIVE → CREATING 뿐이다. 다른 상태에 그 설명을 붙이지 않는다.
+    case "$out" in
+      CREATING) _lw_flip_report "스트림 $1 ACTIVE" "$settle" "상태가 '$out' 다" "$out" ;;
+      '') _lw_report "스트림 $1 ACTIVE (재확인)" "ACTIVE 를 확인하고 ${settle}초 뒤 다시 조회했더니 상태가 비어 있다" "$out" ;;
+      *) _lw_report "스트림 $1 ACTIVE (재확인)" "ACTIVE 를 확인하고 ${settle}초 뒤 다시 보니 상태가 '$out' 다 — VM 시계 되돌림에서 관찰된 증상(ACTIVE → CREATING)이 아니다. 같은 스트림을 지우거나 바꾸는 다른 호출이 있는지 확인" "$out" ;;
+    esac
     return 1
   fi
   out="$(printf '%s\n' "$out" | _lw_clean)"
   code="$(_lw_error_code "$out")"
   if [ "$code" = ResourceNotFoundException ]; then
-    _lw_flip_report "스트림 $1 ACTIVE" "$settle" "DescribeStream 이 ResourceNotFoundException" "$out"
+    _lw_report "스트림 $1 ACTIVE (재확인)" "ACTIVE 를 확인하고 ${settle}초 뒤 다시 보니 DescribeStream 이 ResourceNotFoundException 이다 — 스트림이 없어졌다(지워졌거나 에뮬레이터가 재시작됐을 수 있다). VM 시계 되돌림에서 관찰된 증상(ACTIVE → CREATING)이 아니다" "$out"
   else
     _lw_report "스트림 $1 ACTIVE (재확인)" "$(_lw_error_reason "$code" "$out")" "$out"
   fi
