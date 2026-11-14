@@ -21,7 +21,7 @@ test('원고에서 순서도·종료 코드·오류 코드를 읽는다', () => 
   assert.equal(f.signature.code, 'SignatureDoesNotMatch');
   assert.equal(f.signature.skewMinutes, 15);
   assert.deepEqual([f.clock.sts, f.clock.other], ['SignatureDoesNotMatch', 'RequestTimeTooSkewed']);
-  assert.equal(f.endpoint.aws, 'https://sts.us-east-1.amazonaws.com');
+  assert.equal(f.endpoint.aws, 'https://sts.us-east-1.amazonaws.com'); // sitecheck-allow: 원고(레슨 4 순서도)의 문구를 읽었는지 대조할 뿐 접속하지 않는다
   assert.match(f.endpoint.emulator, /^https:\/\/127\.0\.0\.1:\d+$/);
   assert.deepEqual([f.unsigned.code, f.unsigned.status], ['InvalidClientTokenId', 403]);
   const lines = lesson.split('\n');

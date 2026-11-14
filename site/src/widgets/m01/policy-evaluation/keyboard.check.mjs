@@ -30,7 +30,7 @@ const expect = async (what, re) => {
 const stoppedAt = () => page.getAttribute('.pe-step[aria-current=step]', 'data-step');
 
 try {
-  await page.goto(`http://127.0.0.1:${port}${PAGE}`, { waitUntil: 'networkidle' });
+  await page.goto(`http://127.0.0.1:${port}${PAGE}`, { waitUntil: 'networkidle' }); // sitecheck-allow: 이 스크립트가 띄운 루프백 검사 서버
   await page.locator('.pe').evaluate((e) => e.scrollIntoView());
   await page.waitForFunction(() => document.querySelector('.guide-widget[data-widget="m01/policy-evaluation"] astro-island:not([ssr])') !== null);
   await page.evaluate(() => document.activeElement?.blur());

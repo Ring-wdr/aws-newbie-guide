@@ -32,7 +32,7 @@ const expect = async (what, re) => {
 const decidedRows = () => page.$$eval('.nf-table tr[data-decided=true]', (rs) => rs.map((r) => r.cells[0].textContent + ' ' + r.cells[1].textContent));
 
 try {
-  await page.goto(`http://127.0.0.1:${port}${PAGE}`, { waitUntil: 'networkidle' });
+  await page.goto(`http://127.0.0.1:${port}${PAGE}`, { waitUntil: 'networkidle' }); // sitecheck-allow: 이 스크립트가 띄운 루프백 검사 서버
   await page.locator('.nf').evaluate((e) => e.scrollIntoView());
   await page.waitForFunction(() => document.querySelector('.guide-widget[data-widget="m02/nacl-sg-round-trip"] astro-island:not([ssr])') !== null);
   await page.evaluate(() => document.activeElement?.blur());

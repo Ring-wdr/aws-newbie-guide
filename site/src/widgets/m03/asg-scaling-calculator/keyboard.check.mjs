@@ -31,7 +31,7 @@ const expect = async (what, re) => {
 };
 
 try {
-  await page.goto(`http://127.0.0.1:${port}${PAGE}`, { waitUntil: 'networkidle' });
+  await page.goto(`http://127.0.0.1:${port}${PAGE}`, { waitUntil: 'networkidle' }); // sitecheck-allow: 이 스크립트가 띄운 루프백 검사 서버
   await page.locator('.as').evaluate((e) => e.scrollIntoView());
   await page.waitForFunction(() => document.querySelector('.guide-widget[data-widget="m03/asg-scaling-calculator"] astro-island:not([ssr])') !== null);
   await page.evaluate(() => document.activeElement?.blur());
