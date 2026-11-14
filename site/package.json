@@ -10,7 +10,8 @@
     "build": "ASTRO_TELEMETRY_DISABLED=1 ASTRO_DISABLE_UPDATE_CHECK=true astro build --force",
     "build:pilot": "GUIDE_SCOPE=pilot ASTRO_TELEMETRY_DISABLED=1 ASTRO_DISABLE_UPDATE_CHECK=true astro build --force",
     "preview": "ASTRO_TELEMETRY_DISABLED=1 ASTRO_DISABLE_UPDATE_CHECK=true astro preview --host 127.0.0.1",
-    "report": "node scripts/converter-report.mjs"
+    "report": "node scripts/converter-report.mjs",
+    "test:widgets": "node --test 'src/widgets/**/*.test.mjs' 'src/progress/*.test.mjs' 'src/lib/*.test.mjs'"
   },
   "dependencies": {
     "@astrojs/markdown-remark": "7.3.8",

@@ -1,4 +1,4 @@
-// node --test src/progress/ src/lib/  (전 모듈 진행 추적의 순수 함수와 원고 읽기)
+// node --test 'src/progress/*.test.mjs' 'src/lib/*.test.mjs'  (site/ 에서. 위젯 시험 전부: pnpm test:widgets)  (전 모듈 진행 추적의 순수 함수와 원고 읽기)
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';

@@ -618,6 +618,25 @@ def gate_static(dist: Path, verbose: bool = True) -> Gate:
     return g
 
 
+# ---------------------------------------------------------------- 위젯·진행 추적 단위 시험(Node, 브라우저 없음)
+def gate_widgets() -> Gate:
+    """site/package.json 의 test:widgets(위젯 폴더의 *.test.mjs 와 src/progress·src/lib 의 시험)를 돌린다.
+    위젯 폴더에 시험 파일이 하나도 없는 위젯도 실패로 본다(계약 4: 계산 로직의 단위 시험)."""
+    g = Gate("위젯·진행 추적 단위 시험(pnpm test:widgets)")
+    for d in sorted((SITE / "src/widgets").glob("m[0-9][0-9]/*/")):
+        if (d / "index.astro").exists() and not any(d.glob("*.test.mjs")):
+            g.fail(f"site/src/widgets/{d.parent.name}/{d.name}: 단위 시험(*.test.mjs)이 없다")
+    script = json.loads((SITE / "package.json").read_text(encoding="utf-8"))["scripts"]["test:widgets"]
+    p = subprocess.run(script, shell=True, capture_output=True, text=True, cwd=SITE)
+    g.checked = 1
+    summary = {k: v for k, v in re.findall(r"^ℹ (tests|pass|fail) (\d+)$", p.stdout, re.M)}
+    print(f"  test:widgets: 시험 {summary.get('tests', '?')}개, 통과 {summary.get('pass', '?')}, 실패 {summary.get('fail', '?')}")
+    if p.returncode != 0 or summary.get("fail", "1") != "0":
+        sys.stdout.write("\n".join(l for l in p.stdout.splitlines() if l.startswith(("not ok", "✖"))) + "\n" + p.stderr[-2000:])
+        g.fail(f"test:widgets 종료 코드 {p.returncode}")
+    return g
+
+
 # ---------------------------------------------------------------- 브라우저 검사(Node)
 BROWSER_SCRIPTS = {
     "offline": "tests/offline.mjs",
@@ -669,7 +688,7 @@ def gate_browser(port: int, which: str, pages: str = "pilot") -> Gate:
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="가이드 사이트 검사기 (GUIDE-SITE 5장)")
-    ap.add_argument("check", choices=["all", "parity", "grades", "quiz", "exam", "links", "run-commands", "static", "selftest", "scanner", "offline", "a11y", "keyboard", "diagrams", "tables", "browser"])
+    ap.add_argument("check", choices=["all", "parity", "grades", "quiz", "exam", "links", "run-commands", "static", "selftest", "scanner", "widgets", "offline", "a11y", "keyboard", "diagrams", "tables", "browser"])
     ap.add_argument("--pages", default="all", help="all(기본, 전 페이지) | pilot(시범 14쪽, 빠른 확인) | 쉼표로 구분한 경로(/curriculum/.../)")
     ap.add_argument("--dist", default=None, help="빌드 산출물 폴더(기본: site/dist)")
     ap.add_argument("--site", default=None, help="site/ 폴더(기본: 저장소의 site/) — 검사기 자체를 시험할 때 사본을 가리킨다")
@@ -713,6 +732,8 @@ def main(argv: list[str] | None = None) -> int:
         gates.append(gate_run_commands(dist))
     if c in ("all", "static"):
         gates.append(gate_static(dist))
+    if c in ("all", "widgets"):
+        gates.append(gate_widgets())
     browser = list(BROWSER_SCRIPTS) if c in ("all", "browser") else ([c] if c in BROWSER_SCRIPTS else [])
     if browser and not args.port:
         print("브라우저 검사에는 --port 가 필요하다(에이전트 전용 포트, 127.0.0.1 에만 연다)", file=sys.stderr)

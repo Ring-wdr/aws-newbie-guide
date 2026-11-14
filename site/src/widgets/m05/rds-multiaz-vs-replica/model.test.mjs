@@ -1,4 +1,4 @@
-// node --test src/widgets/m05/rds-multiaz-vs-replica/*.test.mjs
+// node --test src/widgets/m05/rds-multiaz-vs-replica/*.test.mjs   (site/ 에서. 위젯 시험 전부: pnpm test:widgets)
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
