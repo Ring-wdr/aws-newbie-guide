@@ -6,7 +6,25 @@ import { confirmDialog } from '../scripts/dialog';
 import { GROUPS, EXAM_HISTORY_KEY, QUIZ_STATE_KEY, sanitize, toggle, computeProgress, quizGradedCount } from './progress.mjs';
 import { latestExam } from '../lib/exam-history.mjs';
 
-export default function Tracker({ items, storeKey, quizRoute, quizTotal, moduleTitle }) {
+const GRADE_CLASS = { '🟢': 'g', '🟡': 'y', '🔴': 'r' };
+/** 항목 이름의 등급 이모지에 본문과 같은 라벨(.grade-mark — 라벨 글자는 생성 콘텐츠)을 붙인다. */
+function LabelText({ text, grades }) {
+  if (!grades) return text;
+  return text.split(/(🟢|🟡|🔴)/u).map((part, i) =>
+    GRADE_CLASS[part] && grades[part] ? (
+      <span key={i} class={`grade-mark grade-mark-${GRADE_CLASS[part]}`} title={grades[part].title}>
+        <span aria-hidden="true">{part}</span>
+        <span class="grade-mark-label" data-label={grades[part].label}></span>
+      </span>
+    ) : (
+      part
+    ),
+  );
+}
+
+const speak = (text, grades) => (grades ? text.replace(/🟢|🟡|🔴/gu, (e) => (grades[e] ? `${e}${grades[e].label}` : e)) : text);
+
+export default function Tracker({ items, storeKey, quizRoute, quizTotal, moduleTitle, grades = null }) {
   const [state, setState] = useState(() => sanitize(null, items));
   const [ready, setReady] = useState(false);
   const [canStore, setCanStore] = useState(true);
@@ -104,10 +122,12 @@ export default function Tracker({ items, storeKey, quizRoute, quizTotal, moduleT
                     <input type="checkbox" id={cid} data-item={it.id} checked={on} disabled={!ready} onChange={(e) => set(it.id, e.currentTarget.checked)} />
                     <label for={cid}>
                       <span class="pt-mark" aria-hidden="true">{on ? '✓' : '○'}</span>
-                      <span class="pt-label">{it.label}</span>
+                      <span class="pt-label">
+                        <LabelText text={it.label} grades={grades} />
+                      </span>
                       <span class="pt-state">{on ? ' — 완료' : ''}</span>
                     </label>
-                    <a class="pt-open" href={it.href} aria-label={`${it.label} 열기`}>
+                    <a class="pt-open" href={it.href} aria-label={`${speak(it.label, grades)} 열기`}>
                       열기
                     </a>
                     {it.kind === 'quiz' && ready && quizGraded > 0 ? (

@@ -189,6 +189,16 @@ kbd {
   font-weight: 700;
   vertical-align: 0.1em;
 }
+/* 라벨 글자는 생성 콘텐츠다: 보이고 화면 낭독기가 읽지만, 복사한 글에는 들어가지 않는다(원고에 없는 글자) */
+.grade-mark-label::after,
+.grade-label::after {
+  content: attr(data-label);
+}
+.grade-mark-label,
+.grade-label {
+  -webkit-user-select: none;
+  user-select: none;
+}
 .grade-mark-g .grade-mark-label { background: var(--guide-g-bg); color: var(--guide-g-fg); border-color: var(--guide-g-bd); }
 .grade-mark-y .grade-mark-label { background: var(--guide-y-bg); color: var(--guide-y-fg); border-color: var(--guide-y-bd); }
 .grade-mark-r .grade-mark-label { background: var(--guide-r-bg); color: var(--guide-r-fg); border-color: var(--guide-r-bd); }
