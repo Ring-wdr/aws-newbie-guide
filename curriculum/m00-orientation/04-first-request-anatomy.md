@@ -140,6 +140,8 @@ HTTP 상태 코드는 `403`이었다. 방금 본 것: 에뮬레이터도 실제 
 | 254 | 요청은 나갔고 **서비스가 오류를 돌려줌** (ValidationException, AccessDenied …) |
 | 255 | 그 밖의 오류 (연결 실패 등) |
 
+<!-- widget: request-journey -->
+
 ## 실제 AWS에서는
 
 - 엔드포인트는 서비스·리전별 공식 주소(`https://sts.us-east-1.amazonaws.com` 등)다. 에뮬레이터는 모든 서비스를 **한 주소**에서 받는다.
