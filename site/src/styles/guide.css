@@ -172,6 +172,22 @@ kbd {
 .grade-g { background: var(--guide-g-bg); color: var(--guide-g-fg); border-color: var(--guide-g-bd); }
 .grade-y { background: var(--guide-y-bg); color: var(--guide-y-fg); border-color: var(--guide-y-bd); }
 .grade-r { background: var(--guide-r-bg); color: var(--guide-r-fg); border-color: var(--guide-r-bd); }
+.grade-mark {
+  white-space: nowrap;
+}
+/* 본문·표 칸의 등급 이모지 옆 글자 라벨(rehype-guide) — 색이 아닌 글자로 구분 */
+.grade-mark-label {
+  margin-inline-start: 0.15em;
+  padding: 0 0.25em;
+  border: 1px solid;
+  border-radius: 0.25rem;
+  font-size: 0.75em;
+  font-weight: 700;
+  vertical-align: 0.1em;
+}
+.grade-mark-g .grade-mark-label { background: var(--guide-g-bg); color: var(--guide-g-fg); border-color: var(--guide-g-bd); }
+.grade-mark-y .grade-mark-label { background: var(--guide-y-bg); color: var(--guide-y-fg); border-color: var(--guide-y-bd); }
+.grade-mark-r .grade-mark-label { background: var(--guide-r-bg); color: var(--guide-r-fg); border-color: var(--guide-r-bd); }
 .grade-legend {
   margin-top: 0.5rem;
   font-size: 0.875rem;

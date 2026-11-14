@@ -140,6 +140,47 @@ def gate_parity(dist: Path, files: list[str]) -> Gate:
     return g
 
 
+# ---------------------------------------------------------------- 등급 이모지의 글자 라벨(원칙 6)
+GRADE_EMOJI = re.compile("[\U0001F7E2\U0001F7E1\U0001F534]")  # 🟢 🟡 🔴
+GRADE_OK_CLASS = {"grade-mark", "grade-badge"}
+GRADE_SKIP_TAGS = {"pre", "code", "svg", "script", "style", "kbd", "template", "title"}
+
+
+def bare_grade_emoji(content: "htmlbuilt.Node") -> list[str]:
+    """글자 라벨(.grade-mark·.grade-badge) 없이 색으로만 남은 등급 이모지가 있는 글 조각들."""
+    out: list[str] = []
+
+    def walk(n, ok: bool) -> None:
+        if n.tag in GRADE_SKIP_TAGS:
+            return
+        ok = ok or bool(n.cls() & GRADE_OK_CLASS)
+        for c in n.children:
+            if isinstance(c, str):
+                if not ok and GRADE_EMOJI.search(c):
+                    out.append(c.strip()[:40])
+            else:
+                walk(c, ok)
+
+    walk(content, False)
+    return out
+
+
+def gate_grades(dist: Path, files: list[str]) -> Gate:
+    g = Gate("등급 이모지 🟢🟡🔴 에 글자 라벨·접근 가능한 이름(색만으로 전달 금지)")
+    for rel in files:
+        html_path = html_for_route(dist, route_for(rel))
+        if not html_path.exists():
+            continue
+        content = htmlbuilt.content_root(htmlbuilt.parse(html_path.read_text(encoding="utf-8")))
+        if content is None:
+            continue
+        g.checked += 1
+        bare = bare_grade_emoji(content)
+        if bare:
+            g.fail(f"{rel}: 라벨 없는 등급 이모지 {len(bare)}곳 — 예: {bare[:3]}")
+    return g
+
+
 # ---------------------------------------------------------------- 퀴즈 정답
 def gate_quiz(dist: Path, files: list[str]) -> Gate:
     g = Gate("퀴즈 정답·통과 기준")
@@ -574,7 +615,7 @@ def gate_browser(port: int, which: str, pages: str = "pilot") -> Gate:
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="가이드 사이트 검사기 (GUIDE-SITE 5장)")
-    ap.add_argument("check", choices=["all", "parity", "quiz", "exam", "links", "run-commands", "static", "selftest", "scanner", "offline", "a11y", "keyboard", "diagrams", "tables", "browser"])
+    ap.add_argument("check", choices=["all", "parity", "grades", "quiz", "exam", "links", "run-commands", "static", "selftest", "scanner", "offline", "a11y", "keyboard", "diagrams", "tables", "browser"])
     ap.add_argument("--pages", default="pilot", help="pilot(기본) | all | 쉼표로 구분한 경로(/curriculum/.../)")
     ap.add_argument("--dist", default=None, help="빌드 산출물 폴더(기본: site/dist)")
     ap.add_argument("--site", default=None, help="site/ 폴더(기본: 저장소의 site/) — 검사기 자체를 시험할 때 사본을 가리킨다")
@@ -595,6 +636,8 @@ def main(argv: list[str] | None = None) -> int:
     c = args.check
     if c in ("all", "parity"):
         gates.append(gate_parity(dist, files))
+    if c in ("all", "grades"):
+        gates.append(gate_grades(dist, files))
     if c in ("all", "quiz"):
         gates.append(gate_quiz(dist, files if args.pages != "pilot" else [f for f in all_content_files() if f in files]))
     if c in ("all", "exam"):
