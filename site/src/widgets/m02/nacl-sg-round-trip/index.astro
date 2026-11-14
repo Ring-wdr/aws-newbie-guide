@@ -1,0 +1,119 @@
+---
+// M02 레슨 4 — DB 연결 왕복: NACL(상태 비저장)과 보안 그룹(상태 저장)의 판정(설명용 모형).
+// 규칙·주소는 빌드 때 원고(04-security-group-vs-nacl.md)의 lab04·lab05 출력에서 읽는다(facts.mjs). 읽지 못하면 빌드가 실패한다.
+import fs from 'node:fs';
+import path from 'node:path';
+import { REPO_ROOT } from '../../../lib/repo.mjs';
+import { readNaclFacts, LESSON } from './facts.mjs';
+import RoundTrip from './RoundTrip.jsx';
+
+const facts = readNaclFacts(fs.readFileSync(path.join(REPO_ROOT, LESSON), 'utf8'));
+---
+
+<RoundTrip client:visible facts={facts} />
+
+<style is:global>
+  .nf {
+    margin: 1.5rem 0;
+    padding: 1rem;
+    border: 1px solid var(--guide-border);
+    border-left: 4px solid var(--sl-color-accent);
+    border-radius: var(--guide-radius);
+    background: var(--guide-surface);
+    font-size: 0.9375rem;
+    overflow-wrap: anywhere;
+  }
+  .nf :is(p, ul, ol, fieldset, details, table) { margin: 0; }
+  .nf > * + * { margin-top: 0.85rem; }
+  .nf-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+  .nf-head h4 { margin: 0; font-size: 1.05rem; }
+  .nf-model {
+    display: inline-block;
+    padding: 0 0.5rem;
+    border: 1px dashed currentColor;
+    border-radius: 999px;
+    font-size: 0.8125rem;
+    font-weight: 700;
+    color: var(--guide-y-fg);
+    background: var(--guide-y-bg);
+  }
+  .nf-intro, .nf-hint, .nf small { color: var(--guide-muted); }
+  .nf small { display: block; font-size: 0.8125rem; line-height: 1.5; }
+  .nf fieldset { border: 0; padding: 0; min-width: 0; }
+  .nf legend { font-weight: 700; padding: 0; margin-bottom: 0.3rem; }
+  .nf-row { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+  .nf-hint { margin-top: 0.35rem !important; font-size: 0.8125rem; }
+  .nf button {
+    font: inherit;
+    font-size: 0.875rem;
+    padding: 0.3rem 0.8rem;
+    min-height: 2.25rem;
+    border-radius: 0.4rem;
+    border: 1px solid var(--guide-border);
+    background: var(--guide-surface-2);
+    color: var(--sl-color-text);
+    cursor: pointer;
+    text-align: left;
+  }
+  .nf button:hover { border-color: var(--sl-color-accent); }
+  .nf button[aria-pressed='true'] { border-color: var(--sl-color-accent); box-shadow: inset 0 0 0 1px var(--sl-color-accent); font-weight: 700; }
+  .nf button[aria-pressed='true']::before { content: '✓ '; }
+  .nf :is(button, input, summary, .nf-table-scroll):focus-visible { outline: 2px solid var(--sl-color-accent); outline-offset: 2px; }
+  .nf-controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: 0.85rem 1.25rem; }
+  .nf-field { display: flex; flex-direction: column; gap: 0.35rem; }
+  .nf-field > label:not(.nf-num), .nf-check { display: flex; gap: 0.4rem; align-items: baseline; }
+  .nf-num { display: flex; flex-direction: column; gap: 0.2rem; }
+  .nf-num > span { font-weight: 700; }
+  .nf input[type='number'] {
+    font: inherit;
+    width: 9rem;
+    max-width: 100%;
+    padding: 0.3rem 0.5rem;
+    border: 1px solid var(--guide-border);
+    border-radius: 0.4rem;
+    background: var(--sl-color-bg);
+    color: var(--sl-color-text);
+  }
+  .nf-result {
+    padding: 0.6rem 0.75rem;
+    border: 1px solid var(--guide-border);
+    border-radius: var(--guide-radius);
+    background: var(--sl-color-bg);
+  }
+  .nf-tag { font-weight: 700; }
+  .nf-result[data-result='ok'] .nf-tag { color: var(--guide-ok); }
+  .nf-result:not([data-result='ok']) .nf-tag { color: var(--guide-bad); }
+  .nf-lanes { display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); gap: 0.75rem 1rem; }
+  .nf-lane-title { font-weight: 700; font-size: 0.875rem; margin-bottom: 0.35rem !important; }
+  .nf-hops { list-style: none; padding: 0 !important; display: flex; flex-direction: column; gap: 0.35rem; }
+  .nf-hop {
+    margin: 0 !important;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.1rem 0.5rem;
+    padding: 0.35rem 0.55rem;
+    border: 2px solid var(--guide-border);
+    border-radius: 0.4rem;
+    background: var(--sl-color-bg);
+    font-size: 0.8125rem;
+  }
+  .nf-where { font-weight: 700; }
+  .nf-mark { font-weight: 700; white-space: nowrap; }
+  .nf-note { grid-column: 1 / -1; color: var(--guide-muted); }
+  .nf-hop[data-pass='true'] .nf-mark { color: var(--guide-ok); }
+  .nf-hop[data-pass='false'] { border-color: var(--guide-bad); border-width: 3px; }
+  .nf-hop[data-pass='false'] .nf-mark { color: var(--guide-bad); }
+  .nf-hop[data-pass='null'] { border-style: dashed; }
+  .nf-hop[data-pass='null'] :is(.nf-where, .nf-mark) { color: var(--guide-muted); }
+  .nf details > summary { cursor: pointer; font-weight: 700; width: fit-content; }
+  .nf-table-scroll { overflow-x: auto; margin-top: 0.5rem; }
+  .nf-table { width: 100%; border-collapse: collapse; font-size: 0.8125rem; display: table; }
+  .nf-table :is(th, td) { border: 1px solid var(--guide-border); padding: 0.3rem 0.45rem; text-align: left; vertical-align: top; white-space: nowrap; }
+  .nf-table tr[data-decided='true'] { background: var(--sl-color-accent-low); font-weight: 700; }
+  .nf-table tr.nf-removed td:not(:last-child) { text-decoration: line-through; color: var(--guide-muted); }
+  .nf-table-box > small { margin-top: 0.35rem; }
+  .nf-assume ul { margin-top: 0.4rem !important; padding-left: 1.2rem; }
+  @media (prefers-reduced-motion: reduce) {
+    .nf * { transition: none !important; animation: none !important; }
+  }
+</style>
