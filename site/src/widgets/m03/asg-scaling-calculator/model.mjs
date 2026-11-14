@@ -17,13 +17,13 @@ const int = (v, lo, hi, dflt) => {
   if (v === '' || v === null || v === undefined) return dflt;
   const n = Number(v);
   if (!Number.isFinite(n)) return dflt;
-  return Math.min(hi, Math.max(lo, Math.round(n)));
+  return Math.min(hi, Math.max(lo, Math.round(n))) + 0; // + 0: -0을 0으로(화면에 "-0"이 나오지 않게)
 };
 const num = (v, lo, hi, dflt) => {
   if (v === '' || v === null || v === undefined) return dflt;
   const n = Number(v);
   if (!Number.isFinite(n)) return dflt;
-  return Math.min(hi, Math.max(lo, n));
+  return Math.min(hi, Math.max(lo, n)) + 0;
 };
 
 /**
@@ -126,7 +126,9 @@ export function combine(desiredList) {
 }
 
 export function fmt(n) {
-  return Number.isInteger(n) ? n.toLocaleString('en-US') : (Math.round(n * 100) / 100).toLocaleString('en-US');
+  // 반올림이 -0을 만들면(예: -0.001) "-0"이 아니라 "0"으로 쓴다
+  const v = (Number.isInteger(n) ? n : Math.round(n * 100) / 100) + 0;
+  return v.toLocaleString('en-US');
 }
 const sign = (n) => (n >= 0 ? `+${n}` : `−${-n}`);
 

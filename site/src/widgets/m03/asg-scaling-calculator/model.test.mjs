@@ -107,6 +107,15 @@ test('fmt', () => {
   assert.equal(fmt(7500), '7,500');
   assert.equal(fmt(1875), '1,875');
   assert.equal(fmt(10.8), '10.8');
+  // -0 정리: 화면에 "-0"이 나오지 않는다
+  assert.equal(fmt(-0), '0');
+  assert.equal(fmt(-0.001), '0');
+  assert.ok(Object.is(normalize({ min: '-0', max: 10, current: -0.2, metric: '-0' }, f.asg).current, 0));
+  assert.ok(Object.is(normalize({ metric: '-0' }, f.asg).metric, 0));
+  for (const policy of ['cpu', 'alb', 'step', 'simple', 'scheduled']) {
+    const r = compute(normalize({ policy, min: 0, max: 5, current: 0, metric: '-0' }, f.asg), f);
+    assert.ok(!r.lines.join(' ').includes('-0'), r.lines.join(' / '));
+  }
 });
 
 test('원고·정책 파일이 바뀌어 읽지 못하면 실패한다', () => {
