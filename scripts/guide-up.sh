@@ -34,11 +34,6 @@ for tool in node pnpm; do
   fi
 done
 
-# 포트가 이미 쓰이면 빌드 전에 알린다(127.0.0.1·0.0.0.0·[::] 어느 쪽에서 듣든). 서버도 같은 검사를 하고 다른 포트로 옮기지 않는다.
-if ! node "$SITE/scripts/serve.mjs" --port "$port" --check; then
-  exit 1
-fi
-
 export ASTRO_TELEMETRY_DISABLED=1
 export ASTRO_DISABLE_UPDATE_CHECK=true
 
@@ -46,6 +41,12 @@ cd "$SITE"
 if [ ! -d node_modules ] || [ pnpm-lock.yaml -nt node_modules/.modules.yaml ]; then
   echo "== site/ 패키지 설치 (lockfile 고정)"
   pnpm install --frozen-lockfile
+fi
+
+# 포트가 이미 쓰이면 빌드 전에 알린다(127.0.0.1·0.0.0.0·[::] 어느 쪽에서 듣든). 서버도 같은 검사를 하고 다른 포트로 옮기지 않는다.
+# (이 검사는 site/ 의 패키지를 불러오므로 설치 뒤에 한다 — 갓 받은 저장소에서 먼저 하면 모듈을 찾지 못해 죽는다.)
+if ! node scripts/serve.mjs --port "$port" --check; then
+  exit 1
 fi
 
 needs_build=0
