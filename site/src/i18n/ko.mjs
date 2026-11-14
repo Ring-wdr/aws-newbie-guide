@@ -29,6 +29,8 @@ export const ko = {
   diagram: {
     label: '다이어그램',
     source: '다이어그램 원문(Mermaid 텍스트)',
+    openFull: '그림을 원래 크기로 보기(새 탭)',
+    fullTitle: '다이어그램 원래 크기',
   },
   table: {
     region: (n) => `표 ${n} (넓으면 이 상자 안에서 가로로 스크롤)`,

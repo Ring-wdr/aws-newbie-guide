@@ -15,7 +15,7 @@ import { transformMarkers } from './markers.mjs';
 import { transformExamQuestions, transformExamKey } from './exam.mjs';
 import { transformChecklist } from './checklist.mjs';
 import { checkLessonSections, transformSelfCheck } from './sections.mjs';
-import { renderMermaid } from './mermaid-render.mjs';
+import { renderMermaid, prefixFor } from './mermaid-render.mjs';
 
 function relOf(file) {
   const p = file.path ? (String(file.path).startsWith('file:') ? fileURLToPath(file.path) : String(file.path)) : null;
@@ -83,7 +83,7 @@ export function remarkGuide(options = {}) {
           const line = ph.position?.start?.line;
           throw new Error(`${rel}:${line}: Mermaid 다이어그램을 그리지 못했다 — ${r.error || '알 수 없는 오류'}`);
         }
-        Object.assign(ph, html(mermaidHtml(ph.source, r)));
+        Object.assign(ph, html(mermaidHtml(ph.source, r, { light: prefixFor(ph.source, 'light'), dark: prefixFor(ph.source, 'dark') })));
         delete ph.data;
         delete ph.source;
       });

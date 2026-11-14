@@ -30,7 +30,7 @@ function cacheVersion() {
         return '?';
       }
     };
-    versionTag = `mi${v('mermaid-isomorphic')}-pw${v('playwright')}-v4`;
+    versionTag = `mi${v('mermaid-isomorphic')}-pw${v('playwright')}-v5`;
   }
   return versionTag;
 }
@@ -49,17 +49,19 @@ function keyFor(source, theme) {
 }
 
 // 다이어그램마다 고유한 id 접두어. SVG 안의 <style>이 id로 범위를 잡으므로 한 페이지 안에서 겹치면 안 된다.
-function prefixFor(source, theme) {
+export function prefixFor(source, theme) {
   return `mmd-${crypto.createHash('sha256').update(source).digest('hex').slice(0, 10)}-${theme}`;
 }
 
 // Mermaid 기본 배치(dagre)는 서브그래프 제목이 내용보다 넓으면 이웃 서브그래프와 겹쳐 라벨을 가린다.
-// 그런 그림만, 내용은 그대로 두고 간격을 넓힌 배치로 다시 그린다(겹침이 없어지는 첫 설정을 쓴다).
+// 그런 그림과 간선 라벨이 노드·제목에 가려지는 그림만, 내용은 그대로 두고 간격을 넓힌 배치로 다시 그린다
+// (겹침이 없어지는 첫 설정, 없으면 겹침이 가장 적은 설정).
 const LAYOUTS = [
-  { name: 'default', flowchart: {} },
-  { name: 'spacious', flowchart: { nodeSpacing: 90, rankSpacing: 60, padding: 30 } },
-  { name: 'wide', flowchart: { nodeSpacing: 120, rankSpacing: 70, padding: 40 } },
-  { name: 'widest', flowchart: { nodeSpacing: 150, rankSpacing: 80, padding: 40 } },
+  { name: 'default', spacing: {} },
+  { name: 'spacious', spacing: { nodeSpacing: 90, rankSpacing: 60, padding: 30 } },
+  { name: 'wide', spacing: { nodeSpacing: 120, rankSpacing: 70, padding: 40 } },
+  { name: 'widest', spacing: { nodeSpacing: 150, rankSpacing: 90, padding: 40 } },
+  { name: 'tall', spacing: { nodeSpacing: 90, rankSpacing: 130, padding: 40 } },
 ];
 
 // 겹침을 재는 브라우저는 여러 원고가 동시에 쓰므로, 쓰는 쪽이 하나도 없을 때만 닫는다(열어 두면 빌드가 끝나지 않는다).
@@ -90,9 +92,20 @@ async function measure(measurePage, svg, width) {
     const con = (a, b) => a.left <= b.left + 1 && a.right >= b.right - 1 && a.top <= b.top + 1 && a.bottom >= b.bottom - 1;
     const cl = [...document.querySelectorAll('g.cluster > rect')].map((r) => r.getBoundingClientRect());
     const nd = [...document.querySelectorAll('g.node')].map((r) => r.getBoundingClientRect());
+    // 간선 라벨이 노드·서브그래프 제목·다른 간선 라벨에 가려지는 경우(tests/diagrams.mjs 와 같은 기준)
+    const lb = [...document.querySelectorAll('g.edgeLabel')]
+      .filter((e) => e.textContent.trim())
+      .map((e) => e.getBoundingClientRect())
+      .filter((r) => r.width > 1 && r.height > 1);
+    const tl = [...document.querySelectorAll('g.cluster-label')].map((r) => r.getBoundingClientRect());
     let k = 0;
     for (let i = 0; i < cl.length; i++) for (let j = i + 1; j < cl.length; j++) if (inter(cl[i], cl[j]) && !con(cl[i], cl[j]) && !con(cl[j], cl[i])) k++;
     for (let i = 0; i < nd.length; i++) for (let j = i + 1; j < nd.length; j++) if (inter(nd[i], nd[j])) k++;
+    for (const l of lb) {
+      for (const n of nd) if (inter(l, n)) k++;
+      for (const t of tl) if (inter(l, t)) k++;
+    }
+    for (let i = 0; i < lb.length; i++) for (let j = i + 1; j < lb.length; j++) if (inter(lb[i], lb[j])) k++;
     return k;
   });
 }
@@ -105,7 +118,8 @@ async function renderOne(source, theme, layout) {
       ...THEMES[theme],
       fontFamily: FONT_STACK,
       securityLevel: 'strict',
-      flowchart: { htmlLabels: true, ...layout.flowchart },
+      flowchart: { htmlLabels: true, ...layout.spacing },
+      state: { ...layout.spacing },
     },
   });
   if (res.status !== 'fulfilled') throw new Error(String(res.reason?.message || res.reason));
@@ -141,13 +155,16 @@ async function renderAll(sources) {
     }
     try {
       // 라이트 테마로 배치를 정하고(겹침이 없는 첫 설정), 다크 테마도 같은 배치로 그린다.
-      let light;
-      let chosen = LAYOUTS[0];
+      // 겹침이 없는 첫 배치를 쓰고, 모두 겹치면 겹침이 가장 적은 배치를 쓴다.
+      let best;
       for (const layout of LAYOUTS) {
-        light = await renderOne(src, 'light', layout);
-        chosen = layout;
-        if (!/^\s*(flowchart|graph)\b/.test(src) || (await overlaps(light.svg, light.width)) === 0) break;
+        const cand = await renderOne(src, 'light', layout);
+        const n = await overlaps(cand.svg, cand.width);
+        if (!best || n < best.n) best = { cand, layout, n };
+        if (n === 0) break;
       }
+      const light = best.cand;
+      const chosen = best.layout;
       const dark = await renderOne(src, 'dark', chosen);
       fs.writeFileSync(files.light, JSON.stringify(light));
       fs.writeFileSync(files.dark, JSON.stringify(dark));

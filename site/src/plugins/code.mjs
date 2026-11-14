@@ -81,15 +81,24 @@ export function transformCode(tree, ctx) {
   });
 }
 
-export function mermaidHtml(source, rendered) {
+export function mermaidHtml(source, rendered, ids) {
   const svgBox = (theme) => {
     const r = rendered[theme];
     // SVG의 가로 크기를 원래 크기로 유지해, 좁은 화면에서는 줄이지 않고 상자 안에서 가로로 스크롤한다.
     return `<div class="diagram-${theme}" style="--diagram-w:${Math.ceil(r.width)}px">${r.svg}</div>`;
   };
+  // 넓은 그림은 같은 사이트 안의 SVG 파일(/diagrams/<id>.svg)로 원래 크기 그대로 볼 수 있게 한다.
+  const open =
+    Math.ceil(rendered.light.width) > 640
+      ? `<p class="diagram-open">` +
+        `<a class="diagram-open-light" href="/diagrams/${ids.light}.svg" target="_blank" rel="noopener">${esc(ko.diagram.openFull)}</a>` +
+        `<a class="diagram-open-dark" href="/diagrams/${ids.dark}.svg" target="_blank" rel="noopener">${esc(ko.diagram.openFull)}</a>` +
+        `</p>`
+      : '';
   return (
     `<figure class="diagram">` +
     `<div class="diagram-scroll" tabindex="0" role="group" aria-label="${esc(ko.diagram.label)}">${svgBox('light')}${svgBox('dark')}</div>` +
+    open +
     `<details class="diagram-src"><summary>${esc(ko.diagram.source)}</summary><pre class="mermaid-src"><code>${esc(source)}</code></pre></details>` +
     `</figure>`
   );

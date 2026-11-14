@@ -293,6 +293,13 @@ kbd {
 .diagram foreignObject p {
   margin: 0 !important;
 }
+.diagram-open {
+  margin: 0.4rem 0 0 !important;
+  font-size: 0.8125rem;
+}
+.diagram-open-dark { display: none; }
+:root[data-theme='dark'] .diagram-open-light { display: none; }
+:root[data-theme='dark'] .diagram-open-dark { display: inline; }
 .diagram-dark { display: none; }
 :root[data-theme='dark'] .diagram-light { display: none; }
 :root[data-theme='dark'] .diagram-dark { display: block; }
