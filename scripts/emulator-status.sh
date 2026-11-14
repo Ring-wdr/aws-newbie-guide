@@ -13,7 +13,15 @@ colima_unresponsive=0
 if command -v colima >/dev/null 2>&1 && [ "$(uname -s)" = "Darwin" ]; then
   # colima 가 응답하지 않아도 상태 표시가 멈추지 않게 3초로 제한한다 (넘기면 VM 목록만 건너뛴다)
   cl="$(mktemp "${TMPDIR:-/tmp}/emulator-status.XXXXXX")"
-  if run_limited 3 "$cl" colima list; then
+  # Ctrl-C·TERM·HUP 로 끝나도 임시 파일을 남기지 않는다 (신호마다 exit 를 걸어야 EXIT trap 이 언제나 돈다)
+  trap 'rm -f "$cl"' EXIT
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
+  trap 'exit 129' HUP
+  rc=0
+  run_limited 3 "$cl" colima list || rc=$?
+  [ "$rc" -ne 130 ] || exit 130   # Ctrl-C 로 중단됨
+  if [ "$rc" -eq 0 ]; then
     sed 's/^/  /' "$cl"
   else
     echo "  (colima list 가 3초 안에 응답하지 않았거나 실패해 VM 목록을 건너뜁니다)"
