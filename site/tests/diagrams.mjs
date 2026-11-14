@@ -3,9 +3,122 @@
 //  - 겹침: 서브그래프(cluster) 상자끼리 한쪽이 다른 쪽을 품지 않은 채 겹친다, 노드끼리 겹친다,
 //          간선 라벨이 노드·서브그래프 제목·다른 간선 라벨에 가려진다
 // 를 찾는다. 실제 화면 폭(1280px)에서 본다.
+// 글꼴(빌드한 OS 와 보는 OS 의 시스템 글꼴이 달라도 라벨이 잘리지 않는가 — src/plugins/diagram-font.mjs):
+//  - 정상 조건: 실린 다이어그램 글꼴("Guide Diagram")을 다 읽은 뒤 잰다. 읽기 실패·시스템 글꼴로 그려진 글자(그림 글자 제외,
+//    DevTools 프로토콜 CSS.getPlatformFontsForNode)도 실패.
+//  - 대체 글꼴 조건: 실린 글꼴 요청을 막아 시스템 글꼴로 그리게 한 경우(라이트·다크)와, 거기에 폭이 크게 다른 고정폭 글꼴을
+//    강제한 경우(라이트). 이때는 라벨이 상자를 넘칠 수 있지만, 잘려서 사라지는 글자(자르는 조상 밖의 글자, 스크롤로 닿을 수
+//    없는 왼쪽·위로 나간 글자)는 0 이어야 한다.
+//  - 단독 SVG(원래 크기로 보기): 파일 안에 담은 글꼴을 읽고 라벨이 잘리지 않는다.
 // 사용: node tests/diagrams.mjs --port <포트> [--pages all(기본)|pilot|/a/,/b/] [--fail]   (--fail: 하나라도 있으면 종료 코드 1)
 import fs from 'node:fs';
 import { offlineBrowser, pagesFromArgs, portFromArgs, serve, baseUrl, siteRoute } from './lib/harness.mjs';
+import { DIAGRAM_FAMILY, EMOJI_SEQ } from '../src/plugins/diagram-font.mjs';
+
+const FONT_ROUTE = '**/fonts/diagram-*.woff2';
+// 대체 글꼴 조건 2: 실린 글꼴을 막고 폭이 크게 다른 고정폭 글꼴을 강제한다.
+const FORCE_WIDE = '.diagram svg, .diagram svg * { font-family: "Courier New", monospace !important; }';
+
+/** 페이지 안: 그림 글자에 필요한 다이어그램 글꼴 조각을 읽고 상태를 돌려준다. */
+async function loadDiagramFonts(family) {
+  const svgs = [...document.querySelectorAll('.diagram svg, .diagram-selftest svg')];
+  if (!svgs.length) return { diagrams: 0 };
+  const text = svgs.map((x) => x.textContent).join('');
+  try {
+    await document.fonts.load(`16px "${family}"`, text);
+  } catch {}
+  await document.fonts.ready;
+  const faces = [...document.fonts].filter((f) => f.family.replace(/"/g, '') === family);
+  return {
+    diagrams: svgs.length,
+    faces: faces.length,
+    loaded: faces.filter((f) => f.status === 'loaded').length,
+    error: faces.filter((f) => f.status === 'error').length,
+    ready: document.fonts.check(`16px "${family}"`, text),
+  };
+}
+
+/** 페이지 안: 보이는 그림의 글자 노드에 표시를 달고 개수를 돌려준다(시스템 글꼴 검사용). */
+function markText(theme) {
+  let n = 0;
+  for (const svg of document.querySelectorAll(`.diagram-${theme} svg, .diagram-n-${theme} svg`)) {
+    if (!svg.getClientRects().length) continue;
+    const w = document.createTreeWalker(svg, NodeFilter.SHOW_TEXT);
+    for (let t = w.nextNode(); t; t = w.nextNode()) {
+      if (!t.nodeValue.trim() || t.parentElement.closest('style, title, desc')) continue;
+      if (!t.parentElement.hasAttribute('data-fchk')) {
+        t.parentElement.setAttribute('data-fchk', '');
+        n++;
+      }
+    }
+  }
+  return n;
+}
+
+/** Chromium 이 실제로 쓴 글꼴: 실린 글꼴이 아닌 글꼴로 그려진 글자가 있는 노드(그림 글자 묶음 수만큼은 허용). */
+async function systemFontText(page, theme) {
+  if (!(await page.evaluate(markText, theme))) return [];
+  const cdp = await page.context().newCDPSession(page);
+  const out = [];
+  try {
+    await cdp.send('DOM.enable');
+    await cdp.send('CSS.enable');
+    const { root } = await cdp.send('DOM.getDocument', { depth: -1 });
+    const { nodeIds } = await cdp.send('DOM.querySelectorAll', { nodeId: root.nodeId, selector: '[data-fchk]' });
+    for (const nodeId of nodeIds) {
+      const { fonts } = await cdp.send('CSS.getPlatformFontsForNode', { nodeId });
+      const sys = fonts.filter((f) => !f.isCustomFont && f.glyphCount > 0);
+      if (!sys.length) continue;
+      const { outerHTML } = await cdp.send('DOM.getOuterHTML', { nodeId });
+      const text = outerHTML.replace(/<[^>]+>/g, '').trim();
+      const emoji = (text.match(new RegExp(EMOJI_SEQ.source, 'gu')) || []).length;
+      if (sys.reduce((a, f) => a + f.glyphCount, 0) > emoji) out.push(`시스템 글꼴로 그려진 글자(${sys.map((f) => f.familyName).join(', ')}) "${text.slice(0, 30)}"`);
+    }
+  } finally {
+    await page.evaluate(() => document.querySelectorAll('[data-fchk]').forEach((e) => e.removeAttribute('data-fchk')));
+    await cdp.detach().catch(() => {});
+  }
+  return out;
+}
+
+/**
+ * 페이지 안: 잘려서 사라지는 글자. 그림 안 글자 노드의 줄 상자마다, 그림 상자(.diagram-scroll)까지의 조상 중
+ * 넘침을 자르는(overflow 가 visible 이 아닌) 요소 밖으로 나간 부분이 있거나, 스크롤 상자의 왼쪽·위로 나가 스크롤로도 닿을 수 없으면 센다.
+ */
+function clipLoss(theme) {
+  const out = [];
+  const svgs = [...document.querySelectorAll(`.diagram-${theme} svg, .diagram-n-${theme} svg`)];
+  svgs.forEach((svg) => {
+    if (!svg.getClientRects().length) return;
+    const scroll = svg.closest('.diagram-scroll');
+    const all = [...document.querySelectorAll(svg.parentElement.classList.contains(`diagram-n-${theme}`) ? `.diagram-n-${theme} svg` : `.diagram-${theme} svg`)];
+    const index = (svg.parentElement.classList.contains(`diagram-n-${theme}`) ? 'n' : '') + (all.indexOf(svg) + 1);
+    const w = document.createTreeWalker(svg, NodeFilter.SHOW_TEXT);
+    const lost = new Set();
+    for (let t = w.nextNode(); t; t = w.nextNode()) {
+      if (!t.nodeValue.trim() || t.parentElement.closest('style, title, desc')) continue;
+      const range = document.createRange();
+      range.selectNodeContents(t);
+      for (const r of range.getClientRects()) {
+        if (r.width < 0.5 || r.height < 0.5) continue;
+        let bad = false;
+        for (let el = t.parentElement; el && el !== scroll; el = el.parentElement) {
+          const cs = getComputedStyle(el);
+          const b = el.getBoundingClientRect();
+          if (cs.overflowX !== 'visible' && (r.left < b.left - 1 || r.right > b.right + 1)) bad = true;
+          if (cs.overflowY !== 'visible' && (r.top < b.top - 1 || r.bottom > b.bottom + 1)) bad = true;
+        }
+        if (scroll) {
+          const sb = scroll.getBoundingClientRect();
+          if (r.left < sb.left - scroll.scrollLeft - 1 || r.top < sb.top - scroll.scrollTop - 1) bad = true;
+        }
+        if (bad) lost.add(t.nodeValue.trim().slice(0, 30));
+      }
+    }
+    if (lost.size) out.push({ index, issues: [...lost].map((x) => `글자 잘림 "${x}"`) });
+  });
+  return out;
+}
 
 // 원고 구조 때문에 배치로는 고칠 수 없어 편집자에게 넘긴 겹침(이유와 함께). 여기 없는 것은 실패.
 const KNOWN = JSON.parse(fs.readFileSync(new URL('./diagrams-known.json', import.meta.url), 'utf8')).known;
@@ -120,6 +233,9 @@ async function selftest(page) {
         `<svg width="1600" height="80" style="max-width:none;width:1600px">` +
         node('LOW', 60, '#fde2e2', '#cccccc') + node('B1', 300, '#1f2020', '#cccccc') + node('B2', 330, '#1f2020', '#cccccc') + node('START', 1540, '#1f2020', '#cccccc') +
         `<path data-edge="true" data-id="L_START_LOW_0" d="M0 0"></path><path data-edge="true" data-id="L_START_B1_0" d="M0 0"></path><path data-edge="true" data-id="L_START_B2_0" d="M0 0"></path>` +
+        // 잘려서 사라지는 글자(자르는 상자 안의 긴 글자)와 시스템 글꼴로 그려진 글자
+        `<foreignObject x="600" y="10" width="60" height="24"><div style="overflow:hidden;width:40px;white-space:nowrap">CLIPPEDCLIPPEDCLIPPED</div></foreignObject>` +
+        `<text x="800" y="30" style="font-family:monospace">SYSFONT</text>` +
         `</svg></div></div></div>`,
     );
   });
@@ -129,11 +245,18 @@ async function selftest(page) {
   const contrast = issues.some((x) => x.startsWith('노드 글자 명암비'));
   const overlap = issues.some((x) => x.startsWith('노드 겹침'));
   const start = sv.some((x) => x.msg.includes('START'));
-  const ok = contrast && overlap && start;
-  console.log(`자체 시험(심은 결함): 낮은 명암비 ${contrast ? '잡음' : '못 잡음'}, 노드 겹침 ${overlap ? '잡음' : '못 잡음'}, 첫 화면에서 잘린 시작 노드 ${start ? '잡음' : '못 잡음'} → ${ok ? 'PASS' : 'FAIL'}`);
+  const lost = (await page.evaluate(clipLoss, 'selftest')).some((x) => x.issues.some((i) => i.includes('CLIPPED')));
+  const sysFont = (await systemFontText(page, 'selftest')).some((x) => x.includes('SYSFONT'));
+  const ok = contrast && overlap && start && lost && sysFont;
+  const said = (b) => (b ? '잡음' : '못 잡음');
+  console.log(`자체 시험(심은 결함): 낮은 명암비 ${said(contrast)}, 노드 겹침 ${said(overlap)}, 첫 화면에서 잘린 시작 노드 ${said(start)}, 잘려서 사라지는 글자 ${said(lost)}, 시스템 글꼴로 그려진 글자 ${said(sysFont)} → ${ok ? 'PASS' : 'FAIL'}`);
   return ok;
 }
 const results = [];
+const fontFail = [];
+const lossFail = [];
+const condFail = [];
+let fontPages = 0;
 const opens = new Set();
 const svgFail = [];
 const startFail = [];
@@ -147,6 +270,12 @@ try {
     if (colorScheme === 'light') selfOk = await selftest(page);
     for (const p of pages) {
       await page.goto(`${baseUrl(port)}${p}`, { waitUntil: 'load' });
+      const fl = await page.evaluate(loadDiagramFonts, DIAGRAM_FAMILY);
+      if (fl.diagrams) {
+        fontPages++;
+        if (!fl.faces || fl.error || !fl.ready) fontFail.push(`${p} (${colorScheme}): 다이어그램 글꼴을 읽지 못함(@font-face ${fl.faces ?? 0}개, 오류 ${fl.error ?? 0}개)`);
+        if (colorScheme === 'light') for (const x of await systemFontText(page, 'light')) fontFail.push(`${p}: ${x}`);
+      }
       const found = await page.evaluate(analyze, colorScheme);
       for (const f of found.out) results.push({ page: p, theme: colorScheme, ...f });
       // 좁은 화면용 TB 배치(아주 넓은 LR 그림만, 40rem 이하에서 보임): 잠깐 보이게 해서 같은 기준으로 잰다. 순번은 n1, n2…
@@ -171,7 +300,46 @@ try {
       const res = await page.goto(`${baseUrl(port)}${route}`, { waitUntil: 'load' });
       const ok = await page.evaluate(() => document.documentElement.localName === 'svg' && !document.querySelector('parsererror') && (() => { const b = document.documentElement.getBBox(); return b.width > 50 && b.height > 20 && document.documentElement.textContent.trim().length > 0; })());
       if (!res || res.status() !== 200 || !ok) svgFail.push(`${href}: ${res ? res.status() : '응답 없음'}${ok ? '' : ', SVG 로 그려지지 않음'}`);
+      // 단독 SVG 안에 담은 글꼴을 읽고, 그 글꼴로 라벨이 잘리지 않는지
+      const st = await page.evaluate(async (family) => {
+        await document.fonts.ready;
+        const faces = [...document.fonts].filter((f) => f.family.replace(/"/g, '') === family);
+        await Promise.all(faces.map((f) => f.load().catch(() => {})));
+        const clipped = [];
+        for (const fo of document.querySelectorAll('foreignObject')) {
+          const inner = fo.firstElementChild;
+          if (!inner) continue;
+          const fr = fo.getBoundingClientRect();
+          const ir = inner.getBoundingClientRect();
+          if (ir.width - fr.width > 1.5 || ir.height - fr.height > 1.5) clipped.push(inner.textContent.trim().slice(0, 30));
+        }
+        return { faces: faces.length, bad: faces.filter((f) => f.status !== 'loaded').length, clipped, visible: [...document.querySelectorAll('foreignObject')].every((f) => getComputedStyle(f).overflow === 'visible') };
+      }, DIAGRAM_FAMILY);
+      if (!st.faces || st.bad) svgFail.push(`${href}: 담은 다이어그램 글꼴을 읽지 못함(${st.faces}개 중 ${st.bad}개)`);
+      if (st.clipped.length) svgFail.push(`${href}: 라벨 잘림 ${st.clipped.slice(0, 3).map((x) => `"${x}"`).join(', ')}`);
+      if (!st.visible) svgFail.push(`${href}: 라벨 넘침을 자른다(foreignObject overflow 가 visible 이 아님)`);
       svgChecked++;
+    }
+    await browser.close();
+  }
+  // 대체 글꼴 조건: 실린 글꼴을 막아 시스템 글꼴로(라이트·다크), 그리고 폭이 크게 다른 고정폭 글꼴로(라이트). 잘려서 사라지는 글자 0.
+  for (const cond of [
+    { name: '시스템 글꼴', colorScheme: 'light', force: false },
+    { name: '시스템 글꼴', colorScheme: 'dark', force: false },
+    { name: '고정폭 글꼴', colorScheme: 'light', force: true },
+  ]) {
+    const { browser, context } = await offlineBrowser({ colorScheme: cond.colorScheme, viewport: { width: 1280, height: 900 } });
+    const page = await context.newPage();
+    await page.route(FONT_ROUTE, (route) => route.abort('blockedbyclient'));
+    for (const p of pages) {
+      await page.goto(`${baseUrl(port)}${p}`, { waitUntil: 'load' });
+      const fl = await page.evaluate(loadDiagramFonts, DIAGRAM_FAMILY);
+      if (!fl.diagrams) continue;
+      // 조건이 실제로 걸렸는지(실린 글꼴을 못 읽었는지) — 안 걸렸으면 이 판정은 의미가 없다
+      if (!fl.error && fl.ready) condFail.push(`${p} (${cond.name}, ${cond.colorScheme}): 실린 글꼴을 막지 못함`);
+      if (cond.force) await page.addStyleTag({ content: FORCE_WIDE });
+      if (await page.$('.diagram-scroll-narrow')) await page.addStyleTag({ content: '.diagram-scroll-narrow{display:block!important}' });
+      for (const f of await page.evaluate(clipLoss, cond.colorScheme)) lossFail.push(`${p} 그림 ${f.index} (${cond.name}, ${cond.colorScheme}): ${f.issues.slice(0, 3).join('; ')}`);
     }
     await browser.close();
   }
@@ -208,7 +376,12 @@ for (const k of stale) console.log(`낡은 예외(재현되지 않음 — diagra
 for (const r of fresh.sort((a, b) => b.issues.length - a.issues.length)) console.log(`${r.issues.length}건 ${r.page} 그림 ${r.index} (${r.theme}): ${r.issues.slice(0, 4).join('; ')}`);
 for (const f of svgFail) console.log(`단독 SVG 실패 ${f}`);
 for (const f of startFail) console.log(`첫 화면 ${f}`);
+for (const f of fontFail) console.log(`글꼴 ${f}`);
+for (const f of condFail) console.log(`대체 글꼴 조건 미적용 ${f}`);
+for (const f of lossFail) console.log(`대체 글꼴에서 ${f}`);
 console.log(`단독 SVG(원래 크기 보기) ${svgChecked}개 확인, 실패 ${svgFail.length}개 · 좁은 화면용 TB 배치 ${narrowChecked}개(라이트·다크) 검사`);
-const total = fresh.reduce((s, r) => s + r.issues.length, 0) + svgFail.length + stale.length + startFail.length + (selfOk ? 0 : 1);
-console.log(`${total ? 'FOUND' : 'PASS'} diagrams: 페이지 ${pages.length}개, 새 문제 ${total - stale.length - startFail.length}건(그림 ${fresh.length}개), 첫 화면에서 시작이 잘린 그림 ${startFail.length}개, 알려진 원고 문제 ${known.length}건, 낡은 예외 ${stale.length}건, 자체 시험 ${selfOk ? '통과' : '실패'}`);
+console.log(`글꼴: 그림이 있는 페이지 ${fontPages / 2}개에서 실린 글꼴 확인, 실패 ${fontFail.length}건 · 대체 글꼴 조건(시스템 글꼴 라이트·다크, 고정폭 라이트)에서 잘려서 사라지는 글자 ${lossFail.length}건, 조건 미적용 ${condFail.length}건`);
+const fontTotal = fontFail.length + lossFail.length + condFail.length;
+const total = fresh.reduce((s, r) => s + r.issues.length, 0) + svgFail.length + stale.length + startFail.length + fontTotal + (selfOk ? 0 : 1);
+console.log(`${total ? 'FOUND' : 'PASS'} diagrams: 페이지 ${pages.length}개, 새 문제 ${total - stale.length - startFail.length - fontTotal}건(그림 ${fresh.length}개), 첫 화면에서 시작이 잘린 그림 ${startFail.length}개, 글꼴·대체 글꼴 문제 ${fontTotal}건, 알려진 원고 문제 ${known.length}건, 낡은 예외 ${stale.length}건, 자체 시험 ${selfOk ? '통과' : '실패'}`);
 if (total && process.argv.includes('--fail')) process.exit(1);

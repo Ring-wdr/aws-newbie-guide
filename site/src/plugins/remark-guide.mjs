@@ -16,6 +16,8 @@ import { transformExamQuestions, transformExamKey } from './exam.mjs';
 import { transformChecklist } from './checklist.mjs';
 import { checkLessonSections, transformSelfCheck } from './sections.mjs';
 import { renderMermaid, prefixFor, narrowSource } from './mermaid-render.mjs';
+import { fontFaceCss } from './diagram-font.mjs';
+import { withBase } from '../lib/base.mjs';
 
 function relOf(file) {
   const p = file.path ? (String(file.path).startsWith('file:') ? fileURLToPath(file.path) : String(file.path)) : null;
@@ -86,13 +88,15 @@ export function remarkGuide(options = {}) {
         const r = narrowOut[ni++];
         return r && r.light && r.dark ? { ...r, ids: { light: prefixFor(src, 'light'), dark: prefixFor(src, 'dark') } } : null;
       });
+      // 다이어그램 글꼴(같은 사이트의 /fonts/diagram-*.woff2 — base 포함). 페이지의 첫 그림 앞에 한 번만 둔다.
+      const fontCss = await fontFaceCss((file) => withBase(`/fonts/${file}`));
       ctx.mermaid.forEach((ph, i) => {
         const r = results[i];
         if (r.error || !r.light || !r.dark) {
           const line = ph.position?.start?.line;
           throw new Error(`${rel}:${line}: Mermaid 다이어그램을 그리지 못했다 — ${r.error || '알 수 없는 오류'}`);
         }
-        Object.assign(ph, html(mermaidHtml(ph.source, r, { light: prefixFor(ph.source, 'light'), dark: prefixFor(ph.source, 'dark') }, narrow[i])));
+        Object.assign(ph, html(mermaidHtml(ph.source, r, { light: prefixFor(ph.source, 'light'), dark: prefixFor(ph.source, 'dark') }, narrow[i], i === 0 ? fontCss : '')));
         delete ph.data;
         delete ph.source;
       });
