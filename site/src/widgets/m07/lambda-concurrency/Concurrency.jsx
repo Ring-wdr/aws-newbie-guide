@@ -1,6 +1,6 @@
 // Lambda 동시성 칸 나누기(설명용 모형). 계산은 model.mjs, 수치는 facts.mjs가 원고에서 읽어 props로 준다.
 import { useMemo, useState } from 'preact/hooks';
-import { normalize, allocate, explain, VERDICT_LABEL, MODEL_MAX_DEMAND, throttleFate } from './model.mjs';
+import { normalize, allocate, explain, VERDICT_LABEL, MODEL_MAX_DEMAND, throttleFate, settableMax, UNRESERVED_MIN } from './model.mjs';
 
 const n = (x) => x.toLocaleString('en-US');
 
@@ -61,7 +61,8 @@ export default function Concurrency({ facts }) {
     setRaw(toRaw(p.v));
     setPreset(p.id);
   };
-  const capProv = input.reservedOn ? input.reserved : limit;
+  const maxSet = settableMax(limit); // AWS: 미예약 몫 100을 남겨야 한다(model.mjs D1)
+  const capProv = input.reservedOn ? input.reserved : maxSet;
   const clipped = (field) => raw[field] !== '' && Number(raw[field]) !== input[field];
 
   // 막대: 계정 동시성 limit칸을 왼쪽부터 [예약 몫(A)] [미예약 몫] 순서로 그린다.
@@ -121,17 +122,17 @@ export default function Concurrency({ facts }) {
           </label>
           <label class="lc-sub">
             <span>예약 동시성</span>
-            <input type="number" inputMode="numeric" min="0" max={limit} step="1" value={raw.reserved} disabled={!raw.reservedOn} data-field="reserved" aria-describedby="lc-res-hint" onInput={(e) => set({ reserved: e.currentTarget.value })} />
+            <input type="number" inputMode="numeric" min="0" max={maxSet} step="1" value={raw.reserved} disabled={!raw.reservedOn} data-field="reserved" aria-describedby="lc-res-hint" onInput={(e) => set({ reserved: e.currentTarget.value })} />
           </label>
           <small id="lc-res-hint">
-            0 ~ {n(limit)}. 몫이자 상한(원고 {les(facts.rulesLine)}), 0이면 함수 정지({cs(facts.zeroStopsLine)}).{raw.reservedOn && clipped('reserved') ? ` ${n(input.reserved)}(으)로 맞춤.` : ''}
+            0 ~ {n(maxSet)}(실제 AWS는 미예약 {n(UNRESERVED_MIN)}을 남겨야 한다). 몫이자 상한(원고 {les(facts.rulesLine)}), 0이면 함수 정지({cs(facts.zeroStopsLine)}).{raw.reservedOn && clipped('reserved') ? ` ${n(input.reserved)}(으)로 맞춤.` : ''}
           </small>
         </div>
         <label class="lc-field">
           <span>함수 A의 프로비저닝된 동시성</span>
           <input type="number" inputMode="numeric" min="0" max={capProv} step="1" value={raw.provisioned} data-field="provisioned" aria-describedby="lc-prov-hint" onInput={(e) => set({ provisioned: e.currentTarget.value })} />
           <small id="lc-prov-hint">
-            미리 데워 둔 환경 수(원고 {les(facts.rulesLine)}). 모형은 0 ~ {n(capProv)}{input.reservedOn ? '(예약 동시성 이하)' : ''}만 받는다.{clipped('provisioned') ? ` 지금 ${n(input.provisioned)}(으)로 맞춤.` : ''}
+            미리 데워 둔 환경 수(원고 {les(facts.rulesLine)}). 모형은 0 ~ {n(capProv)}{input.reservedOn ? '(예약 동시성 이하)' : `(실제 AWS처럼 미예약 ${n(UNRESERVED_MIN)}을 남긴다)`}만 받는다.{clipped('provisioned') ? ` 지금 ${n(input.provisioned)}(으)로 맞춤.` : ''}
           </small>
         </label>
         <label class="lc-field">
@@ -239,7 +240,7 @@ export default function Concurrency({ facts }) {
           <li>예약이 없으면 함수 A와 나머지 함수들이 같은 몫을 쓰고, 모형은 A의 요청이 먼저 자리를 잡는다고 둔다. 실제로는 요청이 도착하는 순서에 따라 나뉜다.</li>
           <li>데워진 환경은 프로비저닝된 것뿐이라고 둔다. 실제로는 앞선 호출에서 남은 환경이 재사용되면(웜 스타트) 콜드 스타트가 그보다 적다.</li>
           <li>프로비저닝된 환경은 요청이 없어도 칸을 차지하고, 예약 동시성을 넘지 않게 맞춘다(원고에 없는 내용 — 모형 가정).</li>
-          <li>실제 AWS는 미예약 몫을 일정량 이상 남기도록 예약 동시성의 최댓값을 제한한다. 모형은 계정 동시성 전부를 예약할 수 있게 둔다.</li>
+          <li>실제 AWS처럼 예약 동시성과 (예약 없이 거는) 프로비저닝된 동시성은 미예약 몫 {n(UNRESERVED_MIN)}을 남긴 {n(maxSet)}까지만 받는다(AWS Lambda 개발자 안내서의 예약·프로비저닝 동시성 설정 절 — 원고에 없는 내용). 다른 함수에는 예약·프로비저닝이 없다고 둔다.</li>
           <li>나머지 함수들은 동기 호출로 두고 콜드 스타트를 따지지 않는다. 계정 동시성은 증설 요청 전의 기본값 {n(limit)}으로 고정한다.</li>
         </ul>
       </details>

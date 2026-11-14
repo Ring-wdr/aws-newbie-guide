@@ -1,4 +1,4 @@
-// node --test src/widgets/m07/lambda-concurrency/
+// node --test src/widgets/m07/lambda-concurrency/*.test.mjs   (site/ 에서. 위젯 시험 전부: pnpm test:widgets)
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -118,10 +118,14 @@ test('칸의 합은 언제나 계정 동시성과 같고 음수가 없다', () =
 
 test('normalize: 범위 밖·빈칸·숫자 아님', () => {
   const n = normalize({ reservedOn: 1, reserved: 5000, provisioned: 9999, demandA: -3, demandB: 'abc', invokeA: 'x' }, L);
-  assert.deepEqual(n, { reservedOn: true, reserved: 1000, provisioned: 1000, demandA: 0, demandB: 0, invokeA: 'sync' });
+  assert.deepEqual(n, { reservedOn: true, reserved: 900, provisioned: 900, demandA: 0, demandB: 0, invokeA: 'sync' });
   assert.equal(normalize({ demandA: 99999 }, L).demandA, MODEL_MAX_DEMAND);
   assert.equal(normalize({ demandA: '' }, L).demandA, 0);
-  assert.equal(normalize({ provisioned: 1500 }, L).provisioned, 1000);
+  assert.equal(normalize({ provisioned: 1500 }, L).provisioned, 900);
+  // AWS 문서: 예약이 없어도 미예약 100은 남겨야 한다 → 계정 1,000이면 프로비저닝 최대 900, 예약도 최대 900
+  assert.equal(normalize({ reservedOn: false, provisioned: 1000 }, L).provisioned, 900);
+  assert.equal(normalize({ reservedOn: true, reserved: 1000, provisioned: 1000 }, L).reserved, 900);
+  assert.equal(normalize({ reservedOn: true, reserved: 1000, provisioned: 1000 }, L).provisioned, 900);
 });
 
 test('parseCount', () => {
