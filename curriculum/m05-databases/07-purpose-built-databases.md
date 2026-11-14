@@ -10,7 +10,7 @@ TodayOrder에 요구 사항이 쏟아진다. 경영진은 "지난 3년 주문을
 ### 요구 사항 → DB 고르기
 
 ```mermaid
-flowchart TD
+flowchart LR
   Q{데이터와 질문의 모양은?}
   Q -->|정해진 스키마, JOIN, 트랜잭션| R[RDS / Aurora]
   Q -->|키로 찾기, 대규모·밀리초, 서버리스| D[DynamoDB]

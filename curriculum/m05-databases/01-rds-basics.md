@@ -41,7 +41,7 @@ aws rds describe-db-engine-versions --engine postgres --query 'DBEngineVersions[
 ### RDS 인스턴스를 이루는 부품
 
 ```mermaid
-flowchart TB
+flowchart LR
   subgraph VPC["VPC 10.50.0.0/16"]
     subgraph A["us-east-1a · 프라이빗 서브넷"]
       DB[(RDS 인스턴스<br/>PostgreSQL 16)]
