@@ -300,6 +300,44 @@ export function listPages(root = DIST) {
   return out.map((p) => p.replace(/^\/\/$/, '/')).sort();
 }
 
+/**
+ * 검사 대상 페이지를 명령줄에서 고른다(sitecheck.py --pages 와 같은 값).
+ *   --pages pilot(기본) | all | /a/,/b/   (예전 --all 은 --pages all 과 같다)
+ * all 은 dist 의 모든 페이지다. withFiles=false 면 소스 보기(/files/…)를 뺀다.
+ */
+export function pagesFromArgs({ withFiles = true, def = 'pilot' } = {}) {
+  const i = process.argv.indexOf('--pages');
+  let v = i >= 0 ? process.argv[i + 1] : process.argv.includes('--all') ? 'all' : def;
+  let pages;
+  if (v === 'pilot') pages = PILOT_PAGES;
+  else if (v === 'all') pages = listPages();
+  else pages = v.split(',').map((p) => p.trim()).filter(Boolean).map((p) => (p.endsWith('/') ? p : `${p}/`));
+  if (!withFiles) pages = pages.filter((p) => !p.startsWith('/files/'));
+  return pages;
+}
+
+/**
+ * 페이지 목록을 탭 여러 개(기본 6, GUIDE_TABS)로 나눠 연다. 전 페이지(--pages all, 약 350쪽) 검사 시간을 줄이려는 것이다.
+ * 탭마다 페이지 하나를 재사용하고, fn(page, item) 은 차례로 불린다(같은 탭 안에서는 순서대로).
+ */
+export async function eachPage(context, items, fn, n = Number(process.env.GUIDE_TABS || 6)) {
+  const queue = [...items];
+  await Promise.all(
+    Array.from({ length: Math.max(1, Math.min(n, queue.length)) }, async () => {
+      const page = await context.newPage();
+      try {
+        while (queue.length) await fn(page, queue.shift());
+      } finally {
+        await page.close();
+      }
+    }),
+  );
+}
+
+/** 고정 상호작용 단계가 쓰는 페이지(대상에 있을 때만 그 단계를 돈다). */
+export const EXAM_PAGE = '/curriculum/m14-capstone-exam/mock-exam/questions/';
+export const isQuizPage = (p) => /^\/curriculum\/m\d\d-[^/]+\/quiz\/$/.test(p);
+
 /** 시범(P1) 확인 대상 페이지. */
 export const PILOT_PAGES = [
   '/',

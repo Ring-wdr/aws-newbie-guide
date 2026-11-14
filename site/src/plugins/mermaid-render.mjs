@@ -30,7 +30,7 @@ function cacheVersion() {
         return '?';
       }
     };
-    versionTag = `mi${v('mermaid-isomorphic')}-pw${v('playwright')}-v5`;
+    versionTag = `mi${v('mermaid-isomorphic')}-pw${v('playwright')}-v7`;
   }
   return versionTag;
 }
@@ -110,10 +110,30 @@ async function measure(measurePage, svg, width) {
   });
 }
 
+// 원고가 classDef/style 로 밝은 바탕(fill)을 박아 두고 글자색(color)을 주지 않으면, 다크 테마의 밝은 글자가
+// 밝은 바탕 위에 놓여 읽기 어렵다. 다크로 그릴 때만 그런 줄 끝에 어두운 글자색을 더한다(원고는 그대로).
+const DARK_TEXT_ON_LIGHT_FILL = '#1b1e24';
+function luminance(hex) {
+  let h = hex.replace('#', '');
+  if (h.length === 3 || h.length === 4) h = [...h.slice(0, 3)].map((c) => c + c).join('');
+  if (!/^[0-9a-f]{6}/i.test(h)) return null;
+  const [r, g, b] = [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16) / 255).map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+export function darkTextForLightFills(source) {
+  return source.replace(/^(\s*(?:classDef|style)\s+\S+\s+)([^\n]*)$/gm, (line, head, decl) => {
+    if (/(^|[,;])\s*color\s*:/i.test(decl)) return line;
+    const fill = /(?:^|[,;])\s*fill\s*:\s*(#[0-9a-f]{3,8})\b/i.exec(decl);
+    const lum = fill ? luminance(fill[1]) : null;
+    if (lum === null || lum < 0.4) return line;
+    return `${head}${decl.replace(/\s*;?\s*$/, '')},color:${DARK_TEXT_ON_LIGHT_FILL}`;
+  });
+}
+
 async function renderOne(source, theme, layout) {
   const render = await getRenderer();
-  const [res] = await render([source], {
-    prefix: prefixFor(source, theme),
+  const [res] = await render([theme === 'dark' ? darkTextForLightFills(source) : source], {
+    prefix: prefixFor(source, theme), // id 접두어는 원고 원문으로 정한다(페이지·단독 SVG 이름과 맞게)
     mermaidConfig: {
       ...THEMES[theme],
       fontFamily: FONT_STACK,

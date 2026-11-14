@@ -112,12 +112,24 @@ def main() -> int:
             print(f"{'ok  ' if ok else 'BAD '} 내용 동등성 이스케이프: {md!r} → {got!r}")
             if not ok:
                 failures.append(f"escape {md}")
+        # 등급 이모지 관문: 라벨 없는 이모지를 심으면 잡고, 라벨이 붙은 것·코드 안은 통과
+        import htmlbuilt
+        for name, html, want_bare in [
+            ("표 칸의 맨 이모지", '<div class="sl-markdown-content"><table><tr><td>\U0001F7E2</td></tr></table></div>', True),
+            ("라벨 붙은 이모지", '<div class="sl-markdown-content"><p><span class="grade-mark"><span aria-hidden="true">\U0001F7E1</span><span class="grade-mark-label">부분</span></span></p></div>', False),
+            ("코드 안의 이모지", '<div class="sl-markdown-content"><pre><code># (\U0001F534)</code></pre></div>', False),
+        ]:
+            got = bool(sitecheck.bare_grade_emoji(htmlbuilt.content_root(htmlbuilt.parse(html))))
+            ok = got == want_bare
+            print(f"{'ok  ' if ok else 'BAD '} 등급 이모지 관문: {name} → {'잡음' if got else '통과'}")
+            if not ok:
+                failures.append(f"grades {name}")
     finally:
         sitecheck.SITE = original_site
     if failures:
         print(f"FAIL selftest: {failures}")
         return 1
-    print(f"PASS selftest: 정적 관문에 심은 결함 {len(STATIC_CASES)}가지와 실행 명령 결함 3가지를 모두 잡고, 근거 있는 경우는 통과, 메타 줄 이스케이프 2가지 일치")
+    print(f"PASS selftest: 정적 관문에 심은 결함 {len(STATIC_CASES)}가지와 실행 명령 결함 3가지를 모두 잡고, 근거 있는 경우는 통과, 메타 줄 이스케이프 2가지 일치, 등급 이모지 3가지")
     return 0
 
 

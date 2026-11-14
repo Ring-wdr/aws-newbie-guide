@@ -34,6 +34,7 @@ export const ko = {
   },
   table: {
     region: (n) => `표 ${n} (넓으면 이 상자 안에서 가로로 스크롤)`,
+    scrollHint: '▸ 표가 화면보다 넓습니다. 가로로 스크롤하세요(표를 누르거나 Tab으로 고른 뒤 ←/→ 키).',
   },
   reveal: {
     show: '답 보기',

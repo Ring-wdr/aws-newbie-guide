@@ -2,11 +2,12 @@
 
 사용 (저장소 루트에서, 먼저 `pnpm --dir site build`):
 
-    uv run python tools/sitecheck/sitecheck.py all --port 4390            # 모든 관문(시범 페이지)
+    uv run python tools/sitecheck/sitecheck.py all --port 4390            # 모든 관문(전 페이지가 기본, 약 9분)
+    uv run python tools/sitecheck/sitecheck.py all --pages pilot --port 4390  # 시범 페이지만(빠른 확인)
     uv run python tools/sitecheck/sitecheck.py parity --pages all         # 내용 동등성(전 페이지)
     uv run python tools/sitecheck/sitecheck.py parity --pages /curriculum/m06-integration-messaging/02-sqs/
     uv run python tools/sitecheck/sitecheck.py quiz | exam | links | static
-    uv run python tools/sitecheck/sitecheck.py browser --port 4390        # 오프라인·접근성·키보드(Node, site/ 안의 Playwright)
+    uv run python tools/sitecheck/sitecheck.py browser --port 4390        # 오프라인·접근성·키보드·다이어그램·표(Node, site/ 안의 Playwright)
 
 관문마다 "PASS"/"FAIL" 요약 줄을 내고, 하나라도 실패하면 종료 코드 1.
 브라우저 검사는 지정한 포트의 127.0.0.1 에서만 서버를 연다(에이전트마다 전용 포트 — GUIDE-SITE 6장).
@@ -137,6 +138,47 @@ def gate_parity(dist: Path, files: list[str]) -> Gate:
             mt = htmlbuilt.meta_text(content)
             if mt != src.meta:
                 g.fail(f"{rel}: 메타 줄 글자가 다름 — 원고 {src.meta!r} / 페이지 {mt!r}")
+    return g
+
+
+# ---------------------------------------------------------------- 등급 이모지의 글자 라벨(원칙 6)
+GRADE_EMOJI = re.compile("[\U0001F7E2\U0001F7E1\U0001F534]")  # 🟢 🟡 🔴
+GRADE_OK_CLASS = {"grade-mark", "grade-badge"}
+GRADE_SKIP_TAGS = {"pre", "code", "svg", "script", "style", "kbd", "template", "title"}
+
+
+def bare_grade_emoji(content: "htmlbuilt.Node") -> list[str]:
+    """글자 라벨(.grade-mark·.grade-badge) 없이 색으로만 남은 등급 이모지가 있는 글 조각들."""
+    out: list[str] = []
+
+    def walk(n, ok: bool) -> None:
+        if n.tag in GRADE_SKIP_TAGS:
+            return
+        ok = ok or bool(n.cls() & GRADE_OK_CLASS)
+        for c in n.children:
+            if isinstance(c, str):
+                if not ok and GRADE_EMOJI.search(c):
+                    out.append(c.strip()[:40])
+            else:
+                walk(c, ok)
+
+    walk(content, False)
+    return out
+
+
+def gate_grades(dist: Path, files: list[str]) -> Gate:
+    g = Gate("등급 이모지 🟢🟡🔴 에 글자 라벨·접근 가능한 이름(색만으로 전달 금지)")
+    for rel in files:
+        html_path = html_for_route(dist, route_for(rel))
+        if not html_path.exists():
+            continue
+        content = htmlbuilt.content_root(htmlbuilt.parse(html_path.read_text(encoding="utf-8")))
+        if content is None:
+            continue
+        g.checked += 1
+        bare = bare_grade_emoji(content)
+        if bare:
+            g.fail(f"{rel}: 라벨 없는 등급 이모지 {len(bare)}곳 — 예: {bare[:3]}")
     return g
 
 
@@ -524,9 +566,25 @@ def gate_static(dist: Path, verbose: bool = True) -> Gate:
 
 
 # ---------------------------------------------------------------- 브라우저 검사(Node)
-def gate_browser(port: int, which: str) -> Gate:
-    g = Gate(f"브라우저 검사({which})")
-    script = {"offline": "tests/offline.mjs", "a11y": "tests/a11y.mjs", "keyboard": "tests/keyboard.mjs", "diagrams": "tests/diagrams.mjs"}[which]
+BROWSER_SCRIPTS = {
+    "offline": "tests/offline.mjs",
+    "a11y": "tests/a11y.mjs",
+    "keyboard": "tests/keyboard.mjs",
+    "diagrams": "tests/diagrams.mjs",
+    "tables": "tests/tables.mjs",
+}
+
+
+def browser_pages_arg(pages: str) -> str:
+    """--pages 값을 Node 브라우저 검사에 그대로 넘길 형태로(pilot·all, 또는 쉼표로 구분한 경로 — 끝의 / 를 맞춘다)."""
+    if pages in ("pilot", "all"):
+        return pages
+    return ",".join(p if p.endswith("/") else p + "/" for p in pages.split(",") if p.strip())
+
+
+def gate_browser(port: int, which: str, pages: str = "pilot") -> Gate:
+    g = Gate(f"브라우저 검사({which}, 페이지 {pages if pages in ('pilot', 'all') else str(len(pages.split(','))) + '개'})")
+    script = BROWSER_SCRIPTS[which]
     if which == "offline":
         # 관문이 잡는다고 주장하는 통로마다 결함을 심어 실제로 잡는지 먼저 확인한다.
         st = subprocess.run(["node", "tests/offline-selftest.mjs", "--port", str(port)], capture_output=True, text=True, cwd=SITE)
@@ -536,14 +594,15 @@ def gate_browser(port: int, which: str) -> Gate:
             g.fail("offline-selftest: 심은 결함을 잡지 못한 통로가 있다")
     with tempfile.TemporaryDirectory(prefix="sitecheck-browser-") as d:
         env = {**os.environ, "GUIDE_DIST": str(DIST_IN_USE)}
-        args = ["--fail"] if which == "diagrams" else ["--out", d]
+        args = ["--fail"] if which in ("diagrams", "tables") else ["--out", d]
+        args += ["--pages", browser_pages_arg(pages)]
         p = subprocess.run(["node", script, "--port", str(port), *args], capture_output=True, text=True, cwd=SITE, env=env)
         sys.stdout.write(p.stdout)
         if p.returncode != 0:
             sys.stdout.write(p.stderr[-3000:])
             g.fail(f"{script} 종료 코드 {p.returncode}")
         g.checked = 1
-        if which == "keyboard" and p.returncode == 0:
+        if which == "keyboard" and p.returncode == 0 and (Path(d) / "keyboard-answers.txt").exists():
             # 키보드로 끝까지 푼 모의고사 답안을 grade.py 로도 채점해 화면 결과와 맞춘다.
             sheet = Path(d) / "keyboard-answers.txt"
             shown = json.loads((Path(d) / "keyboard-result.json").read_text(encoding="utf-8"))
@@ -557,8 +616,8 @@ def gate_browser(port: int, which: str) -> Gate:
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="가이드 사이트 검사기 (GUIDE-SITE 5장)")
-    ap.add_argument("check", choices=["all", "parity", "quiz", "exam", "links", "run-commands", "static", "selftest", "scanner", "offline", "a11y", "keyboard", "diagrams", "browser"])
-    ap.add_argument("--pages", default="pilot", help="pilot(기본) | all | 쉼표로 구분한 경로(/curriculum/.../)")
+    ap.add_argument("check", choices=["all", "parity", "grades", "quiz", "exam", "links", "run-commands", "static", "selftest", "scanner", "offline", "a11y", "keyboard", "diagrams", "tables", "browser"])
+    ap.add_argument("--pages", default="all", help="all(기본, 전 페이지) | pilot(시범 14쪽, 빠른 확인) | 쉼표로 구분한 경로(/curriculum/.../)")
     ap.add_argument("--dist", default=None, help="빌드 산출물 폴더(기본: site/dist)")
     ap.add_argument("--site", default=None, help="site/ 폴더(기본: 저장소의 site/) — 검사기 자체를 시험할 때 사본을 가리킨다")
     ap.add_argument("--port", type=int, default=int(os.environ.get("GUIDE_PORT", "0")) or None, help="브라우저 검사용 127.0.0.1 포트(필수)")
@@ -578,6 +637,8 @@ def main(argv: list[str] | None = None) -> int:
     c = args.check
     if c in ("all", "parity"):
         gates.append(gate_parity(dist, files))
+    if c in ("all", "grades"):
+        gates.append(gate_grades(dist, files))
     if c in ("all", "quiz"):
         gates.append(gate_quiz(dist, files if args.pages != "pilot" else [f for f in all_content_files() if f in files]))
     if c in ("all", "exam"):
@@ -599,13 +660,12 @@ def main(argv: list[str] | None = None) -> int:
         gates.append(gate_run_commands(dist))
     if c in ("all", "static"):
         gates.append(gate_static(dist))
-    browser = {"all": ["offline", "a11y", "keyboard", "diagrams"], "browser": ["offline", "a11y", "keyboard", "diagrams"]}.get(
-        c, [c] if c in ("offline", "a11y", "keyboard", "diagrams") else [])
+    browser = list(BROWSER_SCRIPTS) if c in ("all", "browser") else ([c] if c in BROWSER_SCRIPTS else [])
     if browser and not args.port:
         print("브라우저 검사에는 --port 가 필요하다(에이전트 전용 포트, 127.0.0.1 에만 연다)", file=sys.stderr)
         return 2
     for b in browser:
-        gates.append(gate_browser(args.port, b))
+        gates.append(gate_browser(args.port, b, args.pages))
     ok = True
     print()
     for gt in gates:

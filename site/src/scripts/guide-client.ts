@@ -203,19 +203,112 @@ function initReveal() {
   }
 }
 
-/* ---------- 넓은 다이어그램: 왼쪽 끝(흐름의 시작)부터 보이게 한다 ---------- */
+/* ---------- 넓은 다이어그램: 흐름의 시작이 보이게 처음 스크롤 위치를 정한다 ---------- */
+// 시작 = 들어오는 간선이 없는 노드(여럿이면 가장 위, 같은 높이면 가장 왼쪽). 그림의 왼쪽 끝에서 시작 노드가
+// 다 보이면 왼쪽 끝(앞 여백만 건너뛴다)에, 아니면 시작 노드를 상자 가운데에 둔다(위→아래 트리의 뿌리가 가운데·오른쪽일 때).
+function startNode(svg: SVGSVGElement): Element | null {
+  const nodes = [...svg.querySelectorAll('g.node')];
+  const idOf = (n: Element) => /flowchart-(.+)-\d+$/.exec(n.id)?.[1];
+  const ids = new Map(nodes.map((n) => [idOf(n), n] as const));
+  const targets = new Set<string>();
+  for (const e of svg.querySelectorAll('path[data-edge="true"][data-id]')) {
+    const m = /^L_(.+)_\d+$/.exec(e.getAttribute('data-id') || '');
+    if (!m) continue;
+    // "L_<시작>_<끝>_<n>": 이름에 _ 가 있을 수 있어 두 쪽이 모두 노드 이름인 자르기를 찾는다
+    const parts = m[1].split('_');
+    for (let k = 1; k < parts.length; k++) {
+      const from = parts.slice(0, k).join('_');
+      const to = parts.slice(k).join('_');
+      if (ids.has(from) && ids.has(to)) {
+        targets.add(to);
+        break;
+      }
+    }
+  }
+  const starts = nodes.filter((n) => !targets.has(idOf(n) || '')).map((n) => ({ n, r: n.getBoundingClientRect() })).filter((x) => x.r.width > 0);
+  if (!starts.length) return null;
+  starts.sort((a, b) => (Math.abs(a.r.top - b.r.top) > 2 ? a.r.top - b.r.top : a.r.left - b.r.left));
+  return starts[0].n;
+}
+
 function initDiagrams() {
   const dark = document.documentElement.dataset.theme === 'dark';
   for (const box of document.querySelectorAll<HTMLElement>('.diagram-scroll')) {
     if (box.scrollWidth <= box.clientWidth + 1) continue;
     const svg = box.querySelector<SVGSVGElement>(`.diagram-${dark ? 'dark' : 'light'} svg`);
     if (!svg) continue;
-    // 노드·간선 라벨·서브그래프 중 가장 왼쪽 것의 바로 앞에서 시작한다(그림 앞 여백을 건너뛴다)
+    // 노드·간선 라벨·서브그래프 중 가장 왼쪽 것의 바로 앞(그림 앞 여백을 건너뛴다)
     const rects = [...svg.querySelectorAll('g.node, g.edgeLabel, g.cluster')].map((n) => n.getBoundingClientRect()).filter((r) => r.width > 0);
     if (!rects.length) continue;
-    const left = Math.min(...rects.map((r) => r.left)) - box.getBoundingClientRect().left + box.scrollLeft;
-    box.scrollLeft = Math.max(0, Math.min(box.scrollWidth - box.clientWidth, left - 8));
+    const boxLeft = box.getBoundingClientRect().left - box.scrollLeft;
+    const max = box.scrollWidth - box.clientWidth;
+    let want = Math.min(...rects.map((r) => r.left)) - boxLeft - 8;
+    const start = startNode(svg)?.getBoundingClientRect();
+    if (start) {
+      const sLeft = start.left - boxLeft;
+      const sRight = start.right - boxLeft;
+      if (sRight > want + box.clientWidth || sLeft < want) want = sLeft - (box.clientWidth - start.width) / 2;
+    }
+    box.scrollLeft = Math.max(0, Math.min(max, want));
+    box.dataset.startScroll = String(Math.round(box.scrollLeft));
   }
+}
+
+/* ---------- 넓은 표: 넘칠 때만 스크롤 표시(안내 글 + 가장자리 그림자 + 점선 테두리)와 키보드 초점 ---------- */
+// 넘치지 않으면 안내를 숨기고 aria-describedby·tabindex 도 뗀다(창 폭이 바뀌면 ResizeObserver 로 다시 정한다).
+// 스크립트가 없으면 빌드 때의 tabindex=0 이 그대로 남아 언제나 키보드로 스크롤할 수 있다.
+function initTables() {
+  const boxes = [...document.querySelectorAll<HTMLElement>('.table-scroll')];
+  if (!boxes.length) return;
+  let seq = 0;
+  const update = (box: HTMLElement) => {
+    const over = box.scrollWidth > box.clientWidth + 1;
+    box.classList.toggle('is-scrollable', over);
+    let hint = box.previousElementSibling as HTMLElement | null;
+    if (!hint?.classList.contains('table-scroll-hint')) hint = null;
+    if (over) {
+      if (!hint) {
+        hint = document.createElement('p');
+        hint.className = 'table-scroll-hint';
+        hint.id = `table-scroll-hint-${++seq}`;
+        hint.textContent = ko.table.scrollHint;
+        box.before(hint);
+      }
+      hint.hidden = false;
+      box.setAttribute('aria-describedby', hint.id);
+      box.tabIndex = 0;
+    } else {
+      if (hint) hint.hidden = true;
+      box.removeAttribute('aria-describedby');
+      box.removeAttribute('tabindex');
+    }
+  };
+  for (const b of boxes) update(b);
+  if ('ResizeObserver' in window) {
+    // 상자와 그 안의 표를 함께 본다: 창 폭이 바뀐 첫 프레임에 표가 아직 예전 폭이면 상자만 봐서는 다시 판단할 기회가 없다
+    const ro = new ResizeObserver((entries) => {
+      for (const e of entries) update((e.target as HTMLElement).closest<HTMLElement>('.table-scroll')!);
+    });
+    for (const b of boxes) {
+      ro.observe(b);
+      const t = b.querySelector('table');
+      if (t) ro.observe(t);
+    }
+  }
+  // 닫힌 <details>(스스로 확인의 답 등) 안의 표는 ResizeObserver 알림을 받지 못한다 — 창 폭이 바뀌거나 펼칠 때 다시 판단한다
+  let pending = 0;
+  window.addEventListener('resize', () => {
+    cancelAnimationFrame(pending);
+    pending = requestAnimationFrame(() => boxes.forEach(update));
+  });
+  document.addEventListener(
+    'toggle',
+    (e) => {
+      const d = e.target as HTMLElement;
+      if (d.tagName === 'DETAILS') d.querySelectorAll<HTMLElement>('.table-scroll').forEach(update);
+    },
+    true,
+  );
 }
 
 function init() {
@@ -224,6 +317,7 @@ function init() {
   initQuiz();
   initChecklist();
   initReveal();
+  initTables();
   initDiagrams();
   mountStoragePanels();
 }
