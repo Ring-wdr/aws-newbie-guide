@@ -1,4 +1,4 @@
-// 키보드만으로 퀴즈와 모의고사를 끝까지 조작할 수 있는지 확인한다(GUIDE-SITE 5장).
+// 키보드만으로 퀴즈, M06 위젯, 모의고사를 끝까지 조작할 수 있는지 확인한다(GUIDE-SITE 5장).
 // 조작은 전부 키 입력(Tab, Shift+Tab, 화살표, Space, Enter)이다. 마우스 클릭·page.check 같은 API 조작은 쓰지 않는다.
 // 페이지 상태를 "읽는" 것(어디에 초점이 있나, 정답이 무엇인가)만 DOM에서 한다.
 // 결과: --out 폴더에 keyboard-answers.txt(시험 모드가 내보낸 답안), keyboard-result.json(화면의 채점 결과).
@@ -56,6 +56,71 @@ try {
   const score = await page.textContent('.quiz-score');
   console.log(`퀴즈(키보드): ${score}`);
   if (!score.includes(`${quiz.length}문항 중 ${quiz.length - 1}문항 정답`) || !score.includes('통과')) problems.push(`퀴즈 점수 표시가 기대와 다름: ${score}`);
+
+  /* ---------------- M06 위젯: SQS 가시성 타임아웃 타임라인 ---------------- */
+  await page.goto(`${base}/curriculum/m06-integration-messaging/02-sqs/`, { waitUntil: 'networkidle' });
+  await page.locator('.vt').evaluate((e) => e.scrollIntoView());
+  await page.waitForFunction(() => document.querySelector('.guide-widget[data-widget="m06/sqs-visibility-timeline"] astro-island:not([ssr])') !== null);
+  await page.evaluate(() => document.activeElement?.blur());
+  await tabUntil(focusIs, '.vt button[data-preset=lab02]');
+  await press('Enter');
+  let vt = await page.textContent('.vt-result');
+  if (!vt.includes('DLQ로 옮겨짐')) problems.push(`타임라인 lab02 예: DLQ 결과가 아님 "${vt}"`);
+  // 재드라이브 끄기(Space) → 계속 반복
+  await tabUntil(focusIs, '.vt input[data-field=redrive]');
+  await press('Space');
+  vt = await page.textContent('.vt-result');
+  if (!vt.includes('계속 반복')) problems.push(`타임라인 재드라이브 끔: 반복 결과가 아님 "${vt}"`);
+  // 처리 결과를 "성공"으로(화살표), 처리 시간 1초 < 타임아웃 2초 → 삭제
+  await tabUntil(focusIs, '.vt input[name=vt-outcome]', { back: true });
+  await press('ArrowUp');
+  vt = await page.textContent('.vt-result');
+  if (!vt.includes('삭제됨')) problems.push(`타임라인 성공: 삭제 결과가 아님 "${vt}"`);
+  // 처리 시간을 숫자 키로 5초로 바꾼다 → 타임아웃(2초)보다 길어 중복 처리
+  await tabUntil(focusIs, '.vt input[data-field=processing]', { back: true });
+  for (let i = 0; i < 6; i++) await press('Backspace');
+  await press('5');
+  vt = await page.textContent('.vt-result');
+  if (!vt.includes('중복 처리')) problems.push(`타임라인 처리 5초: 중복 처리 결과가 아님 "${vt}"`);
+  // 단계별 보기: 처음 → 다음
+  await tabUntil(focusIs, '.vt button[data-step=first]');
+  await press('Enter');
+  // "처음"이 비활성화되면 초점은 "다음 단계"로 옮겨져야 한다(body로 빠지지 않게)
+  if (!(await page.waitForFunction(focusIs, '.vt button[data-step=next]', { timeout: 2000 }).then(() => true, () => false))) problems.push('타임라인: "처음" 뒤 초점이 "다음 단계"에 있지 않음');
+  await tabUntil(focusIs, '.vt button[data-step=next]');
+  await press('Enter');
+  const nowText = await page.textContent('.vt-now');
+  if (!/^단계 2\//.test(nowText.trim())) problems.push(`타임라인 단계 이동: "${nowText}"`);
+  await tabUntil(focusIs, '.vt button[data-step=last]');
+  await press('Enter');
+  if (!(await page.waitForFunction(focusIs, '.vt button[data-step=prev]', { timeout: 2000 }).then(() => true, () => false))) problems.push('타임라인: "끝까지" 뒤 초점이 "이전 단계"에 있지 않음');
+  console.log(`타임라인(키보드): ${vt.trim().slice(0, 60)}… / ${nowText.trim().slice(0, 30)}…`);
+
+  /* ---------------- M06 위젯: 진행 추적 ---------------- */
+  await page.goto(`${base}/curriculum/m06-integration-messaging/`, { waitUntil: 'networkidle' });
+  await page.evaluate(() => localStorage.clear());
+  await page.reload({ waitUntil: 'networkidle' });
+  await page.locator('.pt').evaluate((e) => e.scrollIntoView());
+  await page.waitForSelector('.pt input[data-item]:not([disabled])');
+  await page.evaluate(() => document.activeElement?.blur());
+  for (const id of ['lesson:02-sqs', 'lab:labs/lab02-sqs-dlq-redrive.sh', 'quiz']) {
+    await tabUntil(focusIs, `.pt input[data-item="${id}"]`);
+    await press('Space');
+  }
+  let pt = await page.textContent('.pt [data-progress-text]');
+  if (!pt.includes('3항목 완료')) problems.push(`진행 추적: 3항목 완료가 아님 "${pt}"`);
+  await page.reload({ waitUntil: 'networkidle' });
+  await page.locator('.pt').evaluate((e) => e.scrollIntoView());
+  await page.waitForSelector('.pt input[data-item]:not([disabled])');
+  pt = await page.textContent('.pt [data-progress-text]');
+  if (!pt.includes('3항목 완료')) problems.push(`진행 추적: 새로 고친 뒤 저장이 유지되지 않음 "${pt}"`);
+  await tabUntil(focusIs, '.pt input[data-item="quiz"]');
+  await press('Space');
+  await tabUntil(focusIs, '.pt-reset');
+  await press('Enter');
+  pt = await page.textContent('.pt [data-progress-text]');
+  if (!pt.includes('0항목 완료')) problems.push(`진행 추적: 모두 지우기 뒤 "${pt}"`);
+  console.log('진행 추적(키보드): 체크 3개 → 새로 고침 뒤 유지 → 하나 해제 → 모두 지우기');
 
   /* ---------------- 모의고사 ---------------- */
   await page.goto(`${base}/curriculum/m14-capstone-exam/mock-exam/questions/`, { waitUntil: 'networkidle' });
@@ -148,4 +213,4 @@ if (problems.length) {
   console.log(`FAIL keyboard: ${problems.length}건`);
   process.exit(1);
 }
-console.log('PASS keyboard: 퀴즈 12문항과 모의고사 65문항(복수 응답·표시·무응답 포함)을 키 입력만으로 풀고 제출·검토·내보내기까지 했다');
+console.log('PASS keyboard: 퀴즈 12문항, M06 위젯 2개(가시성 타임아웃 타임라인·진행 추적), 모의고사 65문항(복수 응답·표시·무응답 포함)을 키 입력만으로 조작하고 제출·검토·내보내기까지 했다');

@@ -50,6 +50,8 @@ lab 스크립트는 [labs/_lib.sh](./labs/_lib.sh)의 작은 도우미(폴링, �
 
 정리 자료: [cheatsheet.md](./cheatsheet.md) · [quiz.md](./quiz.md)
 
+<!-- widget: progress-tracker -->
+
 ## 에뮬레이터 제약
 
 이 모듈의 실습은 모두 🟢로 확정했다. 서비스 간 전달(SNS→SQS, EventBridge→SQS, Step Functions→Lambda·SQS)이 실제로 일어나고, 정책·권한도 검사한다. 저자가 포트 9306(에뮬레이터 1.0.322)에서 관찰한 AWS와의 차이:

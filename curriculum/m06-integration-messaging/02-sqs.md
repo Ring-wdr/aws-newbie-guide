@@ -71,6 +71,8 @@ flowchart LR
 - DLQ의 보존 기간은 원본보다 길게 둔다. (표준 큐에서는 메시지가 DLQ로 옮겨져도 원래 넣은 시각 기준으로 보존 기간이 계산된다.)
 - 버그를 고친 뒤 **DLQ 재드라이브(`StartMessageMoveTask`)** 로 메시지를 원본 큐로 되돌린다.
 
+<!-- widget: sqs-visibility-timeline -->
+
 ## 직접 해 보기
 
 ### 1) 가시성 타임아웃·롱 폴링·지연 — [lab01-sqs-basics.sh](./labs/lab01-sqs-basics.sh)
