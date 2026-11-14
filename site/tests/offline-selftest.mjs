@@ -36,6 +36,17 @@ const CASES = {
   'dynamic-import': page(js(`import(${EXT} + '/m.js')`)),
   webrtc: page(js(`new RTCPeerConnection({ iceServers: [{ urls: 'stun:net-selftest.invalid:3478' }] })`)),
   'meta-refresh': page('', '<meta http-equiv="refresh" content="30; url=https://net-selftest.invalid/">'),
+  'beacon-pagehide': page(`<script>addEventListener('pagehide', () => navigator.sendBeacon(${EXT} + '/bye', 'x'));</script>`),
+  'beacon-visibility': page(`<script>document.addEventListener('visibilitychange', () => navigator.sendBeacon(${EXT} + '/hidden', 'x'));</script>`),
+  'srcset-2x': page('<img alt="" src="/ok.svg" srcset="/ok.svg 1x, https://net-selftest.invalid/i@2x.png 2x">'),
+  'picture-source': page('<picture><source srcset="https://net-selftest.invalid/p.webp" type="image/webp"><img alt="" src="/ok.svg"></picture>'),
+  'object-data': page('<object data="https://net-selftest.invalid/o.svg" type="image/svg+xml"></object>'),
+  'embed-src': page('<embed src="https://net-selftest.invalid/e.svg" type="image/svg+xml">'),
+  'video-poster': page('<video poster="https://net-selftest.invalid/poster.png"></video>'),
+  'window-open': page(js(`window.open(${EXT} + '/popup')`)),
+  'location-href': page(js(`location.href = ${EXT} + '/away'`)),
+  'location-assign': page(js(`location.assign(${EXT} + '/away2')`)),
+  'form-autosubmit': page('<form id="f" action="https://net-selftest.invalid/post" method="post"></form>' + js(`document.getElementById('f').submit()`)),
 };
 for (const [name, html] of Object.entries(CASES)) {
   fs.mkdirSync(path.join(root, name), { recursive: true });

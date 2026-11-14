@@ -74,12 +74,28 @@ export function serve(port, root = DIST) {
       return;
     }
     let file = path.join(root, p);
-    const inside = path.relative(root, file);
+    // 경로를 실제 위치(심볼릭 링크를 따라간 뒤)로 바꿔, 실제 dist 폴더 밖이면 거절한다(형제 폴더·링크로 빠져나가기 방지).
+    const realRoot = fs.realpathSync(root);
+    let real;
+    try {
+      real = fs.realpathSync(file);
+    } catch {
+      real = path.resolve(realRoot, path.relative(root, file)); // 없는 파일: 아래에서 404
+    }
+    const inside = path.relative(realRoot, real);
     if (inside.startsWith('..') || path.isAbsolute(inside)) {
       res.writeHead(403).end();
       return;
     }
-    if (fs.existsSync(file) && fs.statSync(file).isDirectory()) file = path.join(file, 'index.html');
+    file = real;
+    if (fs.existsSync(file) && fs.statSync(file).isDirectory()) {
+      file = path.join(file, 'index.html');
+      const r2 = fs.existsSync(file) ? path.relative(realRoot, fs.realpathSync(file)) : '';
+      if (r2.startsWith('..') || path.isAbsolute(r2)) {
+        res.writeHead(403).end();
+        return;
+      }
+    }
     if (!fs.existsSync(file)) {
       const nf = path.join(root, '404.html');
       res.writeHead(404, { 'content-type': TYPES['.html'] });
@@ -115,10 +131,18 @@ export function isLoopbackUrl(url) {
  *    전용 워커(Worker)의 스크립트와 그 워커 안의 fetch — 문맥(context) 단위 route 로 막고 기록한다.
  *  - WebSocket — context.routeWebSocket 으로 막고 기록하며, 페이지의 'websocket' 이벤트로도 기록한다.
  *  - 서비스 워커 — 문맥에서 차단(serviceWorkers: 'block')하고, navigator.serviceWorker.register 호출 자체를 기록한다.
+ *  - navigator.sendBeacon — 함수를 감싸 루프백 밖이면 보내지 않고 기록한다. 페이지를 떠날 때(pagehide) 보내는 비컨은
+ *    route·request 이벤트를 거치지 않고 실제로 나가므로 감싸기가 유일한 방어다. auditPage() 가 pagehide·visibilitychange 를
+ *    일으켜 그런 코드를 드러낸다.
  *  - WebRTC — RTCPeerConnection 생성을 기록한다(ICE 서버 주소가 루프백 밖이면 그 주소, 아니면 생성 사실).
- *  - <link rel=preconnect|dns-prefetch|prefetch|preload|modulepreload|prerender> 와 <meta http-equiv=refresh> —
- *    브라우저가 요청으로 드러내지 않는 연결 예고이므로 auditPage() 가 문서를 훑어 기록한다.
- * 다루지 않는 것: 브라우저 자체의 배경 통신(업데이트 확인 등 — 헤드리스 Chromium 기본 설정), 페이지가 아닌 확장 프로그램.
+ *  - 페이지 이동(window.open, location 변경, form 제출, meta refresh 로 실제로 이동하는 경우) — 문서 요청이므로 route 가 막는다.
+ *  - 문서 훑기(auditPage): <link rel=preconnect|dns-prefetch|prefetch|preload|modulepreload|prerender>, <meta http-equiv=refresh>,
+ *    srcset 의 모든 후보, <object data>, <embed src>, <video poster>, 미디어 src — 이 환경에서 브라우저가 불러오지 않아
+ *    요청으로 드러나지 않는 참조.
+ * 다루지 않는 것: 브라우저 자체의 배경 통신(헤드리스 Chromium 기본 설정), 확장 프로그램, 사용자 조작으로만 일어나는 동작
+ *  (누르기 전에는 요청이 없다 — 탐색 링크 <a href> 는 원고의 외부 링크로 허용). 이런 것과 스크립트 안의 주소 조립은
+ *  정적 검사(tools/sitecheck static)가 뒷받침한다: site/src 는 외부 주소·네트워크 API 사용 자체를, 산출물은 리소스 속성·
+ *  CSS 참조·스크립트의 네트워크 API·window.open/location 이동의 외부 주소를 본다.
  * @returns {{browser, context, blocked: string[], auditPage: (page) => Promise<void>}}
  */
 export async function offlineBrowser({ colorScheme = 'light', viewport = { width: 1280, height: 900 }, reducedMotion = 'no-preference', blockStorage = false } = {}) {
@@ -153,7 +177,10 @@ export async function offlineBrowser({ colorScheme = 'light', viewport = { width
   context.on('request', (req) => {
     if (!isLoopbackUrl(req.url())) record(`request(${req.resourceType()})`, req.url());
   });
-  await context.exposeBinding('__guideNetRecord', (_src, kind, url) => record(kind, url));
+  // 페이지 안 감싸기가 알려 주는 시도. 루프백 주소는 기록하지 않는다(서비스 워커 등록·WebRTC 생성은 주소와 상관없이 기록).
+  await context.exposeBinding('__guideNetRecord', (_src, kind, url) => {
+    if (kind === 'service-worker-register' || kind === 'webrtc' || !isLoopbackUrl(url)) record(kind, url);
+  });
   await context.addInitScript(() => {
     const rec = (kind, url) => {
       try {
@@ -169,6 +196,17 @@ export async function offlineBrowser({ colorScheme = 'light', viewport = { width
         return String(u);
       }
     };
+    // sendBeacon: 페이지를 떠날 때(pagehide) 보내는 비컨은 Playwright 의 route·request 이벤트를 거치지 않고 실제로 나간다.
+    // 그래서 함수 자체를 감싸 루프백 밖이면 보내지 않고(false) 기록한다.
+    if (navigator.sendBeacon) {
+      const origBeacon = navigator.sendBeacon.bind(navigator);
+      navigator.sendBeacon = (url, data) => {
+        const u = abs(url);
+        if (/^https?:\/\/(127\.0\.0\.1|localhost|\[::1\])(:|\/|$)/.test(u)) return origBeacon(url, data);
+        rec('beacon', u);
+        return false;
+      };
+    }
     if (navigator.serviceWorker) {
       const orig = navigator.serviceWorker.register.bind(navigator.serviceWorker);
       navigator.serviceWorker.register = (url, opts) => {
@@ -196,10 +234,39 @@ export async function offlineBrowser({ colorScheme = 'light', viewport = { width
       Object.defineProperty(window, 'sessionStorage', { get: deny, configurable: true });
     });
   }
-  /** 문서를 훑어 연결 예고(link rel)와 meta refresh 를 기록한다. 페이지를 연 뒤 부른다. */
+  /**
+   * 페이지를 연 뒤 부른다. ① 떠날 때 이벤트(pagehide·visibilitychange)를 일으켜 그때 나가는 시도를 드러내고,
+   * ② 브라우저가 이 환경에서 불러오지 않는 참조를 문서에서 훑는다: 연결 예고 link, meta refresh,
+   *    srcset 의 모든 후보(화면 배율 1에서는 2x 후보를 불러오지 않는다), <object data>·<embed src>(헤드리스는 불러오지 않는다),
+   *    <video poster>·미디어 src.
+   */
   const auditPage = async (page) => {
+    await page
+      .evaluate(() => {
+        window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: false }));
+        Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true });
+        document.dispatchEvent(new Event('visibilitychange'));
+      })
+      .catch(() => {});
+    await page.waitForTimeout(50);
     const found = await page.evaluate(() => {
       const out = [];
+      const absu = (u) => {
+        try {
+          return new URL(u, location.href).href;
+        } catch {
+          return u;
+        }
+      };
+      for (const el of document.querySelectorAll('[srcset]')) {
+        for (const cand of el.getAttribute('srcset').split(',')) {
+          const u = cand.trim().split(/\s+/)[0];
+          if (u) out.push([`srcset(${el.tagName.toLowerCase()})`, absu(u)]);
+        }
+      }
+      for (const [sel, attr] of [['object[data]', 'data'], ['embed[src]', 'src'], ['video[poster]', 'poster'], ['video[src],audio[src],source[src],track[src]', 'src']]) {
+        for (const el of document.querySelectorAll(sel)) out.push([`${el.tagName.toLowerCase()}[${attr}]`, absu(el.getAttribute(attr))]);
+      }
       for (const l of document.querySelectorAll('link[rel][href]')) {
         const rel = l.rel.toLowerCase();
         if (/\b(preconnect|dns-prefetch|prefetch|preload|modulepreload|prerender)\b/.test(rel)) out.push([`link(${rel})`, l.href]);
