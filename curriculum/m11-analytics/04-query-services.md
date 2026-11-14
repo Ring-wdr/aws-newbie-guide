@@ -38,6 +38,8 @@ flowchart LR
 3. **압축**(Snappy/GZIP/ZSTD) → 바이트 ↓
 4. **작업 그룹의 쿼리당 스캔 상한**(`BytesScannedCutoffPerQuery`) → 실수로 전체 테이블을 스캔하는 쿼리를 차단
 
+<!-- widget: athena-scan-estimator -->
+
 ## 직접 해 보기
 
 ### 파이프라인 한 번에 — [lab05-athena-revenue.sh](./labs/lab05-athena-revenue.sh)

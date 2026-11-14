@@ -1,0 +1,107 @@
+---
+// M11 레슨 4 — Athena 스캔량 어림(설명용 모형).
+// 수치는 빌드 때 원고(curriculum/m11-analytics/04-query-services.md, 03-glue-catalog-etl.md)에서 읽는다(facts.mjs).
+// 읽지 못하거나 lab05 파일 크기의 합이 기록된 ScannedBytes와 다르면 빌드가 실패한다.
+import fs from 'node:fs';
+import path from 'node:path';
+import { REPO_ROOT } from '../../../lib/repo.mjs';
+import { readScanFacts, LESSON, CATALOG_LESSON } from './facts.mjs';
+import Estimator from './Estimator.jsx';
+
+const read = (p) => fs.readFileSync(path.join(REPO_ROOT, p), 'utf8');
+const facts = readScanFacts(read(LESSON), read(CATALOG_LESSON));
+---
+
+<Estimator client:visible facts={facts} />
+
+<style is:global>
+  .asc {
+    margin: 1.5rem 0;
+    padding: 1rem;
+    border: 1px solid var(--guide-border);
+    border-left: 4px solid var(--sl-color-accent);
+    border-radius: var(--guide-radius);
+    background: var(--guide-surface);
+    font-size: 0.9375rem;
+    overflow-wrap: anywhere;
+  }
+  .asc :is(p, ul, fieldset, figure, details, table) { margin: 0; }
+  .asc > * + * { margin-top: 0.85rem; }
+  .asc-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+  .asc-head h4 { margin: 0; font-size: 1.05rem; }
+  .asc-model {
+    display: inline-block;
+    padding: 0 0.5rem;
+    border: 1px dashed currentColor;
+    border-radius: 999px;
+    font-size: 0.8125rem;
+    font-weight: 700;
+    color: var(--guide-y-fg);
+    background: var(--guide-y-bg);
+  }
+  .asc-intro, .asc-hint, .asc small, .asc-legend { color: var(--guide-muted); }
+  .asc small { display: block; font-size: 0.8125rem; line-height: 1.5; }
+  .asc-hint, .asc-legend { font-size: 0.8125rem; }
+  .asc-presets .asc-hint { margin-top: 0.35rem; }
+  .asc fieldset { border: 0; padding: 0; min-width: 0; }
+  .asc legend { font-weight: 700; padding: 0; margin-bottom: 0.3rem; }
+  .asc-row { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+  .asc button {
+    font: inherit;
+    font-size: 0.875rem;
+    padding: 0.3rem 0.8rem;
+    min-height: 2.25rem;
+    border-radius: 0.4rem;
+    border: 1px solid var(--guide-border);
+    background: var(--guide-surface-2);
+    color: var(--sl-color-text);
+    cursor: pointer;
+    text-align: left;
+  }
+  .asc button:hover { border-color: var(--sl-color-accent); }
+  .asc button[aria-pressed='true'] { border-color: var(--sl-color-accent); box-shadow: inset 0 0 0 1px var(--sl-color-accent); font-weight: 700; }
+  .asc button[aria-pressed='true']::before { content: '✓ '; }
+  .asc :is(button, input, summary):focus-visible { outline: 2px solid var(--sl-color-accent); outline-offset: 2px; }
+  .asc-controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 0.85rem 1.25rem; }
+  .asc-field { display: flex; flex-direction: column; gap: 0.25rem; min-width: 0; }
+  .asc-field > span { font-weight: 700; }
+  .asc input[type='range'] { width: 100%; max-width: 22rem; accent-color: var(--sl-color-accent); }
+  .asc-radios label { display: flex; gap: 0.4rem; align-items: baseline; }
+  .asc-check { margin-top: 0.3rem; }
+  .asc-result {
+    padding: 0.6rem 0.75rem;
+    border: 1px solid var(--guide-border);
+    border-radius: var(--guide-radius);
+    background: var(--sl-color-bg);
+  }
+  .asc-result > * + * { margin-top: 0.4rem !important; }
+  .asc-fig figcaption { font-weight: 700; font-size: 0.875rem; margin-bottom: 0.35rem; }
+  /* 색과 무늬를 함께: 쓴 약정 = 채움, 쓰지 않은 약정 = 빗금(빨강), 온디맨드 = 점, 스팟 = 가로줄 */
+  .asc details > summary { cursor: pointer; font-weight: 700; width: fit-content; }
+  .asc-assume ul { margin-top: 0.4rem !important; padding-left: 1.2rem; }
+  .asc-sub { display: flex; flex-direction: column; gap: 0.25rem; margin-top: 0.3rem; }
+  .asc-sub > span { font-weight: 700; }
+  .asc :is(input[type='number'], select) {
+    font: inherit;
+    width: 100%;
+    max-width: 16rem;
+    padding: 0.3rem 0.5rem;
+    border: 1px solid var(--guide-border);
+    border-radius: 0.4rem;
+    background: var(--sl-color-bg);
+    color: var(--sl-color-text);
+  }
+  .asc input:disabled { opacity: 0.55; }
+  .asc-check { display: flex; gap: 0.4rem; align-items: baseline; font-weight: 700; }
+  .asc-bytes { font-size: 1.05rem; }
+  .asc-block { display: inline-block; margin-top: 0.3rem; color: var(--guide-r-fg); background: var(--guide-r-bg); border: 1px dashed var(--guide-r-bd); border-radius: 0.3rem; padding: 0 0.4rem; font-weight: 700; }
+  .asc-steps { list-style: none; padding: 0 !important; margin: 0 !important; display: flex; flex-direction: column; gap: 0.45rem; }
+  .asc-steps li { margin: 0 !important; }
+  .asc-step-label { display: block; font-size: 0.8125rem; }
+  .asc-track { position: relative; display: block; overflow: hidden; height: 1rem; margin-top: 0.15rem; background: var(--guide-surface-2); border-radius: 0.2rem; }
+  .asc-fill { position: absolute; left: 0; top: 0; bottom: 0; background: repeating-linear-gradient(135deg, var(--sl-color-accent) 0 4px, var(--sl-color-accent-low) 4px 7px); border: 1px solid var(--sl-color-accent); border-radius: 0.2rem; }
+  .asc-cut { position: absolute; top: 0; bottom: 0; width: 0; margin-left: -1px; border-left: 2px dashed var(--guide-bad); }
+  @media (prefers-reduced-motion: reduce) {
+    .asc * { transition: none !important; animation: none !important; }
+  }
+</style>

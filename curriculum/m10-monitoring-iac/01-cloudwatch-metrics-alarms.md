@@ -45,6 +45,8 @@ stateDiagram-v2
 - **복합 알람(composite alarm)** — 여러 알람을 `AND`/`OR`/`NOT`으로 묶는다. "지연 높음 AND 5xx 많음"일 때만 당직을 깨워 **알람 피로**를 줄인다. 복합 알람은 SNS·Lambda·Systems Manager 액션은 실행하지만 **EC2 동작이나 Auto Scaling 액션은 실행할 수 없다.**
 - **지표 수학(metric math)** — `100*errors/requests` 처럼 지표끼리 계산한 값에 알람을 건다.
 
+<!-- widget: alarm-state-evaluator -->
+
 ```mermaid
 flowchart LR
   App[주문 API] -- PutMetricData --> M[(TodayOrder/Api<br/>Latency)]
