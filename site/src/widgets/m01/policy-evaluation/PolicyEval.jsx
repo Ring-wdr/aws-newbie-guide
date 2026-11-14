@@ -5,14 +5,15 @@ import { evaluate, normalize, PRESETS, presetInput, displayOrder, question, desc
 const MARK = { allowed: '✓', explicitDeny: '✕', implicitDeny: '○' };
 
 function Radios({ legend, name, value, options, onChange, hint, disabled = false }) {
-  // 안내 문장(특히 비활성인 사유)을 묶음과 각 라디오의 설명으로 잇는다 — 화면 낭독기가 legend 뒤에 읽는다.
+  // 안내 문장(특히 비활성인 사유)을 묶음(fieldset)의 설명으로 한 번만 잇는다 — 비활성 라디오는 초점을 받지 않으므로
+  // 묶음 쪽에 둔다(각 라디오에도 걸면 두 번 읽힌다).
   const hintId = hint ? `${name}-hint` : undefined;
   return (
     <fieldset class="pe-field" aria-describedby={hintId}>
       <legend>{legend}</legend>
       {options.map(([v, label]) => (
         <label key={v}>
-          <input type="radio" name={name} value={v} checked={value === v} disabled={disabled} aria-describedby={hintId} onChange={() => onChange(v)} /> {label}
+          <input type="radio" name={name} value={v} checked={value === v} disabled={disabled} onChange={() => onChange(v)} /> {label}
         </label>
       ))}
       {hint ? <small id={hintId}>{hint}</small> : null}
