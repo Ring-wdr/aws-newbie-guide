@@ -156,7 +156,7 @@
 | 종료된 인스턴스의 루트 볼륨이 `in-use`로 남고, EBS IOPS:GiB 비율을 검사하지 않는다 | `compute-gaps` |
 | ALB: 구성·리스너 규칙(path·header·query)과 컨테이너 안 HTTP 응답은 동작한다. **host-header 조건은 매칭되지 않는다** | `elbv2`, `compute-gaps` |
 | 대상 헬스는 HTTP 검사를 하지 않고 인스턴스 상태를 따른다: 리스너에 연결된 대상 그룹에 등록하면 `initial`(`Elb.RegistrationInProgress`) → 약 1초 뒤 `healthy`, 인스턴스를 중지하면 수 초 안에 `unhealthy`(`Target.Timeout`). 리스너에 연결되지 않은 대상 그룹의 대상은 `unused`(`Target.NotInUse`)다(AWS와 같음) | `compute-gaps` |
-| ASG: Min/Max/Desired·`SetDesiredCapacity`·**인스턴스 새로 고침(Successful)**은 동작한다. 조정 정책·예약·후크·각종 Describe·`SetInstanceHealth`는 501이다. `--target-group-arns`의 인스턴스는 대상 그룹에 등록되지 않고, 자가 치유는 없다 | `autoscaling`, `compute-gaps` |
+| ASG: Min/Max/Desired·`SetDesiredCapacity`·**인스턴스 새로 고침**(Successful)은 동작한다. 조정 정책·예약·후크·각종 Describe·`SetInstanceHealth`는 501이다. `--target-group-arns`의 인스턴스는 대상 그룹에 등록되지 않고, 자가 치유는 없다 | `autoscaling`, `compute-gaps` |
 | ASG 축소 시 새 인스턴스부터 종료한다. 혼합 인스턴스 정책·시작 템플릿 태그·메타데이터 옵션은 반영되지 않는다. 배치 그룹 제한과 최대 절전 조건은 검사하지 않는다 | 모듈 저자 관찰 (m03 README) |
 
 ### M04 스토리지
