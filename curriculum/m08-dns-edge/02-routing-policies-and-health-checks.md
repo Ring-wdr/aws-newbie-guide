@@ -239,6 +239,8 @@ LAB03 OK
 
 </details>
 
+<!-- widget: route53-routing-answer -->
+
 ## 실제 AWS에서는
 
 - 지연 시간·지리·지리 근접·IP 기반 정책은 **질의자의 IP(리졸버 또는 EDNS Client Subnet)** 로 위치·지연을 판단한다. 에뮬레이터에는 그 데이터가 없어 위 표처럼 고정된 답을 준다. `test-dns-answer`의 `--resolver-ip`/`--edns0-client-subnet-*` 옵션은 실제 AWS에서 바로 이런 시험을 하라고 있는 것이다.

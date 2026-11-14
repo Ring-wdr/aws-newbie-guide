@@ -58,6 +58,8 @@ sequenceDiagram
 - S3 SSE-KMS, EBS, RDS 암호화가 내부적으로 이렇게 동작한다.
 - **암호화 컨텍스트**(encryption context): 키-값 쌍을 함께 넣으면 복호화할 때 똑같이 넣어야 한다(추가 인증 데이터). CloudTrail에 기록되고, 키 정책 조건(`kms:EncryptionContext:…`)으로도 쓴다.
 
+<!-- widget: kms-envelope-steps -->
+
 ### S3 서버 측 암호화 비교 (M04 복습, 시험 단골)
 
 | | SSE-S3 | SSE-KMS | DSSE-KMS | SSE-C |
