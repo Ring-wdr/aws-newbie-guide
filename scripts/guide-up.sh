@@ -8,7 +8,8 @@
 #   GUIDE_REBUILD=1 scripts/guide-up.sh 4331   # 원고가 바뀌지 않았어도 다시 빌드
 #   GUIDE_BASE=/aws-newbie-guide/ scripts/guide-up.sh 4331   # 공개 배포본과 같은 하위 경로로 빌드해 http://127.0.0.1:4331/aws-newbie-guide/ 에서 연다
 #
-# 처음 한 번은 site/ 의 Node 패키지를 lockfile 그대로 설치한다(npm 레지스트리 접속, 빌드하는 쪽에만 필요).
+# 처음 한 번은 site/ 의 Node 패키지를 lockfile 그대로 설치하고(npm 레지스트리 접속), 그림을 그릴 헤드리스 브라우저가 없으면
+# 내려받는다(Playwright). 둘 다 빌드하는 쪽에만 필요하고, 빌드된 사이트는 외부 요청을 하지 않는다.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -71,6 +72,12 @@ elif [ -n "$(find "$ROOT/curriculum" "$ROOT/docs" "$ROOT/README.md" "$SITE/src" 
   needs_build=1
 fi
 if [ "$needs_build" = "1" ]; then
+  # Mermaid 그림은 빌드 때 Playwright 헤드리스 Chromium 으로 그린다. 없으면 처음 한 번 내려받는다(빌드하는 쪽에만 필요).
+  if ! node -e "import('playwright').then(async ({ chromium }) => { await (await chromium.launch()).close(); }).catch(() => process.exit(1))" >/dev/null 2>&1; then
+    pw_ver="$(node -p "require('playwright/package.json').version")"
+    echo "== Mermaid 그림용 헤드리스 Chromium 내려받기: lockfile 의 playwright ${pw_ver} 에 맞는 chromium-headless-shell(과 Playwright 가 함께 받는 ffmpeg)만, Playwright 내려받기 서버(cdn.playwright.dev)에서 ${PLAYWRIGHT_BROWSERS_PATH:-기본 캐시 폴더}로 (처음 한 번)"
+    pnpm exec playwright install chromium-headless-shell
+  fi
   echo "== 사이트 빌드 (원고 → site/dist)"
   pnpm run build
 else

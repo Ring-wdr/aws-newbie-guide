@@ -1,5 +1,6 @@
 // 브라우저 검사 공용 도구: dist/ 를 127.0.0.1 에서만 여는 정적 서버 + 루프백 밖 요청을 모두 막고 기록하는 브라우저.
-// Playwright 브라우저는 내려받지 않는다(이미 설치된 chromium 을 쓴다 — package.json 의 고정 버전과 짝).
+// Playwright 브라우저는 내려받지 않는다(빌드가 쓰는 것과 같은 chromium-headless-shell 을 쓴다 — package.json 의 고정 버전과 짝.
+// 없으면 scripts/guide-up.sh 가 빌드 전에 받는다).
 import http from 'node:http';
 import net from 'node:net';
 import fs from 'node:fs';

@@ -12,7 +12,7 @@ scripts/guide-up.sh 4331     # 포트 지정 — 비대화형 실행(에이전�
 - `127.0.0.1`에만 열린다. 포트가 이미 쓰이면 다른 포트로 옮기지 않고 실패한다.
 - 에뮬레이터와 무관하다. 페이지는 명령을 **복사**만 하고 실행하지 않는다.
 - 처음 한 번 `pnpm install --frozen-lockfile`이 npm 레지스트리에 접속한다(빌드하는 쪽에만 필요). 빌드된 사이트는 외부 요청을 하나도 하지 않는다.
-- 필요한 것: Node 24 이상, pnpm. Mermaid 그림은 빌드 때 Playwright의 Chromium으로 그린다 — `playwright` 1.64.1은 Chromium 1248을 쓴다(`~/Library/Caches/ms-playwright/chromium_headless_shell-1248`). 없으면 빌드가 브라우저를 찾지 못했다고 실패한다.
+- 필요한 것: Node 24 이상, pnpm. Mermaid 그림은 빌드 때 Playwright의 Chromium으로 그린다 — `playwright` 1.64.1은 Chromium 1248을 쓴다(`~/Library/Caches/ms-playwright/chromium_headless_shell-1248`). 없으면 `guide-up.sh`가 빌드 전에 한 번 내려받는다(`pnpm exec playwright install chromium-headless-shell` — lockfile에 고정된 playwright 버전의 헤드리스 Chromium과 Playwright가 함께 받는 ffmpeg만, Playwright 내려받기 서버 접속. 이미 있으면 접속하지 않는다. 빌드하는 쪽에만 필요). `pnpm build`를 직접 돌릴 때는 없으면 빌드가 브라우저를 찾지 못했다고 실패한다.
 
 ## 공개 배포 (GitHub Pages)
 
@@ -111,7 +111,7 @@ node site/tests/screenshots.mjs --port 4331 --out <폴더> [--full]            #
 
 오프라인 관문이 기록하는 통로: HTTP(S) 요청 전부(문서·스크립트·스타일·이미지·iframe, fetch, XMLHttpRequest, EventSource, sendBeacon, 전용 워커와 그 안의 요청), WebSocket(페이지와 워커), 서비스 워커 등록(차단하고 기록), WebRTC(`RTCPeerConnection` 생성), `<link rel=preconnect|dns-prefetch|prefetch|preload|modulepreload|prerender>`, `<meta http-equiv=refresh>`, pagehide·visibilitychange 때의 sendBeacon, `<object data>`·`<embed>`·모든 `srcset` 후보·`<video poster>`, `window.open`·`location` 이동. 각 통로를 어느 층이 맡는지는 `tests/lib/harness.mjs` 머리 주석에 있고, 정적 검사(`static`)가 뒤를 받친다. 브라우저 자체의 배경 통신은 다루지 않는다.
 
-브라우저 검사(`offline`·`a11y`·`keyboard`·`diagrams`)는 `site/tests/`의 Node 스크립트이며, 이미 설치된 Playwright Chromium을 쓰고 아무것도 내려받지 않는다. 키보드 검사 스크립트는 `site/tests/keyboard.mjs`다.
+브라우저 검사(`offline`·`a11y`·`keyboard`·`diagrams`)는 `site/tests/`의 Node 스크립트이며, 빌드가 쓰는 것과 같은 Playwright 헤드리스 Chromium(chromium-headless-shell — `chromium.launch({ headless: true })`)을 쓰고 아무것도 내려받지 않는다(없으면 실패한다. 받는 것은 `guide-up.sh`나 `pnpm exec playwright install chromium-headless-shell`). 키보드 검사 스크립트는 `site/tests/keyboard.mjs`다.
 
 ## 알아 둘 성질
 
