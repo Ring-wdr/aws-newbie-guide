@@ -20,6 +20,9 @@ CLEAN_HTML = "<!doctype html><html lang=ko><body><main><p>WebSocket 이라는 �
 # (이름, 심을 곳, 파일, 내용) — src 는 site/src, dist 는 빌드 산출물
 STATIC_CASES = [
     ("src: 외부 주소", "src", "components/A.astro", '<link rel="stylesheet" href="https://fonts.selftest.invalid/a.css" />'),
+    ("src: 시험 스크립트의 루프백처럼 보이는 외부 주소", "src", "widgets/m99/w/keyboard.check.mjs", "const base = `http://127.0.0.1.selftest.invalid:${port}`;"),
+    ("src: 시험 스크립트의 사용자 정보 뒤 외부 호스트", "src", "widgets/m99/w/model.test.mjs", "const u = 'http://127.0.0.1:80@x.selftest.invalid/';"),
+    ("src: 시험이 아닌 소스의 루프백 주소", "src", "scripts/h.ts", "const u = `http://127.0.0.1:${port}/`;"),
     ("src: WebSocket", "src", "scripts/a.ts", "const u = location.host; new WebSocket('ws://' + u);"),
     ("src: EventSource", "src", "scripts/b.ts", "new EventSource(path);"),
     ("src: sendBeacon", "src", "scripts/c.ts", "navigator.sendBeacon(path, data);"),
@@ -51,6 +54,12 @@ def make_tree(root: Path) -> tuple[Path, Path]:
     site = root / "site"
     (site / "src").mkdir(parents=True)
     (site / "src/ok.ts").write_text("export const ok = 1;\n", encoding="utf-8")
+    # 위젯 검사·시험 스크립트의 루프백 주소는 허용된다(결함 없는 사본에 둔다)
+    (site / "src/widgets/m99/w").mkdir(parents=True)
+    (site / "src/widgets/m99/w/keyboard.check.mjs").write_text(
+        "const base = `http://127.0.0.1:${port}`;\nawait page.goto(`http://127.0.0.1:${port}${PAGE}`);\nconst a = 'http://localhost:4321/x'; const b = 'http://[::1]:4321/';\n",
+        encoding="utf-8",
+    )
     dist = site / "dist"
     dist.mkdir()
     (dist / "index.html").write_text(CLEAN_HTML, encoding="utf-8")

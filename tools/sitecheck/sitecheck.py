@@ -540,9 +540,25 @@ INLINE_SCRIPT = re.compile(r"<script\b([^>]*)>([\s\S]*?)</script>", re.I)
 DIST_API_ALLOW = {("pagefind/pagefind.js", "new Worker(")}
 
 
+# 위젯 폴더의 검사·시험 스크립트(빌드 산출물에 들어가지 않고 Node 에서만 돈다)는 스스로 연 루프백 서버를 부른다.
+# 그런 파일에서는 루프백 주소(127.0.0.0/8, localhost, [::1])를 허용한다. 호스트 뒤에는 포트(숫자나 ${변수})와
+# 경로·끝만 올 수 있다 — '127.0.0.1.nip.io' 나 '127.0.0.1:1@다른호스트' 같은 꼴은 루프백이 아니다.
+NODE_ONLY_SRC = re.compile(r"\.(?:check|test)\.mjs$")
+LOOPBACK_URL = re.compile(
+    r"^(?:https?|wss?)://(?:127(?:\.\d{1,3}){3}|localhost|\[::1\])"
+    r"(?:(?::(?:\d{1,5}|\$\{\w+\}))(?:[/?#]|\$\{|$)|[/?#:]|$)",
+    re.I,
+)
+
+
+def is_loopback_url(u: str) -> bool:
+    return "@" not in u and bool(LOOPBACK_URL.match(u))
+
+
 def gate_static(dist: Path, verbose: bool = True) -> Gate:
     g = Gate("외부 리소스 정적 검사(site/src·빌드 산출물)")
-    # 1) site/src: 주소 자체가 없어야 한다(SVG 이름공간 제외, 줄에 'sitecheck-allow:' 표시가 있으면 예외)
+    # 1) site/src: 주소 자체가 없어야 한다(SVG 이름공간 제외, 줄에 'sitecheck-allow:' 표시가 있으면 예외).
+    #    위젯의 *.check.mjs·*.test.mjs 에서는 루프백 주소를 허용한다(NODE_ONLY_SRC).
     for p in sorted((SITE / "src").rglob("*")):
         if not p.is_file() or p.suffix in {".png", ".jpg", ".ico", ".woff", ".woff2"}:
             continue
@@ -551,9 +567,11 @@ def gate_static(dist: Path, verbose: bool = True) -> Gate:
             if "sitecheck-allow:" in line:
                 continue
             where = f"site/src/{p.relative_to(SITE / 'src')}:{i}"
+            node_only = bool(NODE_ONLY_SRC.search(p.name))
             for u in URL_RE.findall(line):
-                if not NAMESPACE_OK.match(u):
-                    g.fail(f"{where}: 외부 주소 {u}")
+                if NAMESPACE_OK.match(u) or (node_only and is_loopback_url(u)):
+                    continue
+                g.fail(f"{where}: 외부 주소 {u}")
             # 네트워크 API·연결 예고는 사이트 공용부에서 쓰지 않는다(쓰려면 줄에 sitecheck-allow: 이유)
             for m in NET_APIS.finditer(line):
                 g.fail(f"{where}: 네트워크 API {m.group(0)!r}")
