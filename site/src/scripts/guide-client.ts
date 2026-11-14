@@ -254,7 +254,9 @@ function initDiagrams() {
   }
 }
 
-/* ---------- 넓은 표: 넘칠 때만 스크롤 표시(안내 글 + 가장자리 그림자) ---------- */
+/* ---------- 넓은 표: 넘칠 때만 스크롤 표시(안내 글 + 가장자리 그림자 + 점선 테두리)와 키보드 초점 ---------- */
+// 넘치지 않으면 안내를 숨기고 aria-describedby·tabindex 도 뗀다(창 폭이 바뀌면 ResizeObserver 로 다시 정한다).
+// 스크립트가 없으면 빌드 때의 tabindex=0 이 그대로 남아 언제나 키보드로 스크롤할 수 있다.
 function initTables() {
   const boxes = [...document.querySelectorAll<HTMLElement>('.table-scroll')];
   if (!boxes.length) return;
@@ -263,24 +265,50 @@ function initTables() {
     const over = box.scrollWidth > box.clientWidth + 1;
     box.classList.toggle('is-scrollable', over);
     let hint = box.previousElementSibling as HTMLElement | null;
-    if (!hint?.classList.contains('table-scroll-hint')) {
-      if (!over) return;
-      hint = document.createElement('p');
-      hint.className = 'table-scroll-hint';
-      hint.id = `table-scroll-hint-${++seq}`;
-      hint.textContent = ko.table.scrollHint;
-      box.before(hint);
+    if (!hint?.classList.contains('table-scroll-hint')) hint = null;
+    if (over) {
+      if (!hint) {
+        hint = document.createElement('p');
+        hint.className = 'table-scroll-hint';
+        hint.id = `table-scroll-hint-${++seq}`;
+        hint.textContent = ko.table.scrollHint;
+        box.before(hint);
+      }
+      hint.hidden = false;
       box.setAttribute('aria-describedby', hint.id);
+      box.tabIndex = 0;
+    } else {
+      if (hint) hint.hidden = true;
+      box.removeAttribute('aria-describedby');
+      box.removeAttribute('tabindex');
     }
-    hint.hidden = !over;
   };
   for (const b of boxes) update(b);
   if ('ResizeObserver' in window) {
+    // 상자와 그 안의 표를 함께 본다: 창 폭이 바뀐 첫 프레임에 표가 아직 예전 폭이면 상자만 봐서는 다시 판단할 기회가 없다
     const ro = new ResizeObserver((entries) => {
-      for (const e of entries) update(e.target as HTMLElement);
+      for (const e of entries) update((e.target as HTMLElement).closest<HTMLElement>('.table-scroll')!);
     });
-    for (const b of boxes) ro.observe(b);
+    for (const b of boxes) {
+      ro.observe(b);
+      const t = b.querySelector('table');
+      if (t) ro.observe(t);
+    }
   }
+  // 닫힌 <details>(스스로 확인의 답 등) 안의 표는 ResizeObserver 알림을 받지 못한다 — 창 폭이 바뀌거나 펼칠 때 다시 판단한다
+  let pending = 0;
+  window.addEventListener('resize', () => {
+    cancelAnimationFrame(pending);
+    pending = requestAnimationFrame(() => boxes.forEach(update));
+  });
+  document.addEventListener(
+    'toggle',
+    (e) => {
+      const d = e.target as HTMLElement;
+      if (d.tagName === 'DETAILS') d.querySelectorAll<HTMLElement>('.table-scroll').forEach(update);
+    },
+    true,
+  );
 }
 
 function init() {
