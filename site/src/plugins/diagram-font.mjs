@@ -4,7 +4,11 @@
 // 글꼴이 다를 때(ubuntu 에서 빌드 → macOS 에서 봄 등) 줄이 바뀌고 상자 밖 글자가 잘린다. 그래서 재는 글꼴과 보이는 글꼴을
 // 같은 파일로 고정한다. 외부 CDN 은 쓰지 않는다 — 글꼴 파일은 같은 사이트(/fonts/…woff2)에서 나간다.
 //
-// 글꼴(모두 SIL OFL 1.1, 예약 글꼴 이름 없음 — 부분집합을 만들어 실어도 이름 제약이 없다):
+// 글꼴(모두 SIL OFL 1.1). 부분집합은 OFL 의 수정본(Modified Version)이라 예약 글꼴 이름(Reserved Font Name)을 쓸 수 없다.
+// Noto Sans KR 의 저작권 줄(이름 표 ID 0)은 "with Reserved Font Name 'Source'" 이고(fontsource LICENSE 머리에는 빠져 있다),
+// Noto Sans Symbols 2 의 저작권 줄에는 예약 글꼴 이름이 없다. 싣는 글꼴 이름("Guide Diagram")과 남기는 이름 표(Noto Sans KR …)는
+// 'Source' 를 쓰지 않는다(diagram-font.test.mjs 가 확인). 라이선스 전문과 실제 저작권 줄은 /fonts/OFL.txt 로 함께 나간다
+// (fontLicenceText, src/pages/fonts/OFL.txt.ts).
 //   1. Noto Sans KR(@fontsource/noto-sans-kr) — 한글·영문·대부분의 기호. "korean" 조각이 한글 11,172자와 ASCII 를 담고,
 //      화살표·원 숫자·수학 기호는 번호 조각에 흩어져 있다.
 //   2. Noto Sans Symbols 2(@fontsource/noto-sans-symbols-2) — Noto Sans KR 에 없는 ✕ 등.
@@ -244,6 +248,75 @@ export async function assertCovered(text, where) {
   const { chars } = await diagramFonts();
   const miss = [...charsOf(text)].filter((c) => !chars.has(c));
   if (miss.length) throw new Error(`${where}: 다이어그램 글꼴 부분집합에 없는 글자 ${describe(miss)}`);
+}
+
+// ---------------------------------------------------------------- 라이선스(OFL 1.1)
+/** sfnt(TTF/OTF) 바이트의 이름 표 → { 이름 ID: [문자열…] }(같은 ID 의 플랫폼별 값은 중복 없이). */
+export function sfntNames(sfnt) {
+  const b = Buffer.from(sfnt.buffer, sfnt.byteOffset, sfnt.byteLength);
+  const n = b.readUInt16BE(4);
+  for (let i = 0; i < n; i++) {
+    const r = 12 + i * 16;
+    if (b.toString('latin1', r, r + 4) !== 'name') continue;
+    const t = b.subarray(b.readUInt32BE(r + 8), b.readUInt32BE(r + 8) + b.readUInt32BE(r + 12));
+    const count = t.readUInt16BE(2);
+    const strings = t.readUInt16BE(4);
+    const out = {};
+    for (let j = 0; j < count; j++) {
+      const e = 6 + j * 12;
+      const platform = t.readUInt16BE(e);
+      const id = t.readUInt16BE(e + 6);
+      const raw = t.subarray(strings + t.readUInt16BE(e + 10), strings + t.readUInt16BE(e + 10) + t.readUInt16BE(e + 8));
+      const s = platform === 1 ? raw.toString('latin1') : Buffer.from(raw).swap16().toString('utf16le');
+      (out[id] ??= []).includes(s) || out[id].push(s);
+    }
+    return out;
+  }
+  return {};
+}
+
+/** 싣는 글꼴 파일(부분집합)마다 이름 표 — 글꼴 원본별로 묶는다. */
+export async function shippedNames() {
+  const { faces } = await diagramFonts();
+  const woff2 = require('wawoff2');
+  const out = [];
+  for (const f of faces) out.push({ file: f.file, source: f.source, names: sfntNames(new Uint8Array(await woff2.decompress(f.bytes))) });
+  return out;
+}
+
+/**
+ * /fonts/OFL.txt 의 내용. 글꼴 원본마다 실린 파일이 담은 실제 저작권 줄(이름 표 ID 0)과 패키지 LICENSE 의 OFL 본문.
+ * fontsource 의 LICENSE 머리(저작권 줄)는 글꼴 파일과 다를 수 있어(Noto Sans KR 은 "Google Inc."만 적고 예약 이름이 빠짐)
+ * 글꼴 파일의 줄을 쓴다. 본문은 "This Font Software is licensed…" 부터 끝까지 그대로.
+ */
+export async function fontLicenceText() {
+  const named = await shippedNames();
+  const parts = [
+    `"${DIAGRAM_FAMILY}" — 이 사이트의 Mermaid 그림 글꼴(/fonts/diagram-*.woff2, 단독 SVG 에 담긴 글꼴)은 아래 글꼴에서`,
+    '그림에 쓰인 글자만 남긴 부분집합(OFL 의 Modified Version)이다. 각 글꼴의 저작권 고지와 라이선스는 아래와 같다.',
+    '',
+  ];
+  for (const src of SOURCES) {
+    const mine = named.filter((n) => n.source === src.name);
+    if (!mine.length) continue;
+    const copyright = [...new Set(mine.flatMap((n) => n.names[0] ?? []))];
+    if (!copyright.length) throw new Error(`${src.name}: 실린 글꼴 파일에 저작권 줄(이름 표 ID 0)이 없다`);
+    const licence = fs.readFileSync(path.join(path.dirname(require.resolve(`${src.pkg}/package.json`)), 'LICENSE'), 'utf8').replace(/\r\n/g, '\n');
+    const at = licence.indexOf('This Font Software is licensed');
+    if (at < 0) throw new Error(`${src.pkg}/LICENSE: OFL 본문을 찾지 못했다`);
+    parts.push(
+      '='.repeat(72),
+      `${src.name} (${src.pkg})`,
+      '='.repeat(72),
+      '',
+      ...copyright,
+      '',
+      licence.slice(at).trimEnd(),
+      '',
+      '',
+    );
+  }
+  return parts.join('\n');
 }
 
 const FACE_STYLE = 'font-style:normal;font-weight:400;font-display:swap';

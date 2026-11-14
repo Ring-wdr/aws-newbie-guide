@@ -1,7 +1,21 @@
 // 다이어그램 글꼴(diagram-font.mjs) 시험: 글자 집합, unicode-range, 부분집합에 없는 글자에서의 실패, 결정성.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { charsOf, unicodeRange, diagramFonts, assertCovered, embeddedFontCss, mermaidSourcesInContent } from './diagram-font.mjs';
+import { charsOf, unicodeRange, diagramFonts, assertCovered, embeddedFontCss, mermaidSourcesInContent, shippedNames, fontLicenceText, DIAGRAM_FAMILY } from './diagram-font.mjs';
+
+test('라이선스: 실린 글꼴의 저작권 줄과 OFL 본문을 싣고, 예약 글꼴 이름(Source)을 이름에 쓰지 않는다', async () => {
+  const named = await shippedNames();
+  const kr = named.filter((n) => n.source === 'Noto Sans KR');
+  assert.ok(kr.length > 0);
+  for (const n of kr) assert.match(n.names[0].join('\n'), /Reserved Font Name 'Source'/, `${n.file} 저작권 줄`);
+  // 예약 이름은 Noto Sans KR 의 'Source' 뿐 — 싣는 글꼴 이름과 남긴 이름 표(1 가족·4 전체·6 PostScript)에 없어야 한다.
+  assert.doesNotMatch(DIAGRAM_FAMILY, /source/i);
+  for (const n of named) for (const id of [1, 4, 6, 16, 17]) for (const s of n.names[id] ?? []) assert.doesNotMatch(s, /source/i, `${n.file} 이름 ID ${id}`);
+  const text = await fontLicenceText();
+  assert.match(text, /with Reserved Font Name 'Source'/);
+  assert.equal(text.match(/SIL OPEN FONT LICENSE Version 1\.1 - 26 February 2007/g)?.length, new Set(named.map((n) => n.source)).size);
+  for (const n of named) for (const c of n.names[0]) assert.ok(text.includes(c), c);
+});
 
 test('charsOf: 엔티티 코드를 풀고, 그림 글자(이모지)·제어 문자는 뺀다', () => {
   const s = charsOf('A[#quot;가#35;]\n오류 😱 ☁️ ☁');
