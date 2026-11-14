@@ -17,6 +17,7 @@
   --guide-surface-2: #1f232a;
   --guide-border: #343a44;
   --guide-muted: #a7afbb;
+  --guide-scroll-shadow: rgba(190, 200, 215, 0.3);
   --guide-out-bg: #121418;
   --guide-g-bg: #12341f; --guide-g-fg: #b9f0c9; --guide-g-bd: #2f7a49;
   --guide-y-bg: #3a300c; --guide-y-fg: #f6e19c; --guide-y-bd: #8f7420;
@@ -32,6 +33,7 @@
   --guide-surface-2: #eef1f4;
   --guide-border: #d5dae1;
   --guide-muted: #57606c;
+  --guide-scroll-shadow: rgba(30, 40, 55, 0.28);
   --guide-out-bg: #f3f5f7;
   --guide-g-bg: #e3f6e8; --guide-g-fg: #12552a; --guide-g-bd: #7cc596;
   --guide-y-bg: #fdf3d3; --guide-y-fg: #5c4700; --guide-y-bd: #d9b543;
@@ -330,14 +332,29 @@ kbd {
   font-size: 0.9375rem;
 }
 .sl-markdown-content .table-scroll :is(th, td) {
-  min-width: 6.5rem;
+  /* 짧은 값(숫자·"중간")만 있는 열이 지나치게 좁아지지 않을 만큼만. 낱말 폭은 keep-all 이 지킨다 */
+  min-width: 3rem;
+  padding-inline: 0.6rem;
   vertical-align: top;
-  /* 표 칸은 낱말 중간에서 끊지 않는다. 넓으면 표가 자기 상자 안에서 가로로 스크롤된다 */
-  overflow-wrap: normal;
+  /* 한국어 낱말은 중간에서 끊지 않는다(keep-all). 칸보다 긴 낱말만 칸 안에서 끊는다(break-word —
+     최소 폭 계산에 끼지 않으므로 표를 억지로 좁히지 않는다). */
+  overflow-wrap: break-word;
   word-break: keep-all;
 }
+/* 코드·긴 영문 토큰(API 이름, JSON, 주소 — rehype-guide 의 .brk)은 어디서든 끊어도 된다.
+   anywhere 는 최소 폭 계산에도 들어가 긴 토큰 하나가 열 폭을 정하지 않게 한다(1280px 에서 표가 상자에 들어가게). */
+.sl-markdown-content .table-scroll :is(th, td) .brk {
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+/* 인라인 코드는 rehype-guide 가 넣은 <wbr>(구분 기호 뒤·낱말 경계)에서 먼저 끊고, 그래도 길면 아무 데서나 끊는다 */
 .sl-markdown-content .table-scroll :is(th, td) code {
-  overflow-wrap: normal;
+  overflow-wrap: break-word;
+  word-break: normal;
+}
+/* 가운뎃점 묶음 조각이 칸보다 길면 칸 폭에 맞춰 안에서 줄바꿈한다(옆 칸으로 넘치지 않게) */
+.sl-markdown-content .table-scroll :is(th, td) .nb {
+  max-width: 100%;
 }
 /* 좁은 화면: 열을 내용 폭(최대 16rem)으로 두고 표 전체를 상자 안에서 가로로 스크롤한다.
    (100% 폭에 맞추면 마지막 열이 좁아져 줄이 매우 길어진다) */
@@ -351,7 +368,30 @@ kbd {
   }
 }
 .sl-markdown-content .table-scroll :is(th, td):first-child {
-  min-width: 4.5rem;
+  min-width: 3.5rem;
+  padding-inline-start: 0;
+}
+.sl-markdown-content .table-scroll :is(th, td):last-child {
+  padding-inline-end: 0;
+}
+/* 넘치는 표(guide-client.ts 가 .is-scrollable 을 붙인다): 색만이 아닌 표시 — 안내 글(▸ 가로로 스크롤)과
+   숨은 쪽 가장자리의 그림자. 그림자는 스크롤 위치를 따라 바뀐다(background-attachment local/scroll). */
+.table-scroll.is-scrollable {
+  background:
+    linear-gradient(to right, var(--sl-color-bg), var(--sl-color-bg)) left center / 1.5rem 100% no-repeat local,
+    linear-gradient(to left, var(--sl-color-bg), var(--sl-color-bg)) right center / 1.5rem 100% no-repeat local,
+    linear-gradient(to right, var(--guide-scroll-shadow), transparent) left center / 0.9rem 100% no-repeat scroll,
+    linear-gradient(to left, var(--guide-scroll-shadow), transparent) right center / 0.9rem 100% no-repeat scroll;
+  border-inline: 1px dashed var(--guide-border);
+}
+.table-scroll-hint {
+  display: block;
+  margin: 1.25rem 0 0 !important;
+  font-size: 0.8125rem;
+  color: var(--guide-muted);
+}
+.table-scroll-hint + .table-scroll {
+  margin-top: 0.25rem;
 }
 .table-scroll:focus-visible,
 .diagram-scroll:focus-visible,

@@ -218,12 +218,42 @@ function initDiagrams() {
   }
 }
 
+/* ---------- 넓은 표: 넘칠 때만 스크롤 표시(안내 글 + 가장자리 그림자) ---------- */
+function initTables() {
+  const boxes = [...document.querySelectorAll<HTMLElement>('.table-scroll')];
+  if (!boxes.length) return;
+  let seq = 0;
+  const update = (box: HTMLElement) => {
+    const over = box.scrollWidth > box.clientWidth + 1;
+    box.classList.toggle('is-scrollable', over);
+    let hint = box.previousElementSibling as HTMLElement | null;
+    if (!hint?.classList.contains('table-scroll-hint')) {
+      if (!over) return;
+      hint = document.createElement('p');
+      hint.className = 'table-scroll-hint';
+      hint.id = `table-scroll-hint-${++seq}`;
+      hint.textContent = ko.table.scrollHint;
+      box.before(hint);
+      box.setAttribute('aria-describedby', hint.id);
+    }
+    hint.hidden = !over;
+  };
+  for (const b of boxes) update(b);
+  if ('ResizeObserver' in window) {
+    const ro = new ResizeObserver((entries) => {
+      for (const e of entries) update(e.target as HTMLElement);
+    });
+    for (const b of boxes) ro.observe(b);
+  }
+}
+
 function init() {
   document.documentElement.classList.add('guide-js');
   initCopy();
   initQuiz();
   initChecklist();
   initReveal();
+  initTables();
   initDiagrams();
   mountStoragePanels();
 }
