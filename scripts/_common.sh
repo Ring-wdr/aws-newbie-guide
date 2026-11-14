@@ -66,17 +66,23 @@ container_dns() {
 # 바로 끈다(대기용 sleep 이 호출한 셸과 같은 포그라운드 그룹에 남아 Ctrl-C 가 이 하위 셸에 닿는다). 하위 셸의 trap 이
 # 명령의 그룹을 KILL 하고 거둔 뒤 130 으로 끝난다. trap 은 하위 셸 안에만 있어 호출한 셸의 trap 을 바꾸지 않는다.
 # 반환 130 = 중단됨 — 호출한 쪽은 자신도 130 으로 끝내야 한다(bash 는 자식이 신호를 처리하고 끝나면 계속 진행한다).
+# 띄우는 순간(& 와 pid=$! 사이)에 온 신호는 기록만 해 두었다가 pid 를 안 뒤에 처리한다 — 그 창에서 바로 끝내면
+# 막 띄운 명령(colima ssh 등)이 거둬지지 않고 남는다. 무시(trap '')가 아니라 기록 trap 을 쓰는 까닭: 무시한 신호는
+# 자식에게 그대로 물려져(SIG_IGN) 명령이 TERM 을 못 받게 되지만, trap 으로 잡은 신호는 자식에서 기본 동작으로 돌아간다.
 run_limited() {  # <초> <출력 파일> <명령...>
   local limit="$1" out="$2"
   shift 2
   (
     set +e   # 호출한 스크립트의 set -e 를 끈다 — 거둔 명령의 0 이 아닌 상태(137 등)로 하위 셸이 먼저 끝나지 않게
     pid=""
-    trap '[ -n "$pid" ] && { kill -KILL -- "-$pid"; wait "$pid"; } 2>/dev/null; exit 130' INT TERM HUP
+    pending=""
+    trap 'pending=1' INT TERM HUP
     set -m
     "$@" >"$out" 2>/dev/null </dev/null &
     pid=$!
     set +m
+    trap '[ -n "$pid" ] && { kill -KILL -- "-$pid"; wait "$pid"; } 2>/dev/null; exit 130' INT TERM HUP
+    if [ -n "$pending" ]; then { kill -KILL -- "-$pid"; wait "$pid"; } 2>/dev/null; exit 130; fi
     i=0
     while kill -0 "$pid" 2>/dev/null; do
       if [ "$i" -ge $((limit * 10)) ]; then
