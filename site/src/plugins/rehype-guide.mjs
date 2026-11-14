@@ -64,10 +64,14 @@ function keepMiddleDotRuns(node) {
 // 표 칸 안의 긴 영문·기호 토큰(공백 없는 ASCII 16자 이상: API 이름, JSON, 주소)은 어디서든 끊을 수 있게 표시한다(.brk).
 // 한국어 낱말은 그대로 keep-all 이라 낱말 중간에서 끊기지 않는다. 인라인 코드는 CSS 가 같은 규칙을 준다.
 const LONG_TOKEN = /[!-~]{16,}/g;
+// 표 칸의 모듈·레슨 참조("M07-03", "M05-04·05")는 한 덩어리로 둔다(좁은 칸에서 "M07-" / "03"으로 갈라지지 않게).
+// 쉼표 뒤("M05-04, M06-02")에서는 그대로 줄을 바꿀 수 있다. 글자는 바꾸지 않고 <span class="nobr">로 감싸기만 한다.
+const MODULE_REF = /\bM\d\d(?:-\d\d(?:·\d\d)*)?\b/g;
 // 칸 안 인라인 코드의 줄바꿈 자리: 구분 기호(. / :: , _ = · ( 등 — 마침표는 숫자 앞 제외) 뒤와 낱말 경계(소문자→대문자) 앞에 <wbr>.
 // 글자는 그대로이고(복사해도 같다) <wbr>은 "여기서 끊어도 된다"는 표시일 뿐이다.
 // 마침표 뒤는 숫자 앞이면 끊지 않는다(127.0.0.1, 2.40.1 같은 주소·판 번호를 한 덩어리로).
-const CODE_BREAK = /(?<=[/,_=·(&|]|::)(?=[^\s.,:)])|(?<=\.)(?=[^\s.,:)\d])|(?<=[a-z0-9])(?=[A-Z][a-z])/g;
+// 파일 확장자 앞(emulator-status.sh 의 .sh, data.yaml 의 .yaml)도 끊지 않는다: 마침표 뒤가 영숫자 1~5자로 끝나면(토큰 끝·기호 앞) 확장자로 본다.
+const CODE_BREAK = /(?<=[/,_=·(&|]|::)(?=[^\s.,:)])|(?<=\.)(?![a-zA-Z0-9]{1,5}(?:$|[^a-zA-Z0-9]))(?=[^\s.,:)\d])|(?<=[a-z0-9])(?=[A-Z][a-z])/g;
 function wbrCode(code) {
   const out = [];
   for (const c of code.children) {
@@ -94,6 +98,18 @@ function breakableTokensInCells(node, inCell) {
       out.push(c, { type: 'element', tagName: 'wbr', properties: {}, children: [] });
       continue;
     }
+    if (here && c.type === 'text' && /\bM\d\d-\d\d/.test(c.value) && !LONG_TOKEN.test(c.value)) {
+      LONG_TOKEN.lastIndex = 0;
+      let last = 0;
+      for (const m of c.value.matchAll(MODULE_REF)) {
+        if (m.index > last) out.push({ type: 'text', value: c.value.slice(last, m.index) });
+        out.push({ type: 'element', tagName: 'span', properties: { className: ['nobr'] }, children: [{ type: 'text', value: m[0] }] });
+        last = m.index + m[0].length;
+      }
+      if (last < c.value.length) out.push({ type: 'text', value: c.value.slice(last) });
+      continue;
+    }
+    LONG_TOKEN.lastIndex = 0;
     if (here && c.type === 'text' && LONG_TOKEN.test(c.value)) {
       LONG_TOKEN.lastIndex = 0;
       let last = 0;

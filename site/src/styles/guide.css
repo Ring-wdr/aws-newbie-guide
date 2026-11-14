@@ -983,6 +983,11 @@ section.exam-q {
   color: var(--guide-muted);
 }
 
+/* 표 칸의 모듈·레슨 참조(M07-03)는 한 덩어리(rehype-guide.mjs MODULE_REF) */
+.nobr {
+  white-space: nowrap;
+}
+
 /* 지난 응시 기록(시작 화면·결과 화면) */
 .exam-history {
   margin-top: 1.25rem;
