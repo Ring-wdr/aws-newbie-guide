@@ -64,10 +64,14 @@ function keepMiddleDotRuns(node) {
 // 표 칸 안의 긴 영문·기호 토큰(공백 없는 ASCII 16자 이상: API 이름, JSON, 주소)은 어디서든 끊을 수 있게 표시한다(.brk).
 // 한국어 낱말은 그대로 keep-all 이라 낱말 중간에서 끊기지 않는다. 인라인 코드는 CSS 가 같은 규칙을 준다.
 const LONG_TOKEN = /[!-~]{16,}/g;
+// 표 칸의 모듈·레슨 참조("M07-03", "M05-04·05")는 한 덩어리로 둔다(좁은 칸에서 "M07-" / "03"으로 갈라지지 않게).
+// 쉼표 뒤("M05-04, M06-02")에서는 그대로 줄을 바꿀 수 있다. 글자는 바꾸지 않고 <span class="nobr">로 감싸기만 한다.
+const MODULE_REF = /\bM\d\d(?:-\d\d(?:·\d\d)*)?\b/g;
 // 칸 안 인라인 코드의 줄바꿈 자리: 구분 기호(. / :: , _ = · ( 등 — 마침표는 숫자 앞 제외) 뒤와 낱말 경계(소문자→대문자) 앞에 <wbr>.
 // 글자는 그대로이고(복사해도 같다) <wbr>은 "여기서 끊어도 된다"는 표시일 뿐이다.
 // 마침표 뒤는 숫자 앞이면 끊지 않는다(127.0.0.1, 2.40.1 같은 주소·판 번호를 한 덩어리로).
-const CODE_BREAK = /(?<=[/,_=·(&|]|::)(?=[^\s.,:)])|(?<=\.)(?=[^\s.,:)\d])|(?<=[a-z0-9])(?=[A-Z][a-z])/g;
+// 파일 확장자 앞(emulator-status.sh 의 .sh, data.yaml 의 .yaml)도 끊지 않는다: 마침표 뒤가 영숫자 1~5자로 끝나면(토큰 끝·기호 앞) 확장자로 본다.
+const CODE_BREAK = /(?<=[/,_=·(&|]|::)(?=[^\s.,:)])|(?<=\.)(?![a-zA-Z0-9]{1,5}(?:$|[^a-zA-Z0-9]))(?=[^\s.,:)\d])|(?<=[a-z0-9])(?=[A-Z][a-z])/g;
 function wbrCode(code) {
   const out = [];
   for (const c of code.children) {
@@ -94,6 +98,18 @@ function breakableTokensInCells(node, inCell) {
       out.push(c, { type: 'element', tagName: 'wbr', properties: {}, children: [] });
       continue;
     }
+    if (here && c.type === 'text' && /\bM\d\d-\d\d/.test(c.value) && !LONG_TOKEN.test(c.value)) {
+      LONG_TOKEN.lastIndex = 0;
+      let last = 0;
+      for (const m of c.value.matchAll(MODULE_REF)) {
+        if (m.index > last) out.push({ type: 'text', value: c.value.slice(last, m.index) });
+        out.push({ type: 'element', tagName: 'span', properties: { className: ['nobr'] }, children: [{ type: 'text', value: m[0] }] });
+        last = m.index + m[0].length;
+      }
+      if (last < c.value.length) out.push({ type: 'text', value: c.value.slice(last) });
+      continue;
+    }
+    LONG_TOKEN.lastIndex = 0;
     if (here && c.type === 'text' && LONG_TOKEN.test(c.value)) {
       LONG_TOKEN.lastIndex = 0;
       let last = 0;
@@ -114,6 +130,7 @@ function breakableTokensInCells(node, inCell) {
 
 // 본문(표 칸·문단)의 등급 이모지 🟢/🟡/🔴 에 글자 라벨을 붙인다(원칙 6: 색만으로 정보를 전달하지 않는다).
 // 원고 글자(이모지)는 그대로 두고 뒤에 작은 라벨(.grade-mark-label, 원고 README 등급 표의 "재현/부분/개념")을 덧붙인다.
+// 라벨은 CSS 생성 콘텐츠라 복사한 글에는 들어가지 않는다(원고 글자만 복사된다).
 // 바로 뒤에 같은 라벨이 이미 적혀 있으면("🟢 재현") 덧붙이지 않는다. 제목(h1~h6)은 글자를 더하면 앵커가 바뀌므로
 // 라벨 대신 접근 가능한 이름(role=img + aria-label)만 준다. 메타 칩의 배지·범례와 코드 안은 건드리지 않는다.
 const GRADE_CLASS = { '🟢': 'g', '🟡': 'y', '🔴': 'r' };
@@ -155,7 +172,9 @@ function gradeMarks(node, inHeading) {
           properties: props,
           children: [
             { type: 'element', tagName: 'span', properties: { ariaHidden: 'true' }, children: [{ type: 'text', value: part }] },
-            { type: 'element', tagName: 'span', properties: { className: ['grade-mark-label'] }, children: [{ type: 'text', value: label }] },
+            // 라벨 글자는 CSS 생성 콘텐츠(::after { content: attr(data-label) })로만 그린다 — 화면과 화면 낭독기에는 보이고/읽히지만
+            // 문단을 복사할 때는 원고에 없는 라벨이 섞이지 않는다("🟢재현" 문제).
+            { type: 'element', tagName: 'span', properties: { className: ['grade-mark-label'], dataLabel: label }, children: [] },
           ],
         });
       }

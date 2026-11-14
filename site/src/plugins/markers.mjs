@@ -1,11 +1,13 @@
 // 원고 속 HTML 주석 표시 처리.
 // - <!-- external-host-ok: … --> : 원고에는 남고 화면에는 내지 않는다(이 단계에서 산출물에서 뺀다).
 // - <!-- widget: <이름> -->      : site/src/widgets/mNN/<이름>/index.astro 를 찾아 그 자리에 놓는다.
-//                                  위젯 디렉터리가 없으면 빌드를 실패시킨다(등록 파일 없이 디렉터리로 찾는다).
+//                                  없으면 공용 위젯(src/lib/shared-widgets.mjs — 예: progress-tracker)인지 본다.
+//                                  둘 다 아니면 빌드를 실패시킨다(등록 파일 없이 디렉터리로 찾는다).
 // - 그 밖의 주석                 : 화면에 내지 않는다(셈만 한다).
 import fs from 'node:fs';
 import path from 'node:path';
 import { WIDGETS_DIR, moduleOf } from '../lib/repo.mjs';
+import { SHARED_WIDGETS } from '../lib/shared-widgets.mjs';
 import { html, isComment, eachParent } from './util.mjs';
 
 const WIDGET_RE = /^<!--\s*widget:\s*([^\s]+?)\s*-->$/;
@@ -37,7 +39,7 @@ export function transformMarkers(tree, ctx) {
           continue;
         }
         const dir = widgetDir(mod, name);
-        if (!fs.existsSync(path.join(dir, 'index.astro'))) {
+        if (!fs.existsSync(path.join(dir, 'index.astro')) && !SHARED_WIDGETS.includes(name)) {
           const msg = `위젯 "${name}"이 없다: ${path.relative(process.cwd(), dir)}/index.astro 를 찾지 못했다`;
           if (report) rep.unrecognised('markers', msg, n);
           else throw new Error(`${rel}:${n.position?.start?.line}: ${msg}`);

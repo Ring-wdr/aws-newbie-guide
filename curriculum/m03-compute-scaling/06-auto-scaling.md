@@ -342,6 +342,8 @@ SDK scaling_worksheet OK
 
 </details>
 
+<!-- widget: asg-scaling-calculator -->
+
 ## 실제 AWS에서는
 
 - 조정 정책·예약 작업·예측 조정·수명 주기 후크·웜 풀이 모두 동작하고, `describe-scaling-activities`로 "왜 늘었/줄었는지" 기록을 본다. 대상 추적 정책은 CloudWatch 경보 두 개(확장·축소용)를 **자동으로 만들고 관리**한다. 직접 고치지 않는다.

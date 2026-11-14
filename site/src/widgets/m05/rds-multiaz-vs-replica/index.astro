@@ -1,0 +1,119 @@
+---
+// M05 레슨 2 — Multi-AZ vs 읽기 전용 복제본 실험대(설명용 모형).
+// 수치·근거 줄은 빌드 때 원고(curriculum/m05-databases/02-multi-az-vs-read-replica.md)에서 읽는다(facts.mjs). 읽지 못하면 빌드가 실패한다.
+import fs from 'node:fs';
+import path from 'node:path';
+import { REPO_ROOT } from '../../../lib/repo.mjs';
+import { readReplicaFacts, LESSON } from './facts.mjs';
+import Simulator from './Simulator.jsx';
+
+const facts = readReplicaFacts(fs.readFileSync(path.join(REPO_ROOT, LESSON), 'utf8'));
+---
+
+<Simulator client:visible facts={facts} />
+
+<style is:global>
+  .rr {
+    margin: 1.5rem 0;
+    padding: 1rem;
+    border: 1px solid var(--guide-border);
+    border-left: 4px solid var(--sl-color-accent);
+    border-radius: var(--guide-radius);
+    background: var(--guide-surface);
+    font-size: 0.9375rem;
+    overflow-wrap: anywhere;
+  }
+  .rr :is(p, ul, ol, fieldset, details, table) { margin: 0; }
+  .rr > * + * { margin-top: 0.85rem; }
+  .rr-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+  .rr-head h4 { margin: 0; font-size: 1.05rem; }
+  .rr-model {
+    display: inline-block;
+    padding: 0 0.5rem;
+    border: 1px dashed currentColor;
+    border-radius: 999px;
+    font-size: 0.8125rem;
+    font-weight: 700;
+    color: var(--guide-y-fg);
+    background: var(--guide-y-bg);
+  }
+  .rr-intro, .rr small { color: var(--guide-muted); }
+  .rr small { font-size: 0.8125rem; line-height: 1.5; }
+  .rr fieldset { border: 0; padding: 0; min-width: 0; }
+  .rr fieldset:disabled { opacity: 0.6; }
+  .rr legend { font-weight: 700; padding: 0; margin-bottom: 0.3rem; }
+  .rr-controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: 0.85rem 1.25rem; }
+  .rr-group { display: flex; flex-direction: column; gap: 0.55rem; }
+  .rr-field { display: flex; flex-direction: column; gap: 0.2rem; }
+  .rr-field > span { font-weight: 700; font-size: 0.875rem; }
+  .rr :is(input[type='number'], select) {
+    font: inherit;
+    width: 100%;
+    max-width: 16rem;
+    padding: 0.3rem 0.5rem;
+    border: 1px solid var(--guide-border);
+    border-radius: 0.4rem;
+    background: var(--sl-color-bg);
+    color: var(--sl-color-text);
+  }
+  .rr-check, .rr-radios label { display: flex; gap: 0.4rem; align-items: baseline; }
+  .rr-radios { display: flex; flex-direction: column; gap: 0.2rem; }
+  .rr-radios + .rr-radios { margin-top: 0.4rem; }
+  .rr-row { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+  .rr button {
+    font: inherit;
+    font-size: 0.875rem;
+    padding: 0.3rem 0.8rem;
+    min-height: 2.25rem;
+    border-radius: 0.4rem;
+    border: 1px solid var(--guide-border);
+    background: var(--guide-surface-2);
+    color: var(--sl-color-text);
+    cursor: pointer;
+    text-align: left;
+  }
+  .rr button:hover { border-color: var(--sl-color-accent); }
+  .rr button[aria-pressed='true'] { border-color: var(--sl-color-accent); box-shadow: inset 0 0 0 1px var(--sl-color-accent); font-weight: 700; }
+  .rr button[aria-pressed='true']::before { content: '✓ '; }
+  .rr :is(button, input, select, summary):focus-visible { outline: 2px solid var(--sl-color-accent); outline-offset: 2px; }
+  .rr-topo { display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: 0.6rem; }
+  .rr-zone { border: 1px dashed var(--guide-border); border-radius: var(--guide-radius); padding: 0.5rem; }
+  .rr-zone.rr-down { border: 2px solid var(--guide-bad); }
+  .rr-zone-name { font-size: 0.8125rem; font-weight: 700; color: var(--guide-muted); }
+  .rr-down .rr-zone-name { color: var(--guide-bad); }
+  .rr-zone ul { list-style: none; padding: 0 !important; margin-top: 0.35rem !important; display: grid; gap: 0.35rem; }
+  .rr-zone li { margin: 0 !important; }
+  .rr-box { display: flex; flex-direction: column; padding: 0.35rem 0.5rem; border-radius: 0.4rem; font-size: 0.8125rem; background: var(--sl-color-bg); }
+  .rr-box span { color: var(--guide-muted); }
+  /* 모양으로도 구분: 원본 굵은 실선, 대기 이중선, 복제본 점선 */
+  .rr-primary { border: 2px solid var(--sl-color-accent); }
+  .rr-standby { border: 3px double var(--sl-color-text); }
+  .rr-replica { border: 2px dashed var(--sl-color-text); }
+  .rr-down .rr-box b { text-decoration: line-through; text-decoration-color: var(--guide-bad); }
+  .rr-empty { font-size: 0.8125rem; color: var(--guide-muted); }
+  .rr-result {
+    padding: 0.6rem 0.75rem;
+    border: 1px solid var(--guide-border);
+    border-radius: var(--guide-radius);
+    background: var(--sl-color-bg);
+  }
+  .rr-tag { font-weight: 700; }
+  .rr-result[data-verdict='ok'] .rr-tag { color: var(--guide-ok); }
+  .rr-result[data-verdict='bad'] .rr-tag { color: var(--guide-bad); }
+  .rr-result[data-verdict='partial'] .rr-tag { color: var(--guide-y-fg); background: var(--guide-y-bg); padding: 0 0.3rem; border-radius: 0.25rem; }
+  .rr-ev { font-weight: 700; }
+  .rr-note { margin-top: 0.4rem !important; font-size: 0.875rem; }
+  .rr-steps { padding-left: 1.4rem; }
+  .rr-steps li { margin: 0.25rem 0 !important; }
+  .rr-src { display: inline-block; }
+  .rr-table-scroll { overflow-x: auto; }
+  .rr-table { width: 100%; border-collapse: collapse; font-size: 0.875rem; display: table; }
+  .rr-table caption { text-align: left; font-weight: 700; padding-bottom: 0.3rem; }
+  .rr-table :is(th, td) { border: 1px solid var(--guide-border); padding: 0.3rem 0.45rem; text-align: left; vertical-align: top; }
+  .rr-table th { white-space: nowrap; width: 1%; }
+  .rr details > summary { cursor: pointer; font-weight: 700; width: fit-content; }
+  .rr-assume ul { margin-top: 0.4rem !important; padding-left: 1.2rem; font-size: 0.875rem; }
+  @media (prefers-reduced-motion: reduce) {
+    .rr * { transition: none !important; animation: none !important; }
+  }
+</style>

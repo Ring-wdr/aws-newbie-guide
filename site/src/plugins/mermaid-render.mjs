@@ -195,3 +195,16 @@ async function renderAll(sources) {
   }
   return out;
 }
+
+// 아주 넓은 왼→오(LR) 흐름도는 좁은 화면(360px)에서 80%로 줄여도 상자 폭의 몇 배라, 세로로 긴 띠 안에 빈 곳만 보이기 쉽다
+// (M14 레슨 2의 전체 그림: 3157×884px → 302×707px 띠). 그런 그림만 같은 원문을 위→아래(TB)로 한 벌 더 그려
+// 좁은 화면에서 대신 보인다(원고는 그대로, 넓은 화면은 원래 그림). 기준: 폭 2400px 이상이고 높이 600px 이상.
+export const NARROW_MIN_WIDTH = 2400;
+export const NARROW_MIN_HEIGHT = 600;
+const LR_HEAD = /^(\s*(?:flowchart|graph))\s+(?:LR|RL)\b/m;
+export function narrowSource(source, rendered) {
+  if (!rendered || rendered.width < NARROW_MIN_WIDTH || rendered.height < NARROW_MIN_HEIGHT) return null;
+  const first = source.split('\n').find((l) => l.trim() && !l.trim().startsWith('%%')) || '';
+  if (!LR_HEAD.test(first)) return null;
+  return source.replace(LR_HEAD, '$1 TB');
+}

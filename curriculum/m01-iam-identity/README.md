@@ -55,6 +55,8 @@ curriculum/m01-iam-identity/labs/verify.sh
 
 정리 자료: [cheatsheet.md](./cheatsheet.md) · [quiz.md](./quiz.md)
 
+<!-- widget: progress-tracker -->
+
 ## 에뮬레이터 제약
 
 에뮬레이터 1.0.322에서 직접 확인한 것이다. 대부분은 재생성된 [FIDELITY.md](../../docs/FIDELITY.md)의 "M01 IAM과 계정 관리" 사실 표에도 있다. ★는 그 보고서에 아직 없는 이 모듈만의 관찰이다.
