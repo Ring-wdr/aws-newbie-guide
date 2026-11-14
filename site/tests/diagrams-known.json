@@ -1,17 +1,4 @@
 {
-  "_설명": "배치를 바꿔도 없어지지 않는, 원고의 그림 구조 때문에 생기는 겹침. 편집자에게 보고했고 원고가 고쳐지면 지운다. 여기 없는 겹침은 diagrams 관문을 실패시킨다.",
-  "known": [
-    {
-      "page": "/curriculum/m14-capstone-exam/02-capstone-requirements-and-design/",
-      "index": 4,
-      "match": "장애 시 복원·배포 (RTO 4h)",
-      "reason": "노드 iac 에서 자기를 품은 서브그래프 dr 로 가는 간선(iac -.-> dr)이라 라벨이 iac 노드 위에 놓인다. 간격을 넓혀도(4가지) 같다"
-    },
-    {
-      "page": "/curriculum/m02-vpc-networking/05-vpc-endpoints/",
-      "index": 1,
-      "match": "S3 요청: 라우팅 테이블의",
-      "reason": "LR 배치에서 서브그래프 app 을 빠져나가는 간선의 라벨이 그 제목 \"app-a (프라이빗)\" 위에 놓인다. 간격을 넓혀도(6가지) 같다"
-    }
-  ]
+  "_설명": "배치를 바꿔도 없어지지 않는, 원고의 그림 구조 때문에 생기는 겹침. 편집자에게 보고했고 원고가 고쳐지면 지운다. 여기 없는 겹침은 diagrams 관문을 실패시키고, 여기 있지만 재현되지 않는 항목(낡은 예외)도 실패시킨다. 항목 형식: {\"page\": 경로, \"index\": 그림 번호, \"match\": 문제 글의 일부, \"reason\": 이유}",
+  "known": []
 }

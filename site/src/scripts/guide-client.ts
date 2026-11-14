@@ -203,18 +203,54 @@ function initReveal() {
   }
 }
 
-/* ---------- 넓은 다이어그램: 왼쪽 끝(흐름의 시작)부터 보이게 한다 ---------- */
+/* ---------- 넓은 다이어그램: 흐름의 시작이 보이게 처음 스크롤 위치를 정한다 ---------- */
+// 시작 = 들어오는 간선이 없는 노드(여럿이면 가장 위, 같은 높이면 가장 왼쪽). 그림의 왼쪽 끝에서 시작 노드가
+// 다 보이면 왼쪽 끝(앞 여백만 건너뛴다)에, 아니면 시작 노드를 상자 가운데에 둔다(위→아래 트리의 뿌리가 가운데·오른쪽일 때).
+function startNode(svg: SVGSVGElement): Element | null {
+  const nodes = [...svg.querySelectorAll('g.node')];
+  const idOf = (n: Element) => /flowchart-(.+)-\d+$/.exec(n.id)?.[1];
+  const ids = new Map(nodes.map((n) => [idOf(n), n] as const));
+  const targets = new Set<string>();
+  for (const e of svg.querySelectorAll('path[data-edge="true"][data-id]')) {
+    const m = /^L_(.+)_\d+$/.exec(e.getAttribute('data-id') || '');
+    if (!m) continue;
+    // "L_<시작>_<끝>_<n>": 이름에 _ 가 있을 수 있어 두 쪽이 모두 노드 이름인 자르기를 찾는다
+    const parts = m[1].split('_');
+    for (let k = 1; k < parts.length; k++) {
+      const from = parts.slice(0, k).join('_');
+      const to = parts.slice(k).join('_');
+      if (ids.has(from) && ids.has(to)) {
+        targets.add(to);
+        break;
+      }
+    }
+  }
+  const starts = nodes.filter((n) => !targets.has(idOf(n) || '')).map((n) => ({ n, r: n.getBoundingClientRect() })).filter((x) => x.r.width > 0);
+  if (!starts.length) return null;
+  starts.sort((a, b) => (Math.abs(a.r.top - b.r.top) > 2 ? a.r.top - b.r.top : a.r.left - b.r.left));
+  return starts[0].n;
+}
+
 function initDiagrams() {
   const dark = document.documentElement.dataset.theme === 'dark';
   for (const box of document.querySelectorAll<HTMLElement>('.diagram-scroll')) {
     if (box.scrollWidth <= box.clientWidth + 1) continue;
     const svg = box.querySelector<SVGSVGElement>(`.diagram-${dark ? 'dark' : 'light'} svg`);
     if (!svg) continue;
-    // 노드·간선 라벨·서브그래프 중 가장 왼쪽 것의 바로 앞에서 시작한다(그림 앞 여백을 건너뛴다)
+    // 노드·간선 라벨·서브그래프 중 가장 왼쪽 것의 바로 앞(그림 앞 여백을 건너뛴다)
     const rects = [...svg.querySelectorAll('g.node, g.edgeLabel, g.cluster')].map((n) => n.getBoundingClientRect()).filter((r) => r.width > 0);
     if (!rects.length) continue;
-    const left = Math.min(...rects.map((r) => r.left)) - box.getBoundingClientRect().left + box.scrollLeft;
-    box.scrollLeft = Math.max(0, Math.min(box.scrollWidth - box.clientWidth, left - 8));
+    const boxLeft = box.getBoundingClientRect().left - box.scrollLeft;
+    const max = box.scrollWidth - box.clientWidth;
+    let want = Math.min(...rects.map((r) => r.left)) - boxLeft - 8;
+    const start = startNode(svg)?.getBoundingClientRect();
+    if (start) {
+      const sLeft = start.left - boxLeft;
+      const sRight = start.right - boxLeft;
+      if (sRight > want + box.clientWidth || sLeft < want) want = sLeft - (box.clientWidth - start.width) / 2;
+    }
+    box.scrollLeft = Math.max(0, Math.min(max, want));
+    box.dataset.startScroll = String(Math.round(box.scrollLeft));
   }
 }
 
