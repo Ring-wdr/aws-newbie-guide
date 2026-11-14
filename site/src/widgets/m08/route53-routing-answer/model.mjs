@@ -190,6 +190,10 @@ export function resolve(recs, state, loc, opt = {}) {
 
   if (policy === 'multivalue') {
     const cand = healthyOrAll();
+    // 건강한 레코드가 multiMax(8)개를 넘으면 실제 Route 53은 "앞의 8개"가 아니라 그중 대략 무작위로 최대 8개를 골라
+    // 리졸버마다 다른 답을 준다(Amazon Route 53 개발자 안내서 "Multivalue answer routing": "To route traffic roughly at
+    // random … Route 53 responds to DNS queries with up to eight healthy records and gives different answers to different
+    // DNS resolvers."). 모형은 설명이 매번 같게 보이도록 앞에서부터 고른다 — 8개를 넘을 때 어느 8개가 나가는지는 모형 값이다.
     const picked = cand.slice(0, multiMax);
     steps.push(`다중값 응답: 건강한 레코드의 값을 최대 ${multiMax}개까지 함께 준다(상태 확인이 없는 레코드는 항상 건강).`);
     for (const r of picked) set(r, '✓', '답함(함께)');
