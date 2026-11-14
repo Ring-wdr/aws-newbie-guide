@@ -352,25 +352,10 @@ function initHydrationGuard() {
 }
 initHydrationGuard();
 
-// 붙는 동안은 위젯 상자(.guide-widget)에 aria-busy="true"를 둬 화면 낭독기에 아직 준비 중임을 알리고, 붙으면(ssr 속성이 사라지면) 뗀다.
-function initHydrationBusy() {
-  const sync = (box: Element) => {
-    if (box.querySelector('astro-island[ssr]')) box.setAttribute('aria-busy', 'true');
-    else box.removeAttribute('aria-busy');
-  };
-  const boxes = [...document.querySelectorAll('.guide-widget')].filter((b) => b.querySelector('astro-island'));
-  if (!boxes.length) return;
-  boxes.forEach(sync);
-  const mo = new MutationObserver((records) => {
-    for (const r of records) {
-      const box = (r.target as Element).closest?.('.guide-widget');
-      if (box) sync(box);
-    }
-  });
-  for (const b of boxes) mo.observe(b, { subtree: true, attributes: true, attributeFilter: ['ssr'] });
-}
-if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initHydrationBusy);
-else initHydrationBusy();
+// 붙기 전 상태를 aria-busy 로 표시하지 않는다. client:visible 위젯은 화면에 들어올 때까지 붙지 않으므로, 빠르게 지나치거나
+// (맨 끝으로 바로 이동) 화면에 머물지 않은 위젯은 busy 가 끝까지 남았고(전 위젯 페이지 101쪽 중 29곳), 화면 낭독기는 busy 영역을
+// 건너뛸 수 있어 서버가 그린 내용(진행 목록·처음 계산 결과)까지 가려졌다. 서버가 그린 내용은 그대로 읽을 수 있는 정상 내용이고,
+// 붙기 전 입력은 위의 막기가 받지 않으므로 busy 표시 없이 둔다. 검사: tests/widget-busy.mjs(sitecheck a11y 관문).
 
 function init() {
   document.documentElement.classList.add('guide-js');

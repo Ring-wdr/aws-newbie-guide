@@ -677,6 +677,13 @@ def gate_browser(port: int, which: str, pages: str = "pilot") -> Gate:
             sys.stdout.write(p.stderr[-3000:])
             g.fail(f"{script} 종료 코드 {p.returncode}")
         g.checked = 1
+        if which == "a11y":
+            # 위젯 상자에 aria-busy="true" 가 남지 않는지(끝까지 스크롤·Tab 만). 스스로 결함을 심어 잡는지 먼저 확인한다.
+            b = subprocess.run(["node", "tests/widget-busy.mjs", "--port", str(port), "--pages", browser_pages_arg(pages)], capture_output=True, text=True, cwd=SITE, env=env)
+            sys.stdout.write(b.stdout)
+            if b.returncode != 0:
+                sys.stdout.write(b.stderr[-3000:])
+                g.fail(f"tests/widget-busy.mjs 종료 코드 {b.returncode}")
         if which == "keyboard" and p.returncode == 0 and (Path(d) / "keyboard-answers.txt").exists():
             # 키보드로 끝까지 푼 모의고사 답안을 grade.py 로도 채점해 화면 결과와 맞춘다.
             sheet = Path(d) / "keyboard-answers.txt"
