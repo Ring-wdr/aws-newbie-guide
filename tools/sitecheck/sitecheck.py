@@ -151,31 +151,34 @@ GRADE_LABEL_CLASS = {"grade-mark-label", "grade-label"}
 
 
 def _grade_mark_problem(mark: "htmlbuilt.Node") -> str | None:
-    """등급 표시(.grade-mark·.grade-badge) 하나가 글자 라벨과 접근 가능한 이름을 제대로 갖췄는지.
+    """등급 표시(.grade-mark·.grade-badge) 하나가 **보이는 글자 라벨**과 **접근 가능한 이름**을 둘 다 갖췄는지.
     문제가 없으면 None. 라벨 칸이 비었거나(data-label="" 또는 속성 없음), role=img 의 이름이 비었거나,
-    이름을 줄 것이 하나도 없으면 그 사유."""
-    names = 0
+    보이는 라벨 없이 화면 낭독기 이름만 남았거나(색만으로 전달), 이름이 없으면 그 사유."""
+    named = visible = False
     for n in mark.iter():
         if n.cls() & GRADE_LABEL_CLASS:
             if not n.attrs.get("data-label", "").strip():
                 return "글자 라벨이 비었다(data-label 없음·빈 값)"
+            visible = True
             if n.attrs.get("aria-hidden") != "true":
-                names += 1  # 생성 콘텐츠 라벨을 화면 낭독기가 읽는다(옛 구조)
+                named = True  # 생성 콘텐츠 라벨을 화면 낭독기가 읽는다(옛 구조)
         if n.attrs.get("role") == "img":
             if not n.attrs.get("aria-label", "").strip():
                 return "role=img 인데 aria-label 이 비었다"
-            names += 1
-    if names:
-        return None
-    # 바로 뒤에 라벨 글자가 원고에 이미 있는 경우("🟢 재현")는 이모지만 감싼다 — 뒤에 글자가 있어야 한다
+            named = True
+    # 바로 뒤에 라벨 글자가 원고에 이미 있는 경우("🟢 재현")는 이모지만 감싼다 — 그 글자가 보이는 라벨이자 이름이다
     par = mark.parent
-    if par is not None:
+    if par is not None and not visible:
         kids = par.children
         i = next(k for k, c in enumerate(kids) if c is mark)
         nxt = kids[i + 1] if i + 1 < len(kids) else ""
         if isinstance(nxt, str) and nxt.strip():
-            return None
-    return "이름이 없다(role=img·aria-label 도, 읽히는 라벨도, 뒤따르는 라벨 글자도 없음)"
+            visible = named = True
+    if not visible:
+        return "보이는 글자 라벨이 없다(화면 낭독기 이름만 있어 화면에서는 색으로만 구분된다)" if named else "이름도 보이는 라벨도 없다"
+    if not named:
+        return "접근 가능한 이름이 없다(role=img·aria-label 없음)"
+    return None
 
 
 def bare_grade_emoji(content: "htmlbuilt.Node") -> list[str]:

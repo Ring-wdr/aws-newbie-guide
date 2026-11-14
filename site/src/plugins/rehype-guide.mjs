@@ -131,8 +131,9 @@ function breakableTokensInCells(node, inCell) {
 // 본문(표 칸·문단)의 등급 이모지 🟢/🟡/🔴 에 글자 라벨을 붙인다(원칙 6: 색만으로 정보를 전달하지 않는다).
 // 원고 글자(이모지)는 그대로 두고 뒤에 작은 라벨(.grade-mark-label, 원고 README 등급 표의 "재현/부분/개념")을 덧붙인다.
 // 라벨은 CSS 생성 콘텐츠라 복사한 글에는 들어가지 않는다(원고 글자만 복사된다). 접근 가능한 이름은 이모지의 role=img + aria-label.
-// 바로 뒤에 같은 라벨이 이미 적혀 있으면("🟢 재현") 덧붙이지 않는다. 제목(h1~h6)은 글자를 더하면 앵커가 바뀌므로
-// 라벨 대신 접근 가능한 이름(role=img + aria-label)만 준다. 메타 칩의 배지·범례와 코드 안은 건드리지 않는다.
+// 바로 뒤에 같은 라벨이 이미 적혀 있으면("🟢 재현") 덧붙이지 않는다. 제목(h1~h6)에도 같은 라벨을 붙인다 — 라벨 칸은
+// 글자 없는 빈 요소(생성 콘텐츠)라 제목 글자와 앵커(id는 원고 글자에서 이미 정해졌다)가 바뀌지 않는다. 보이는 라벨 없이
+// 이름만 두면 화면에서는 색으로만 구분되므로 grades 관문이 실패로 본다. 메타 칩의 배지·범례와 코드 안은 건드리지 않는다.
 const GRADE_CLASS = { '🟢': 'g', '🟡': 'y', '🔴': 'r' };
 const GRADE_RE = /(🟢|🟡|🔴)/u;
 const GRADE_SKIP_CLASS = ['grade-badge', 'grade-legend', 'meta-chip', 'grade-mark'];
@@ -161,9 +162,7 @@ function gradeMarks(node, inHeading) {
       const { label, meaning } = legend[part];
       const after = (parts.slice(k + 1).join('') || (kids[i + 1]?.type === 'text' ? kids[i + 1].value : '')).trimStart();
       const props = { className: ['grade-mark', `grade-mark-${GRADE_CLASS[part]}`], title: `${label}: ${meaning}` };
-      if (inHeading) {
-        out.push({ type: 'element', tagName: 'span', properties: { ...props, role: 'img', ariaLabel: label }, children: [{ type: 'text', value: part }] });
-      } else if (after.startsWith(label)) {
+      if (after.startsWith(label)) {
         out.push({ type: 'element', tagName: 'span', properties: props, children: [{ type: 'text', value: part }] });
       } else {
         out.push({
