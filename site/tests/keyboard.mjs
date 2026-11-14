@@ -85,10 +85,15 @@ try {
   // 단계별 보기: 처음 → 다음
   await tabUntil(focusIs, '.vt button[data-step=first]');
   await press('Enter');
+  // "처음"이 비활성화되면 초점은 "다음 단계"로 옮겨져야 한다(body로 빠지지 않게)
+  if (!(await page.waitForFunction(focusIs, '.vt button[data-step=next]', { timeout: 2000 }).then(() => true, () => false))) problems.push('타임라인: "처음" 뒤 초점이 "다음 단계"에 있지 않음');
   await tabUntil(focusIs, '.vt button[data-step=next]');
   await press('Enter');
   const nowText = await page.textContent('.vt-now');
   if (!/^단계 2\//.test(nowText.trim())) problems.push(`타임라인 단계 이동: "${nowText}"`);
+  await tabUntil(focusIs, '.vt button[data-step=last]');
+  await press('Enter');
+  if (!(await page.waitForFunction(focusIs, '.vt button[data-step=prev]', { timeout: 2000 }).then(() => true, () => false))) problems.push('타임라인: "끝까지" 뒤 초점이 "이전 단계"에 있지 않음');
   console.log(`타임라인(키보드): ${vt.trim().slice(0, 60)}… / ${nowText.trim().slice(0, 30)}…`);
 
   /* ---------------- M06 위젯: 진행 추적 ---------------- */

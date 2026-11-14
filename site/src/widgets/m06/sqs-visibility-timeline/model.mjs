@@ -8,13 +8,15 @@
 //     (원고 02-sqs.md:34 "처리 시간보다 **길게**" — 같으면 안전하지 않다).
 //  4. 재드라이브 정책이 있으면, 이미 maxReceiveCount번 받아 간 메시지를 다음에 받으려는 순간 DLQ로 옮긴다
 //     (원고 02-sqs.md:59 "maxReceiveCount번 넘게 받아 간 메시지를 DLQ로", 02-sqs.md:179 "두 번 실패한 뒤 세 번째로 받으려는 순간 … DLQ로").
-//  5. 처리를 끝낸 워커의 DeleteMessage는 성공한다고 둔다(다른 워커가 같은 메시지를 다시 받아 간 뒤라도). 모형의 단순화다.
+//  5. 처리를 끝낸 워커의 DeleteMessage는 항상 통한다고 둔다(다른 워커가 같은 메시지를 다시 받아 간 뒤라도). 모형의 단순화다.
+//     실제로는 가시성 타임아웃이 지난 뒤의 삭제가 보장되지 않는다(원고에 없는 내용이라 단정하지 않는다).
+//  7. 수신을 MAX_RECEIVES_SHOWN번 펼친 뒤에도 끝나지 않으면 거기서 멈춘다(결과 'looping').
 //  6. 메시지 보존 기간(기본 4일)은 다루지 않는다.
 
 /** 재드라이브 정책이 없을 때 끝없이 반복되는 수신을 화면에 몇 번까지 펼칠지(모형 화면의 상한, AWS 한도가 아니다). */
 export const MAX_RECEIVES_SHOWN = 10;
 
-/** 화면의 maxReceiveCount 입력 범위. 원고에 범위가 없어서 모형 화면의 범위로 둔다(AWS 한도가 아니다). 원고의 예는 lab02의 2(02-sqs.md:148). */
+/** 화면의 maxReceiveCount 입력 범위. 원고에 범위가 없어서 모형 화면의 범위로 둔다(AWS 한도가 아니다). 원고의 예는 lab02의 2(02-sqs.md:150). */
 export const MODEL_MAX_RECEIVE_RANGE = { min: 1, max: MAX_RECEIVES_SHOWN };
 
 /**
@@ -126,9 +128,9 @@ export function describe(ev, input) {
     case 'hidden-end':
       return `${at}: 가시성 타임아웃이 끝나 메시지가 다시 보임`;
     case 'dlq':
-      return `${at}: 이미 ${input.maxReceiveCount}번 받아 간 메시지(maxReceiveCount=${input.maxReceiveCount} 초과) — 원본 큐에서 DLQ로 옮겨짐`;
+      return `${at}: 이미 ${ev.receive}번 받아 간 메시지를 ${ev.receive + 1}번째로 받으려는 순간 — 수신 횟수가 maxReceiveCount(${input.maxReceiveCount})를 넘으므로 원본 큐에서 DLQ로 옮겨짐`;
     case 'stop':
-      return `${at}: 재드라이브 정책이 없어 같은 일이 계속 반복된다(모형은 ${MAX_RECEIVES_SHOWN}번까지만 펼친다)`;
+      return `${at}: 재드라이브 정책이 없어 같은 일이 계속 반복된다 — 모형은 수신 ${MAX_RECEIVES_SHOWN}번에서 멈춘다`;
     default:
       return at;
   }
@@ -147,7 +149,11 @@ export function summarize(sim, input) {
     return `${sim.receives}번 받아 가고도 삭제되지 않아 ${formatDuration(sim.end)}에 DLQ로 옮겨졌다.${busy}`;
   }
   if (input.outcome === 'success') {
-    return `처리가 끝나기 전에 가시성 타임아웃이 계속 끝나 ${MAX_RECEIVES_SHOWN}번 넘게 받아 갔다 — 같은 작업이 겹겹이 중복 처리된다. 가시성 타임아웃을 처리 시간보다 길게 둔다.`;
+    const why =
+      input.visibility === 0
+        ? '가시성 타임아웃이 0초라 받자마자 다시 보여, 시간이 흐르기 전에 다른 워커가 계속 다시 받아 간다'
+        : '처리가 끝나기 전에 가시성 타임아웃이 계속 끝나 다른 워커가 계속 다시 받아 간다';
+    return `${why}. ${MAX_RECEIVES_SHOWN}번 받아 갈 때까지 아무 워커도 처리를 끝내지 못해 메시지가 지워지지 않았다(모형은 ${MAX_RECEIVES_SHOWN}번에서 멈춘다) — 같은 작업이 겹겹이 중복 처리된다. 가시성 타임아웃을 처리 시간보다 길게 둔다.`;
   }
-  return `재드라이브 정책이 없어 지워지지 않는 메시지가 타임아웃마다 다시 나타난다(독 메시지). ${MAX_RECEIVES_SHOWN}번 받아 간 뒤에도 끝나지 않는다.`;
+  return `재드라이브 정책이 없어 지워지지 않는 메시지가 타임아웃마다 다시 나타난다(독 메시지). ${MAX_RECEIVES_SHOWN}번 받아 간 뒤에도 끝나지 않는다(모형은 ${MAX_RECEIVES_SHOWN}번에서 멈춘다).`;
 }

@@ -1,5 +1,5 @@
 // SQS 가시성 타임아웃 타임라인(설명용 모형). 계산은 model.mjs, 수치는 facts.mjs가 원고에서 읽어 props로 준다.
-import { useMemo, useState } from 'preact/hooks';
+import { useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { simulate, normalize, formatDuration, describe, summarize, MODEL_MAX_RECEIVE_RANGE, MAX_RECEIVES_SHOWN } from './model.mjs';
 
 const RESULT_LABEL = { deleted: '삭제됨', dlq: 'DLQ로 옮겨짐', looping: '계속 반복' };
@@ -39,6 +39,16 @@ export default function Timeline({ facts }) {
   const input = useMemo(() => normalize(raw, limits), [raw.visibility, raw.processing, raw.maxReceiveCount, raw.redrive, raw.outcome]);
   const sim = useMemo(() => simulate(input), [input]);
   const [step, setStep] = useState(-1); // -1 = 끝까지 모두
+  // "처음"·"끝까지"를 누르면 그 단추가 비활성화되므로 초점을 옆 단추로 옮긴다(초점이 body로 빠지지 않게).
+  const nextRef = useRef(null);
+  const prevRef = useRef(null);
+  const pendingFocus = useRef(null); // 다시 그린 뒤(단추가 활성화된 뒤) 초점을 옮긴다
+  useLayoutEffect(() => {
+    if (pendingFocus.current) {
+      pendingFocus.current.current?.focus();
+      pendingFocus.current = null;
+    }
+  });
   const last = sim.events.length - 1;
   const cur = step < 0 || step > last ? last : step;
   const now = sim.events[cur].t;
@@ -130,10 +140,10 @@ export default function Timeline({ facts }) {
 
       <div class="vt-steps" role="group" aria-label="단계별로 보기">
         <div class="vt-row">
-          <button type="button" data-step="first" onClick={() => setStep(0)} disabled={cur === 0}>처음</button>
-          <button type="button" data-step="prev" onClick={() => setStep(Math.max(0, cur - 1))} disabled={cur === 0}>이전 단계</button>
-          <button type="button" data-step="next" onClick={() => setStep(Math.min(last, cur + 1))} disabled={cur === last}>다음 단계</button>
-          <button type="button" data-step="last" onClick={() => setStep(-1)} disabled={cur === last}>끝까지</button>
+          <button type="button" data-step="first" onClick={() => { setStep(0); pendingFocus.current = nextRef; }} disabled={cur === 0}>처음</button>
+          <button type="button" data-step="prev" ref={prevRef} onClick={() => setStep(Math.max(0, cur - 1))} disabled={cur === 0}>이전 단계</button>
+          <button type="button" data-step="next" ref={nextRef} onClick={() => setStep(Math.min(last, cur + 1))} disabled={cur === last}>다음 단계</button>
+          <button type="button" data-step="last" onClick={() => { setStep(-1); pendingFocus.current = prevRef; }} disabled={cur === last}>끝까지</button>
         </div>
         <p class="vt-now" aria-live="polite">
           <strong>
@@ -208,7 +218,8 @@ export default function Timeline({ facts }) {
           <li>메시지가 보이면 놀고 있는 워커가 곧바로 받아 간다(폴링 대기 0초).</li>
           <li>처리 시간과 타임아웃이 같으면 메시지가 다시 보이는 쪽을 먼저 둔다 — 원고대로 타임아웃은 처리 시간보다 <strong>길게</strong> 잡는다.</li>
           <li>재드라이브 정책이 있으면 이미 maxReceiveCount번 받아 간 메시지를 다음에 받으려는 순간 DLQ로 옮긴다(lab02에서 관찰한 순서).</li>
-          <li>처리를 끝낸 워커의 DeleteMessage는 성공한다고 둔다. 메시지 보존 기간과 ChangeMessageVisibility는 다루지 않는다.</li>
+          <li>모형은 처리를 끝낸 워커의 DeleteMessage가 항상 통한다고 둔다. 실제로는 가시성 타임아웃이 지난 뒤(다른 워커가 다시 받아 간 뒤)의 삭제는 보장되지 않는다.</li>
+          <li>메시지 보존 기간과 ChangeMessageVisibility는 다루지 않는다.</li>
           <li>재드라이브 정책이 없으면 수신을 {MAX_RECEIVES_SHOWN}번까지만 펼친다(화면의 상한).</li>
         </ul>
       </details>

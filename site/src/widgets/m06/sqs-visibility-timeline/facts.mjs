@@ -1,6 +1,6 @@
 // 위젯의 수치를 원고(curriculum/m06-integration-messaging/02-sqs.md)에서 빌드 때 읽는다(GUIDE-SITE 원칙 4).
 // 원고 문장이 바뀌어 읽지 못하면 빌드를 실패시킨다 — 위젯이 원고와 다른 수치를 조용히 보여 주지 않게.
-// 순수 함수(파일을 읽지 않는다). 단위 시험: facts.test.mjs
+// 순수 함수(파일을 읽지 않는다). 단위 시험: model.test.mjs(원고 읽기 시험 포함)
 
 export const LESSON = 'curriculum/m06-integration-messaging/02-sqs.md';
 
