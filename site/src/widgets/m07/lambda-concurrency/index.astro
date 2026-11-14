@@ -1,0 +1,125 @@
+---
+// M07 레슨 1 — Lambda 동시성 칸 나누기(설명용 모형).
+// 수치와 규칙은 빌드 때 원고(01-lambda-execution-model.md, cheatsheet.md)에서 읽는다(facts.mjs). 읽지 못하면 빌드가 실패한다.
+import fs from 'node:fs';
+import path from 'node:path';
+import { REPO_ROOT } from '../../../lib/repo.mjs';
+import { readConcurrencyFacts, LESSON, CHEATSHEET } from './facts.mjs';
+import Concurrency from './Concurrency.jsx';
+
+const read = (p) => fs.readFileSync(path.join(REPO_ROOT, p), 'utf8');
+const facts = readConcurrencyFacts(read(LESSON), read(CHEATSHEET));
+---
+
+<Concurrency client:visible facts={facts} />
+
+<style is:global>
+  .lc {
+    margin: 1.5rem 0;
+    padding: 1rem;
+    border: 1px solid var(--guide-border);
+    border-left: 4px solid var(--sl-color-accent);
+    border-radius: var(--guide-radius);
+    background: var(--guide-surface);
+    font-size: 0.9375rem;
+    overflow-wrap: anywhere;
+  }
+  .lc :is(p, ul, fieldset, figure, details, table) { margin: 0; }
+  .lc > * + * { margin-top: 0.85rem; }
+  .lc-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+  .lc-head h4 { margin: 0; font-size: 1.05rem; }
+  .lc-model {
+    display: inline-block;
+    padding: 0 0.5rem;
+    border: 1px dashed currentColor;
+    border-radius: 999px;
+    font-size: 0.8125rem;
+    font-weight: 700;
+    color: var(--guide-y-fg);
+    background: var(--guide-y-bg);
+  }
+  .lc-intro, .lc-hint, .lc small { color: var(--guide-muted); }
+  .lc small { display: block; font-size: 0.8125rem; line-height: 1.5; }
+  .lc fieldset { border: 0; padding: 0; min-width: 0; }
+  .lc legend { font-weight: 700; padding: 0; margin-bottom: 0.3rem; }
+  .lc-row { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+  .lc-hint { margin-top: 0.35rem !important; font-size: 0.8125rem; }
+  .lc button {
+    font: inherit;
+    font-size: 0.875rem;
+    padding: 0.3rem 0.8rem;
+    min-height: 2.25rem;
+    border-radius: 0.4rem;
+    border: 1px solid var(--guide-border);
+    background: var(--guide-surface-2);
+    color: var(--sl-color-text);
+    cursor: pointer;
+    text-align: left;
+  }
+  .lc button:hover { border-color: var(--sl-color-accent); }
+  .lc button[aria-pressed='true'] { border-color: var(--sl-color-accent); box-shadow: inset 0 0 0 1px var(--sl-color-accent); font-weight: 700; }
+  .lc button[aria-pressed='true']::before { content: '✓ '; }
+  .lc :is(button, input, summary):focus-visible { outline: 2px solid var(--sl-color-accent); outline-offset: 2px; }
+  .lc-controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 0.85rem 1.25rem; }
+  .lc-field { display: flex; flex-direction: column; gap: 0.25rem; }
+  .lc-field > span, .lc-sub > span { font-weight: 700; }
+  .lc input[type='number'] {
+    font: inherit;
+    width: 100%;
+    max-width: 12rem;
+    padding: 0.3rem 0.5rem;
+    border: 1px solid var(--guide-border);
+    border-radius: 0.4rem;
+    background: var(--sl-color-bg);
+    color: var(--sl-color-text);
+  }
+  .lc input[type='number']:disabled { opacity: 0.55; }
+  .lc-radios label, .lc-check { display: flex; gap: 0.4rem; align-items: baseline; }
+  .lc-sub { display: flex; flex-direction: column; gap: 0.25rem; margin-top: 0.3rem; }
+  .lc-result {
+    padding: 0.6rem 0.75rem;
+    border: 1px solid var(--guide-border);
+    border-radius: var(--guide-radius);
+    background: var(--sl-color-bg);
+  }
+  .lc-result ul { margin-top: 0.35rem !important; padding-left: 1.2rem; }
+  .lc-result li + li { margin-top: 0.2rem; }
+  .lc-tag { font-weight: 700; }
+  .lc-result[data-verdict='ok'] .lc-tag { color: var(--guide-ok); }
+  .lc-result:not([data-verdict='ok']) .lc-tag { color: var(--guide-bad); }
+  .lc-chart { padding: 0.25rem 0; }
+  .lc-bar {
+    position: relative;
+    display: flex;
+    height: 1.6rem;
+    border: 1px solid var(--guide-border);
+    border-radius: 0.25rem;
+    background: var(--guide-surface-2);
+    overflow: hidden;
+  }
+  .lc-seg { display: block; height: 100%; min-width: 2px; box-sizing: border-box; }
+  /* 색 + 무늬로 구분한다(글자 범례 ■▨□┅▤· 를 함께 둔다) */
+  .lc-seg-warm { background: var(--sl-color-accent); }
+  .lc-seg-cold { background: repeating-linear-gradient(135deg, var(--sl-color-accent) 0 3px, transparent 3px 7px); border: 1px solid var(--sl-color-accent); }
+  .lc-seg-idle { background: var(--sl-color-accent-low); border: 2px dashed var(--sl-color-accent); }
+  .lc-seg-resfree { background: var(--sl-color-accent-low); }
+  .lc-seg-b { background: repeating-linear-gradient(0deg, var(--sl-color-text) 0 2px, transparent 2px 5px); border: 1px solid var(--sl-color-text); }
+  .lc-seg-free { background: transparent; }
+  .lc-cut { position: absolute; top: 0; bottom: 0; width: 0; border-left: 3px solid var(--sl-color-text); }
+  .lc-axis { display: flex; justify-content: space-between; gap: 0.5rem; font-size: 0.75rem; color: var(--guide-muted); margin-top: 0.2rem; }
+  .lc-legend { list-style: none; padding: 0 !important; margin: 0.4rem 0 0 !important; display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: 0.2rem 1rem; font-size: 0.8125rem; }
+  .lc-legend li { margin: 0 !important; display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap; }
+  .lc-sw { display: inline-block; flex: none; width: 1.6rem; height: 0.8rem; border-radius: 0.2rem; }
+  .lc-sw.lc-seg-free { border: 1px solid var(--guide-border); }
+  .lc-thr { font-size: 0.8125rem; margin-top: 0.35rem !important; }
+  .lc details > summary { cursor: pointer; font-weight: 700; width: fit-content; }
+  .lc-table-scroll { overflow-x: auto; margin-top: 0.5rem; }
+  .lc-table { width: 100%; min-width: 30rem; border-collapse: collapse; font-size: 0.8125rem; display: table; overflow-wrap: normal; word-break: keep-all; }
+  .lc-table td:nth-child(3) { white-space: nowrap; }
+  .lc-table-scroll:focus-visible { outline: 2px solid var(--sl-color-accent); outline-offset: 2px; }
+  .lc-table :is(th, td) { border: 1px solid var(--guide-border); padding: 0.3rem 0.45rem; text-align: left; vertical-align: top; }
+  .lc-assume ul { margin-top: 0.4rem !important; padding-left: 1.2rem; }
+  @media (prefers-reduced-motion: reduce) {
+    .lc * { transition: none !important; animation: none !important; }
+  }
+</style>
