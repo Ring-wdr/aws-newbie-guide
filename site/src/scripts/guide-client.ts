@@ -2,6 +2,7 @@
 // 스크립트가 없어도 원고 내용은 모두 읽힌다(단추만 숨겨진 채 남는다).
 import { ko } from '../i18n/ko.mjs';
 import { load, save, remove, mountStoragePanels, onStorageChange } from './storage';
+import { installExamGuard } from './exam-guard';
 
 const pageKey = location.pathname.replace(/\/+$/, '') || '/';
 
@@ -335,6 +336,7 @@ function init() {
   initTables();
   initDiagrams();
   mountStoragePanels();
+  installExamGuard();
 }
 
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);

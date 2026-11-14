@@ -7,6 +7,7 @@ import { getEntry } from 'astro:content';
 import { REPO_ROOT } from '../lib/repo.mjs';
 import { parseGradeConstants, parseKey, parseQuestions, parseTimerMinutes } from '../lib/exam-core.mjs';
 import { ko } from '../i18n/ko.mjs';
+import { HISTORY_MAX } from '../lib/exam-history.mjs';
 
 const dir = path.join(REPO_ROOT, 'curriculum/m14-capstone-exam/mock-exam');
 const read = (f: string) => fs.readFileSync(path.join(dir, f), 'utf8');
@@ -37,6 +38,8 @@ const data = {
   questions: Object.fromEntries(nums.map((n) => [n, { choose: qs[n].choose, options: qs[n].options }])),
   keyRoute: '/curriculum/m14-capstone-exam/mock-exam/answer-key/',
 };
+// 지난 응시 기록 상자(시작 화면과 결과 화면에 하나씩). 내용은 exam.ts가 채운다.
+const historyBoxes = ['start', 'result'];
 ---
 
 <section class="exam-app not-content" aria-labelledby="exam-app-title" data-exam>
@@ -56,6 +59,24 @@ const data = {
       <button type="button" data-act="import-sheet">{ko.exam.importSheet}</button>
     </div>
     <p class="exam-msg" role="status" aria-live="polite"></p>
+    {historyBoxes.slice(0, 1).map((where) => (
+      <section class="exam-history" data-exam-history aria-labelledby={`exam-history-title-${where}`}>
+      <h3 id={`exam-history-title-${where}`}>{ko.exam.historyTitle}</h3>
+      <p class="exam-hint">{ko.exam.historyNote(HISTORY_MAX)}</p>
+      <p class="exam-history-empty">{ko.exam.historyEmpty}</p>
+      <div class="table-scroll" tabindex="0" role="region" aria-label={ko.exam.historyTitle} hidden>
+        <table class="exam-history-table">
+          <caption>{ko.exam.historyTitle}</caption>
+          <thead><tr>{ko.exam.historyCols.map((c) => <th scope="col">{c}</th>)}</tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="exam-actions">
+        <button type="button" data-act="clear-history" hidden>{ko.exam.historyClear}</button>
+      </div>
+      <p class="exam-history-msg" role="status"></p>
+    </section>
+    ))}
     <div data-guide-storage></div>
   </div>
 
@@ -97,6 +118,24 @@ const data = {
       <button type="button" data-act="restart">{ko.exam.restart}</button>
     </div>
     <p class="exam-hint">{ko.exam.exportNote}</p>
+    {historyBoxes.slice(1).map((where) => (
+      <section class="exam-history" data-exam-history aria-labelledby={`exam-history-title-${where}`}>
+      <h3 id={`exam-history-title-${where}`}>{ko.exam.historyTitle}</h3>
+      <p class="exam-hint">{ko.exam.historyNote(HISTORY_MAX)}</p>
+      <p class="exam-history-empty">{ko.exam.historyEmpty}</p>
+      <div class="table-scroll" tabindex="0" role="region" aria-label={ko.exam.historyTitle} hidden>
+        <table class="exam-history-table">
+          <caption>{ko.exam.historyTitle}</caption>
+          <thead><tr>{ko.exam.historyCols.map((c) => <th scope="col">{c}</th>)}</tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="exam-actions">
+        <button type="button" data-act="clear-history" hidden>{ko.exam.historyClear}</button>
+      </div>
+      <p class="exam-history-msg" role="status"></p>
+    </section>
+    ))}
     <h3>{ko.exam.reviewTitle}</h3>
     <div class="exam-filter" role="group" aria-label={ko.exam.reviewTitle}>
       <button type="button" data-filter="all" aria-pressed="true">{ko.exam.reviewFilterAll}</button>

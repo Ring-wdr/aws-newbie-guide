@@ -6,6 +6,8 @@
 export const storageKey = (mod) => `progress:${mod}`;
 export const STORAGE_KEY = storageKey('m06'); // P1 호환(M06)
 export const QUIZ_STATE_KEY = (quizRoute) => `quiz:${quizRoute.replace(/\/+$/, '')}`; // guide-client.ts의 퀴즈 저장 키와 같은 규칙
+/** 모의고사 응시 기록(exam.ts가 쓴다). 진행 추적은 읽기만 한다. */
+export const EXAM_HISTORY_KEY = 'exam:m14-mock-exam:history';
 
 const cells = (line) =>
   line

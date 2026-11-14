@@ -3,27 +3,31 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { load, save, remove, storageAvailable, onStorageChange } from '../scripts/storage';
 import { confirmDialog } from '../scripts/dialog';
-import { GROUPS, QUIZ_STATE_KEY, sanitize, toggle, computeProgress, quizGradedCount } from './progress.mjs';
+import { GROUPS, EXAM_HISTORY_KEY, QUIZ_STATE_KEY, sanitize, toggle, computeProgress, quizGradedCount } from './progress.mjs';
+import { latestExam } from '../lib/exam-history.mjs';
 
 export default function Tracker({ items, storeKey, quizRoute, quizTotal, moduleTitle }) {
   const [state, setState] = useState(() => sanitize(null, items));
   const [ready, setReady] = useState(false);
   const [canStore, setCanStore] = useState(true);
   const [quizGraded, setQuizGraded] = useState(0);
+  const [lastExam, setLastExam] = useState(null);
   const [msg, setMsg] = useState('');
   const resetRef = useRef(null);
+  const hasExam = items.some((it) => it.id === 'exam:mock-exam');
 
   useEffect(() => {
     const refresh = () => {
       setState(sanitize(load(storeKey, null), items));
       if (quizTotal > 0) setQuizGraded(quizGradedCount(load(QUIZ_STATE_KEY(quizRoute), null)));
+      if (hasExam) setLastExam(latestExam(load(EXAM_HISTORY_KEY, null)));
     };
     setCanStore(storageAvailable());
     refresh();
     setReady(true);
     // 다른 탭·같은 창(백업 가져오기, 레슨 페이지의 완료 표시)에서 바뀌었거나, 다른 페이지(퀴즈)에 다녀오면 다시 읽는다.
     const off = onStorageChange((key) => {
-      if (key === null || key === storeKey || key.startsWith('quiz:')) refresh();
+      if (key === null || key === storeKey || key.startsWith('quiz:') || key === EXAM_HISTORY_KEY) refresh();
     });
     window.addEventListener('pageshow', refresh);
     window.addEventListener('focus', refresh);
@@ -109,6 +113,11 @@ export default function Tracker({ items, storeKey, quizRoute, quizTotal, moduleT
                     {it.kind === 'quiz' && ready && quizGraded > 0 ? (
                       <small class="pt-quiz-record">
                         퀴즈 페이지 기록: {quizTotal}문항 중 {quizGraded}문항 채점함{quizGraded >= quizTotal && !on ? ' — 다 풀었으면 완료로 표시하자' : ''}
+                      </small>
+                    ) : null}
+                    {it.id === 'exam:mock-exam' && ready && lastExam ? (
+                      <small class="pt-quiz-record" data-exam-last>
+                        최근 응시: {lastExam.when} · {lastExam.ok}/{lastExam.total} = {lastExam.pct}% · {lastExam.pass ? '통과' : '미달'} (기록 {lastExam.count}회)
                       </small>
                     ) : null}
                   </li>

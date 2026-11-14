@@ -4,6 +4,9 @@ import { ko } from '../i18n/ko.mjs';
 import { formatAnswerSheet, gradeExam, parseAnswerSheet } from '../lib/exam-core.mjs';
 import { download, load, pickFile, remove, save } from './storage';
 import { confirmDialog } from './dialog';
+import { onStorageChange } from './storage';
+import { syncExamGuard } from './exam-guard';
+import { addRecord, formatDuration, formatWhen, makeRecord, sanitizeHistory } from '../lib/exam-history.mjs';
 
 type Key = Record<string, { number: number; answer: string[]; domain: string; task: string; kind: string; topic: string }>;
 type Data = {
@@ -26,6 +29,7 @@ type State = {
 };
 
 const STORE = 'exam:m14-mock-exam';
+const HISTORY = 'exam:m14-mock-exam:history'; // 지난 응시 기록(최근 20회) — progress.mjs의 EXAM_HISTORY_KEY와 같다
 
 const app = document.querySelector<HTMLElement>('[data-exam]');
 if (app) init(app);
@@ -221,14 +225,53 @@ function init(app: HTMLElement) {
     state.filter = 'all';
     stopTimer();
     persist();
+    // 지난 응시 기록: 채점은 화면 결과와 같은 gradeExam(= grade.py 규칙). 소요 시간은 타이머가 실제로 줄어든 만큼.
+    const r = gradeExam(data.key, numAnswers(), state.flags, { domains: data.domains, passPct: data.passPct, total: data.total });
+    save(HISTORY, addRecord(load(HISTORY, null), makeRecord(r, { at: new Date().toISOString(), elapsedMs: data.minutes * 60_000 - state.remainingMs, auto })));
     render();
     result.focus();
   }
 
-  function renderResult() {
+  function numAnswers(): Record<number, string[]> {
     const answers: Record<number, string[]> = {};
     for (const [n, a] of Object.entries(state.answers)) answers[Number(n)] = a;
-    const r = gradeExam(data.key, answers, state.flags, { domains: data.domains, passPct: data.passPct, total: data.total });
+    return answers;
+  }
+
+  function renderHistory() {
+    const h = sanitizeHistory(load(HISTORY, null));
+    for (const box of app.querySelectorAll<HTMLElement>('[data-exam-history]')) {
+      const wrap = box.querySelector<HTMLElement>('.table-scroll')!;
+      const tbody = box.querySelector<HTMLElement>('tbody')!;
+      box.querySelector<HTMLElement>('.exam-history-empty')!.hidden = h.records.length > 0;
+      wrap.hidden = h.records.length === 0;
+      box.querySelector<HTMLButtonElement>('[data-act=clear-history]')!.hidden = h.records.length === 0;
+      tbody.replaceChildren(
+        ...h.records.map((x) => {
+          const tr = document.createElement('tr');
+          const cells = [
+            formatWhen(x.at),
+            `${x.ok}/${x.total} = ${x.pct}%`,
+            x.pass ? '통과' : '미달',
+            x.domains.map((d) => `${d.domain} ${d.ok}/${d.total}`).join(' · '),
+            `${formatDuration(x.elapsedMs)}${x.auto ? ` (${ko.exam.historyAuto})` : ''}`,
+          ];
+          cells.forEach((c, i) => {
+            const td = document.createElement(i === 0 ? 'th' : 'td');
+            if (i === 0) td.setAttribute('scope', 'row');
+            else td.dataset.col = ko.exam.historyCols[i];
+            td.textContent = c;
+            tr.append(td);
+          });
+          tr.dataset.pass = String(x.pass);
+          return tr;
+        }),
+      );
+    }
+  }
+
+  function renderResult() {
+    const r = gradeExam(data.key, numAnswers(), state.flags, { domains: data.domains, passPct: data.passPct, total: data.total });
     $('.exam-total').textContent = `${ko.exam.total(r.totalOk, r.totalQ, r.pctText)} · ${ko.exam.blank(r.blank)}`;
     const verdict = $('.exam-verdict');
     verdict.textContent = r.pass ? ko.exam.pass(data.passPct) : ko.exam.fail(data.passPct, r.more);
@@ -267,6 +310,8 @@ function init(app: HTMLElement) {
 
   function render() {
     const phase = state.phase;
+    syncExamGuard(phase === 'running');
+    renderHistory();
     start.hidden = phase !== 'idle';
     $<HTMLButtonElement>('[data-act=start]').textContent = state.remainingMs < data.minutes * 60_000 || Object.keys(state.answers).length ? ko.exam.resume : ko.exam.start;
     $<HTMLButtonElement>('.exam-start [data-act=restart]').hidden = !(Object.keys(state.answers).length || state.flags.length);
@@ -365,6 +410,18 @@ function init(app: HTMLElement) {
         result.focus();
         result.scrollIntoView({ block: 'start' });
         break;
+      case 'clear-history': {
+        const n = sanitizeHistory(load(HISTORY, null)).records.length;
+        if (!(await confirmDialog(ko.exam.historyClearConfirm(n), { yes: ko.exam.historyClear, focus: 'no' }))) return;
+        remove(HISTORY);
+        renderHistory();
+        const box = t.closest<HTMLElement>('[data-exam-history]');
+        const m = box?.querySelector<HTMLElement>('.exam-history-msg');
+        if (m) m.textContent = ko.exam.historyCleared;
+        box?.querySelector<HTMLElement>('h3')?.setAttribute('tabindex', '-1');
+        box?.querySelector<HTMLElement>('h3')?.focus();
+        break;
+      }
       case 'export-sheet':
         download('my-answers.txt', formatAnswerSheet(state.answers, state.flags, data.total), 'text/plain');
         break;
@@ -390,6 +447,16 @@ function init(app: HTMLElement) {
 
   // 시험용 시험 훅: 자동화 검사(tools/sitecheck)가 키 입력만으로 끝까지 풀었는지 상태를 읽는다(쓰기는 하지 않는다).
   (window as any).__guideExamState = () => JSON.parse(JSON.stringify(state));
+
+  // 백업을 가져오면(같은 창) 답·표시·기록을 다시 읽는다. 자기 저장(1초마다)에는 반응하지 않는다.
+  onStorageChange((k) => {
+    if (k === HISTORY) return renderHistory();
+    if (k !== null) return;
+    stopTimer();
+    state = { ...fresh(), ...load<Partial<State>>(STORE, {}) };
+    render();
+    if (state.phase === 'running') startTimer();
+  });
 
   render();
   if (state.phase === 'running') startTimer();

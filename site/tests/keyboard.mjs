@@ -221,6 +221,31 @@ try {
     const key = await page.evaluate(() => JSON.parse(document.getElementById('exam-data').textContent).key);
     await tabUntil(focusIs, '[data-act=start]');
     await press('Enter');
+    // 시험 중: 사이드바·이전/다음의 정답·해설 링크는 숨고, 본문의 링크는 확인을 거친다.
+    const KEY_HREF = '/curriculum/m14-capstone-exam/mock-exam/answer-key/';
+    const guard = await page.evaluate((href) => {
+      const vis = (a) => a.getClientRects().length > 0 && getComputedStyle(a).visibility !== 'hidden';
+      const links = [...document.querySelectorAll(`a[href="${href}"]`)];
+      return {
+        sidebar: links.filter((a) => a.closest('nav.sidebar')).map(vis),
+        pager: links.filter((a) => a.closest('.pagination-links')).map(vis),
+        body: links.filter((a) => a.closest('.sl-markdown-content')).length,
+      };
+    }, KEY_HREF);
+    if (!guard.sidebar.length || guard.sidebar.some(Boolean)) problems.push(`시험 중 사이드바의 정답·해설 링크가 보임 ${JSON.stringify(guard)}`);
+    if (!guard.pager.length || guard.pager.some(Boolean)) problems.push(`시험 중 다음 페이지(정답·해설) 링크가 보임 ${JSON.stringify(guard)}`);
+    if (guard.body) {
+      await tabUntil(focusIs, `.sl-markdown-content a[href="${KEY_HREF}"]`, { back: true });
+      await press('Enter');
+      const asked = await page.waitForSelector('.guide-dialog[open]', { timeout: 2000 }).then(() => true, () => false);
+      if (!asked) problems.push('시험 중 본문의 정답·해설 링크: 확인 상자가 뜨지 않음');
+      else {
+        await press('Enter'); // 초점은 "열지 않기"
+        await page.waitForSelector('.guide-dialog', { state: 'detached' });
+      }
+      if (!page.url().endsWith('/mock-exam/questions/')) problems.push(`시험 중 정답·해설로 이동해 버림: ${page.url()}`);
+    }
+    await page.evaluate(() => document.activeElement?.blur());
     const plan = {};
     const flagged = [];
     for (let n = 1; n <= 65; n++) {
@@ -272,6 +297,15 @@ try {
     await page.waitForSelector('.exam-result:not([hidden])');
     const totalText = await page.textContent('.exam-total');
     const verdictText = await page.textContent('.exam-verdict');
+    // 제출이 끝나면 숨겼던 링크가 돌아온다
+    if (!(await page.evaluate(() => [...document.querySelectorAll('nav.sidebar a[href$="/mock-exam/answer-key/"], .pagination-links a[href$="/mock-exam/answer-key/"]')].every((a) => a.getClientRects().length > 0 || a.closest('details:not([open])')))))
+      problems.push('제출 뒤에도 정답·해설 링크가 숨어 있음');
+    // 지난 응시 기록: 이번 제출이 화면 결과와 같은 점수로 한 줄 쌓였다
+    const histRows = await page.$$eval('.exam-result [data-exam-history] tbody tr', (rs) => rs.map((r) => r.textContent));
+    const tm = /전체 (\d+)\/(\d+) = ([\d.]+)%/.exec(totalText);
+    if (histRows.length !== 1 || !histRows[0].includes(`${tm[1]}/${tm[2]} = ${tm[3]}%`)) problems.push(`응시 기록이 결과와 다름: ${JSON.stringify(histRows)} / ${totalText}`);
+    const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('guide:exam:m14-mock-exam:history') || 'null'));
+    if (stored?.records?.length !== 1 || stored.records[0].domains.length !== 4) problems.push(`응시 기록 저장값: ${JSON.stringify(stored)?.slice(0, 200)}`);
     console.log(`모의고사(키보드): ${totalText} / ${verdictText} / 표시 ${flagged.length}개`);
     // 검토: 첫 번째 틀린 문항을 키보드로 열어 해설이 보이는지
     await tabUntil(focusIs, '[data-filter=wrong]');
@@ -285,6 +319,15 @@ try {
     await press('Enter');
     await tabUntil(focusIs, '[data-act=export-sheet]');
     const [download] = await Promise.all([page.waitForEvent('download'), press('Enter')]);
+    // 응시 기록 지우기(확인 상자: 초점은 "취소" → Tab → "응시 기록 지우기" → Enter)
+    await tabUntil(focusIs, '.exam-result [data-act=clear-history]', { back: true });
+    await press('Enter');
+    await page.waitForSelector('.guide-dialog[open]');
+    await press('Tab');
+    await press('Enter');
+    await page.waitForSelector('.guide-dialog', { state: 'detached' });
+    const left = await page.$$eval('.exam-result [data-exam-history] tbody tr', (rs) => rs.length);
+    if (left !== 0) problems.push(`응시 기록 지우기 뒤 ${left}줄 남음`);
     const m = /전체 (\d+)\/(\d+) = ([\d.]+)%/.exec(totalText);
     const result = { totalOk: Number(m[1]), totalQ: Number(m[2]), pct: m[3], pass: verdictText.includes('통과') };
     if (out) {
@@ -292,7 +335,7 @@ try {
       await download.saveAs(path.join(out, 'keyboard-answers.txt'));
       fs.writeFileSync(path.join(out, 'keyboard-result.json'), JSON.stringify(result));
     }
-    done.push('모의고사 65문항(복수 응답·표시·무응답 포함) 제출·검토·내보내기');
+    done.push('모의고사 65문항(복수 응답·표시·무응답 포함) 제출·검토·내보내기, 시험 중 정답 링크 가림·확인, 응시 기록 쌓기·지우기');
   }
 } catch (e) {
   problems.push(`중단: ${e.message}`);

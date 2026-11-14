@@ -28,12 +28,14 @@ const SHOTS = [
   // M06 맞춤 위젯(element: 위젯 상자만 찍는다)
   { name: 'widget-sqs-timeline', path: '/curriculum/m06-integration-messaging/02-sqs/', element: '.vt', prepare: timelineMid },
   { name: 'widget-progress', path: '/curriculum/m06-integration-messaging/', element: '.pt-wrap', prepare: progressSome },
-  // 진행 추적(전 모듈 공용)·홈 요약·레슨 완료
+  // 진행 추적(전 모듈 공용)·홈 요약·레슨 완료·모의고사 기록
   { name: 'home-progress', path: '/', element: '.po-wrap', prepare: homeProgress },
   { name: 'widget-progress-m14', path: '/curriculum/m14-capstone-exam/', element: '.pt-wrap', prepare: m14Progress },
   { name: 'widget-progress-m12', path: '/curriculum/m12-resilience-dr-migration/', element: '.pt-wrap', prepare: async (p) => { await p.locator('.pt-wrap').scrollIntoViewIfNeeded(); await p.waitForSelector('.pt input[data-item]:not([disabled])'); } },
   { name: 'progress-reset-confirm', path: '/curriculum/m06-integration-messaging/', prepare: resetConfirm },
   { name: 'lesson-done', path: '/curriculum/m06-integration-messaging/02-sqs/', element: '.ld', prepare: lessonDone },
+  { name: 'exam-history-start', path: '/curriculum/m14-capstone-exam/mock-exam/questions/', element: '.exam-start', prepare: examHistory },
+  { name: 'exam-running-nav', path: '/curriculum/m14-capstone-exam/mock-exam/questions/', prepare: examRunningNav },
   { name: 'diagram-m02', path: '/curriculum/m02-vpc-networking/02-vpc-subnet-route-igw/', prepare: (p) => p.locator('.diagram').first().evaluate((e) => e.scrollIntoView({ block: 'start' })) },
 ];
 
@@ -54,6 +56,12 @@ async function progressSome(page) {
   for (const id of ['lesson:01-why-decoupling', 'lesson:02-sqs', 'lab:labs/lab01-sqs-basics.sh']) await page.check(`.pt input[data-item="${id}"]`);
 }
 
+const seedHistory = (page) =>
+  page.evaluate(() => {
+    const rec = (at, ok, pass, ms, auto = false) => ({ at, ok, total: 65, pct: ((100 * ok) / 65).toFixed(1), pass, blank: 0, domains: [{ domain: 'D1', ok: Math.round(ok * 0.31), total: 20 }, { domain: 'D2', ok: Math.round(ok * 0.26), total: 17 }, { domain: 'D3', ok: Math.round(ok * 0.23), total: 15 }, { domain: 'D4', ok: ok - Math.round(ok * 0.31) - Math.round(ok * 0.26) - Math.round(ok * 0.23), total: 13 }], elapsedMs: ms, auto });
+    localStorage.setItem('guide:exam:m14-mock-exam:history', JSON.stringify({ v: 1, records: [rec('2026-11-13T05:10:00Z', 51, true, 6_480_000), rec('2026-11-06T01:02:00Z', 44, false, 7_800_000, true)] }));
+  });
+
 async function homeProgress(page) {
   await page.evaluate(() => {
     localStorage.setItem('guide:progress:m00', JSON.stringify({ v: 1, done: { 'lesson:01-cloud-and-global-infrastructure': true, 'lesson:02-what-is-aws-emulator': true, quiz: true } }));
@@ -64,10 +72,11 @@ async function homeProgress(page) {
 }
 
 async function m14Progress(page) {
+  await seedHistory(page);
   await page.evaluate(() => localStorage.setItem('guide:progress:m14', JSON.stringify({ v: 1, done: { 'lesson:01-well-architected-review': true, 'exam:mock-exam': true } })));
   await page.reload({ waitUntil: 'networkidle' });
   await page.locator('.pt-wrap').scrollIntoViewIfNeeded();
-  await page.waitForSelector('.pt input[data-item]:not([disabled])');
+  await page.waitForSelector('.pt [data-exam-last]');
 }
 
 async function resetConfirm(page) {
@@ -80,6 +89,17 @@ async function lessonDone(page) {
   await page.locator('.ld').scrollIntoViewIfNeeded();
   await page.waitForSelector('.ld input:not([disabled])');
   await page.check('.ld input');
+}
+
+async function examHistory(page) {
+  await seedHistory(page);
+  await page.reload({ waitUntil: 'networkidle' });
+  await page.waitForSelector('.exam-start [data-exam-history] tbody tr');
+}
+
+async function examRunningNav(page) {
+  await page.click('[data-act=start]');
+  await page.evaluate(() => document.querySelector('.pagination-links')?.scrollIntoView({ block: 'end' }));
 }
 
 async function examResult(page) {
