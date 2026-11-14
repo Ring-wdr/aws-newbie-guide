@@ -51,7 +51,7 @@ function cacheVersion() {
         return '?';
       }
     };
-    versionTag = `mi${v('mermaid-isomorphic')}-pw${v('playwright')}-v9-${DOC_LANG}`;
+    versionTag = `mi${v('mermaid-isomorphic')}-pw${v('playwright')}-v10-${DOC_LANG}`;
   }
   return versionTag;
 }
@@ -61,6 +61,11 @@ function cacheVersion() {
 export const DOC_LANG = 'ko';
 const SET_LANG = `(() => { const set = () => { document.documentElement.lang = ${JSON.stringify(DOC_LANG)}; }; document.addEventListener('DOMContentLoaded', set); })();`;
 
+// 헤드리스 Chromium 은 Linux 에서 글자 폭을 힌팅해 정수 px 로 잰다(macOS 는 소수점). 그림 안 글자는 geometricPrecision 으로
+// 힌팅을 끄지만, Mermaid 가 그림 밖 임시 요소로 재는 글자(시퀀스 그림의 참여자·메시지 폭)도 같게 하려고 브라우저 전체의 힌팅을 끈다.
+// macOS 에서는 효과가 없다(원래 힌팅하지 않는다).
+const LAUNCH_ARGS = ['--font-render-hinting=none'];
+
 let renderer;
 async function getRenderer() {
   if (!renderer) {
@@ -69,7 +74,7 @@ async function getRenderer() {
     // 그리기 페이지마다 문서 언어를 사이트와 같게(init 스크립트). mermaid-isomorphic 은 browserType.launch → newContext → newPage 를 쓴다.
     const browserType = {
       async launch(opts) {
-        const browser = await chromium.launch(opts);
+        const browser = await chromium.launch({ ...opts, args: [...(opts?.args ?? []), ...LAUNCH_ARGS] });
         const newContext = browser.newContext.bind(browser);
         browser.newContext = async (o) => {
           const ctx = await newContext(o);
@@ -118,7 +123,7 @@ let active = 0;
 async function measurePageFor() {
   if (!browserPromise) {
     browserPromise = import('playwright').then(async ({ chromium }) => {
-      const browser = await chromium.launch();
+      const browser = await chromium.launch({ args: LAUNCH_ARGS });
       return { browser };
     });
   }

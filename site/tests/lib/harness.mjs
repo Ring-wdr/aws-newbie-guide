@@ -55,6 +55,7 @@ const TYPES = {
   '.ico': 'image/x-icon',
   '.txt': 'text/plain; charset=utf-8',
   '.wasm': 'application/wasm',
+  '.woff2': 'font/woff2', // 다이어그램 글꼴(src/plugins/diagram-font.mjs)
   '.pf_meta': 'application/octet-stream',
   '.pf_index': 'application/octet-stream',
   '.pf_fragment': 'application/octet-stream',
