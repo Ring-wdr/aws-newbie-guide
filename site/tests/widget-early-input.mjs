@@ -14,6 +14,7 @@ import { DIST, baseUrl, eachPage, offlineBrowser, pagesFromArgs, portFromArgs, s
 const port = portFromArgs(4321);
 const DELAY_MS = 1500;
 const MAX_TRIES = 4;
+const MAX_BUTTON_TRIES = 8;
 const SELFTEST_PAGE = '/curriculum/m06-integration-messaging/02-sqs/';
 
 const hasIsland = (p) => {
@@ -44,7 +45,7 @@ function controlsInPage() {
         if (seen.has(x.c.name)) continue;
         seen.add(x.c.name);
       }
-      out.push({ box: i, idx: x.idx, widget: box.dataset.widget || '?', kind: x.kind });
+      out.push({ box: i, idx: x.idx, widget: box.dataset.widget || "?", kind: x.kind, label: (x.c.textContent || "").trim().slice(0, 20) });
     }
     return out.length ? [out] : [];
   });
@@ -65,7 +66,7 @@ const snapshot = (page, box) =>
  *   'none'    — 누르지 않는다(처음 상태)   'after' — 붙은 뒤에 누른다(기준)   'early' — 스크립트를 늦춰 붙기 전에 누른다
  * @returns {{ state: string, pending: boolean|null }} pending: 키를 누른 순간 아직 붙기 전이었는가('early'만)
  */
-async function runOne(page, p, ctl, mode) {
+async function runOne(page, p, ctl, mode, presses = 1) {
   await page.unroute('**/*').catch(() => {});
   if (mode === 'early') {
     const html = fs.readFileSync(path.join(DIST, p, 'index.html'), 'utf8');
@@ -101,11 +102,19 @@ async function runOne(page, p, ctl, mode) {
   const focused = await page.evaluate(() => document.activeElement === window.__earlyTarget || (window.__earlyTarget.type === 'radio' && document.activeElement?.name === window.__earlyTarget.name));
   if (!focused) return { state: null, pending: null, why: 'Tab 으로 첫 조작 요소에 닿지 못함' };
   const pending = await page.evaluate((i) => !!document.querySelectorAll('.guide-widget')[i].querySelector('astro-island[ssr]'), ctl.box);
+  // 붙은 뒤 이 요소에 실제로 전달된 click 수(단추 다시 누르기가 꼭 한 번인지 본다)
+  await page.evaluate(() => {
+    window.__clicksAfter = 0;
+    const t = window.__earlyTarget;
+    t.addEventListener('click', () => { if (!t.closest('astro-island[ssr]')) window.__clicksAfter++; });
+  });
   if (mode === 'after' && pending) return { state: null, pending, why: '기준 측정: 붙은 뒤에 눌러야 하는데 아직 붙기 전이었다' };
   await page.keyboard.press(KEY[ctl.kind] || 'Enter');
+  // 두 번째부터는 같은 요소를 다시 누른다(초점이 옮겨 가도 같은 단추 — "다시 누르기가 두 번 적용된" 결함과 같은 꼴)
+  for (let k = 1; k < presses; k++) await page.evaluate(() => window.__earlyTarget.click());
   await hydrated();
   await page.waitForTimeout(300);
-  return { state: await snapshot(page, ctl.box), pending };
+  return { state: await snapshot(page, ctl.box), pending, clicks: await page.evaluate(() => window.__clicksAfter) };
 }
 
 async function run(pages, initScript) {
@@ -119,7 +128,7 @@ async function run(pages, initScript) {
       for (const cands of widgets) {
         // 위젯마다 후보를 차례로(최대 MAX_TRIES) 시험해, 붙은 위젯에서 눈에 띄는 효과가 있는 첫 조작으로 판정한다.
         let r = null;
-        for (const ctl of cands.slice(0, MAX_TRIES)) {
+        for (const ctl of cands.filter((c) => c.kind !== 'button').concat(cands.filter((c) => c.kind === 'button')).slice(0, MAX_TRIES)) {
           const name = `${p} [${ctl.widget}] ${ctl.kind} ${KEY[ctl.kind] || 'Enter'}`;
           const none = await runOne(page, p, ctl, 'none');
           const after = await runOne(page, p, ctl, 'after');
@@ -133,6 +142,23 @@ async function run(pages, initScript) {
           break;
         }
         results.push(r);
+        // 단추 다시 누르기가 "한 번만" 적용되는지: 효과가 있는 단추를 붙기 전에 한 번 눌러, 붙은 뒤 그 단추에 전달된 click 이
+        // 정확히 1번이고 결과가 "붙은 뒤 한 번 누른" 기준과 같은지 본다(두 번 눌러도 같은 결과인 단추에서도 두 번 눌림을 잡는다).
+        let b = null;
+        for (const ctl of cands.filter((c) => c.kind === 'button').slice(0, MAX_BUTTON_TRIES)) {
+          const name = `${p} [${ctl.widget}] 단추 한 번만 Enter(${ctl.label})`;
+          const none = await runOne(page, p, ctl, 'none');
+          const once = await runOne(page, p, ctl, 'after');
+          if (once.why || once.state === none.state) continue;
+          const early = await runOne(page, p, ctl, 'early');
+          if (early.why) b = { name, verdict: 'fail', why: early.why, button: true };
+          else if (!early.pending) b = { name, verdict: 'fail', why: '키를 누를 때 이미 붙어 있었다(늦추기가 듣지 않음)', button: true };
+          else if (early.clicks !== 1) b = { name, verdict: 'fail', why: `붙기 전에 누른 단추가 붙은 뒤 ${early.clicks}번 눌림(한 번이어야 한다)`, button: true };
+          else if (early.state === once.state) b = { name, verdict: 'pass', button: true };
+          else b = { name, verdict: 'fail', why: '붙기 전에 누른 단추의 결과가 기준과 다름', button: true };
+          break;
+        }
+        if (b) results.push(b);
       }
     }, 3);
   } finally {
@@ -147,6 +173,19 @@ const PLANT_NO_RECORD = () => {
     window.addEventListener(t, (e) => e.target instanceof Element && e.target.closest('.guide-widget astro-island[ssr]') && e.stopImmediatePropagation(), true);
 };
 
+// 심는 결함 ②: 붙기 전에 누른 단추를 붙은 뒤 한 번 더 누른다(받아 두기의 다시 누르기와 합쳐 두 번 적용).
+const PLANT_DOUBLE_CLICK = () => {
+  const pressed = new Map();
+  document.addEventListener('click', (e) => {
+    const island = e.target instanceof Element && e.target.closest('.guide-widget astro-island[ssr]');
+    const btn = island && e.target.closest('button');
+    if (btn) pressed.set(island, [...(pressed.get(island) ?? []), btn]);
+  }, true);
+  document.addEventListener('astro:hydrate', (e) => {
+    for (const btn of pressed.get(e.target) ?? []) setTimeout(() => btn.click(), 0);
+  }, true);
+};
+
 const server = await serve(port);
 let failed = false;
 try {
@@ -154,13 +193,22 @@ try {
   const caught = st.some((r) => r.verdict === 'fail' && r.why.startsWith('붙기 전에 누른 키'));
   console.log(`widget-early-input 자체 시험(받아 두기를 막은 페이지): ${caught ? "첫 키가 사라진 것을 잡음" : "놓침"} — ${st.map((r) => `${r.name}: ${r.verdict}`).join(", ")}`);
   if (!caught) failed = true;
+  const st2 = await run([SELFTEST_PAGE], PLANT_DOUBLE_CLICK);
+  const caught2 = st2.some((r) => r.button && r.verdict === 'fail' && /[02-9]번 눌림/.test(r.why));
+  console.log(`widget-early-input 자체 시험(단추를 두 번 적용하는 페이지): ${caught2 ? '두 번 눌림을 잡음' : '놓침'} — ${st2.filter((r) => r.button).map((r) => `${r.name}: ${r.verdict}`).join(', ') || '단추 판정 없음'}`);
+  if (!caught2) failed = true;
   const pages = pagesFromArgs({ withFiles: false }).filter(hasIsland);
   const res = await run(pages, null);
   const count = (v) => res.filter((r) => r.verdict === v).length;
-  console.log(`widget-early-input: 위젯 페이지 ${pages.length}쪽, 조작 요소가 켜진 위젯 ${res.length}개 — 반영 ${count('pass')}, 효과 없음(판정 안 함) ${count('no-effect')}, 실패 ${count('fail')} (위젯 스크립트 ${DELAY_MS}ms 늦춤)`);
+  console.log(`widget-early-input: 위젯 페이지 ${pages.length}쪽, 조작 요소가 켜진 위젯 ${res.filter((r) => !r.button).length}개 — 반영 ${res.filter((r) => !r.button && r.verdict === 'pass').length}, 효과 없음(판정 안 함) ${count('no-effect')}, 실패 ${count('fail')} (위젯 스크립트 ${DELAY_MS}ms 늦춤)`);
   for (const r of res) if (r.verdict !== 'pass') console.log(`  ${r.verdict === 'fail' ? '✖' : '·'} ${r.name}${r.why ? ` — ${r.why}` : ' — 효과 없음'}`);
   if (count('fail')) failed = true;
-  if (pages.includes(SELFTEST_PAGE) && !res.some((r) => r.name.startsWith(SELFTEST_PAGE) && r.verdict === 'pass')) {
+  console.log(`widget-early-input(단추 한 번만): 판정한 위젯 ${res.filter((r) => r.button).length}개 — 반영 ${res.filter((r) => r.button && r.verdict === 'pass').length}`);
+  if (pages.includes(SELFTEST_PAGE) && !res.some((r) => r.name.startsWith(SELFTEST_PAGE) && r.button && r.verdict === 'pass')) {
+    console.log(`  ✖ ${SELFTEST_PAGE}: M06 위젯의 단추 한 번만 적용이 판정되지 않았다(대표 사례)`);
+    failed = true;
+  }
+  if (pages.includes(SELFTEST_PAGE) && !res.some((r) => r.name.startsWith(SELFTEST_PAGE) && !r.button && r.verdict === 'pass')) {
     console.log(`  ✖ ${SELFTEST_PAGE}: M06 위젯이 판정되지 않았다(대표 사례)`);
     failed = true;
   }
