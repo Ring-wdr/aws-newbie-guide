@@ -1,0 +1,135 @@
+---
+// M10 레슨 1 — CloudWatch 알람 상태 평가기(설명용 모형).
+// 수치·문구는 빌드 때 원고(curriculum/m10-monitoring-iac/01-cloudwatch-metrics-alarms.md)에서 읽는다(facts.mjs). 읽지 못하면 빌드가 실패한다.
+import fs from 'node:fs';
+import path from 'node:path';
+import { REPO_ROOT } from '../../../lib/repo.mjs';
+import { readAlarmFacts, LESSON } from './facts.mjs';
+import Evaluator from './Evaluator.jsx';
+
+const facts = readAlarmFacts(fs.readFileSync(path.join(REPO_ROOT, LESSON), 'utf8'));
+---
+
+<Evaluator client:visible facts={facts} />
+
+<style is:global>
+  .cwa {
+    margin: 1.5rem 0;
+    padding: 1rem;
+    border: 1px solid var(--guide-border);
+    border-left: 4px solid var(--sl-color-accent);
+    border-radius: var(--guide-radius);
+    background: var(--guide-surface);
+    font-size: 0.9375rem;
+    overflow-wrap: anywhere;
+  }
+  .cwa :is(p, ul, fieldset, figure, details, table, ol) { margin: 0; }
+  .cwa > * + * { margin-top: 0.85rem; }
+  .cwa-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+  .cwa-head h4 { margin: 0; font-size: 1.05rem; }
+  .cwa-model {
+    display: inline-block;
+    padding: 0 0.5rem;
+    border: 1px dashed currentColor;
+    border-radius: 999px;
+    font-size: 0.8125rem;
+    font-weight: 700;
+    color: var(--guide-y-fg);
+    background: var(--guide-y-bg);
+  }
+  .cwa-intro, .cwa-hint, .cwa small, .cwa-legend { color: var(--guide-muted); }
+  .cwa small { display: block; font-size: 0.8125rem; line-height: 1.5; }
+  .cwa fieldset { border: 0; padding: 0; min-width: 0; }
+  .cwa legend { font-weight: 700; padding: 0; margin-bottom: 0.3rem; }
+  .cwa-row { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+  .cwa-hint { margin-top: 0.35rem !important; font-size: 0.8125rem; }
+  .cwa button {
+    font: inherit;
+    font-size: 0.875rem;
+    padding: 0.3rem 0.8rem;
+    min-height: 2.25rem;
+    border-radius: 0.4rem;
+    border: 1px solid var(--guide-border);
+    background: var(--guide-surface-2);
+    color: var(--sl-color-text);
+    cursor: pointer;
+    text-align: left;
+  }
+  .cwa button:hover:not(:disabled) { border-color: var(--sl-color-accent); }
+  .cwa button:disabled { opacity: 0.55; cursor: not-allowed; }
+  .cwa button[aria-pressed='true'] { border-color: var(--sl-color-accent); box-shadow: inset 0 0 0 1px var(--sl-color-accent); font-weight: 700; }
+  .cwa button[aria-pressed='true']::before { content: '✓ '; }
+  .cwa :is(button, input, select):focus-visible { outline: 2px solid var(--sl-color-accent); outline-offset: 2px; }
+  .cwa-controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 0.85rem 1.25rem; }
+  .cwa-field { display: flex; flex-direction: column; gap: 0.25rem; min-width: 0; }
+  .cwa-field > span { font-weight: 700; }
+  .cwa :is(input[type='number'], input[type='text'], select) {
+    font: inherit;
+    width: 100%;
+    max-width: 22rem;
+    padding: 0.3rem 0.5rem;
+    border: 1px solid var(--guide-border);
+    border-radius: 0.4rem;
+    background: var(--sl-color-bg);
+    color: var(--sl-color-text);
+  }
+  .cwa input[type='number'] { max-width: 12rem; }
+  .cwa-radios { grid-column: 1 / -1; }
+  .cwa-radios label { display: flex; gap: 0.4rem; align-items: baseline; }
+  .cwa-data { display: flex; flex-direction: column; gap: 0.5rem; }
+  .cwa-data input[type='text'] { max-width: 100%; }
+  .cwa-result {
+    padding: 0.6rem 0.75rem;
+    border: 1px solid var(--guide-border);
+    border-radius: var(--guide-radius);
+    background: var(--sl-color-bg);
+  }
+  .cwa-badge {
+    display: inline-block;
+    padding: 0 0.45rem;
+    border: 1px solid;
+    border-radius: 0.3rem;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+  .cwa-badge[data-state='OK'] { color: var(--guide-g-fg); background: var(--guide-g-bg); border-color: var(--guide-g-bd); }
+  .cwa-badge[data-state='ALARM'] { color: var(--guide-r-fg); background: var(--guide-r-bg); border-color: var(--guide-r-bd); }
+  .cwa-badge[data-state='INSUFFICIENT_DATA'] { color: var(--guide-y-fg); background: var(--guide-y-bg); border-color: var(--guide-y-bd); border-style: dashed; }
+  .cwa-small { font-size: 0.75rem; white-space: normal; }
+  .cwa-at input[type='range'] { width: 100%; max-width: 22rem; accent-color: var(--sl-color-accent); }
+  .cwa-now { margin-top: 0.4rem !important; }
+  .cwa-tiles {
+    list-style: none;
+    padding: 0 !important;
+    margin-top: 0.6rem !important;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(4.6rem, 1fr));
+    gap: 0.4rem;
+  }
+  .cwa-tile {
+    margin: 0 !important;
+    padding: 0.3rem 0.35rem;
+    border: 2px solid var(--guide-border);
+    border-radius: 0.4rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    font-size: 0.8125rem;
+    background: var(--sl-color-bg);
+  }
+  .cwa-tile.cwa-in { border-style: dashed; border-color: var(--sl-color-accent); background: var(--sl-color-accent-low); }
+  .cwa-tile.cwa-cur { border-style: solid; }
+  .cwa-t { color: var(--guide-muted); font-size: 0.75rem; }
+  .cwa-tile.cwa-in .cwa-t { color: var(--sl-color-text); font-weight: 700; }
+  .cwa-v { font-weight: 700; }
+  .cwa-legend { font-size: 0.8125rem; margin-top: 0.4rem !important; }
+  .cwa details > summary { cursor: pointer; font-weight: 700; width: fit-content; }
+  .cwa-table-scroll { overflow-x: auto; margin-top: 0.5rem; }
+  .cwa-table { width: 100%; border-collapse: collapse; font-size: 0.8125rem; display: table; }
+  .cwa-table :is(th, td) { border: 1px solid var(--guide-border); padding: 0.3rem 0.45rem; text-align: left; vertical-align: top; }
+  .cwa-table tr[aria-current='step'] { background: var(--sl-color-accent-low); font-weight: 700; }
+  .cwa-assume ul { margin-top: 0.4rem !important; padding-left: 1.2rem; }
+  @media (prefers-reduced-motion: reduce) {
+    .cwa * { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
+  }
+</style>
