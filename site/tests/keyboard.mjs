@@ -11,11 +11,11 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { EXAM_PAGE, SITE_DIR, isQuizPage, offlineBrowser, pagesFromArgs, portFromArgs, serve } from './lib/harness.mjs';
+import { EXAM_PAGE, SITE_DIR, isQuizPage, offlineBrowser, pagesFromArgs, portFromArgs, serve, baseUrl, withBase } from './lib/harness.mjs';
 import { discoverWidgetChecks, runWidgetChecks } from './lib/widget-checks.mjs';
 
 const port = portFromArgs(4321);
-const base = `http://127.0.0.1:${port}`;
+const base = baseUrl(port); // 하위 경로(base)로 빌드한 산출물이면 그 경로까지
 const outIdx = process.argv.indexOf('--out');
 const out = outIdx >= 0 ? path.resolve(process.argv[outIdx + 1]) : null;
 const problems = [];
@@ -195,7 +195,7 @@ try {
     await tabUntil(focusIs, '.ld input');
     await press('Space');
     if ((await page.isChecked('.ld input')) === before) problems.push('이 레슨 완료: Space로 바뀌지 않음');
-    const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('guide:progress:m06') || '{}'));
+    const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('aws-newbie-guide:progress:m06') || '{}'));
     if (Boolean(stored.done?.['lesson:02-sqs']) === before) problems.push(`이 레슨 완료: 저장값이 진행 추적과 같은 키에 없음 ${JSON.stringify(stored)}`);
     if (!before && leftDone[M06_PAGE] !== undefined) leftDone[M06_PAGE] += 1;
     done.push('이 레슨 완료(M06 레슨 2)');
@@ -215,6 +215,21 @@ try {
     await page.evaluate(() => document.activeElement?.blur());
     await tabUntil(focusIs, '.po a.po-name');
     done.push('홈 전체 진행 요약');
+    // 예전 접두사(guide:)의 키 옮기기: 이 사이트가 만든 꼴은 새 키로 옮겨 홈 요약에 보이고, 다른 guide:* 키는 그대로 남는다
+    await page.evaluate(() => {
+      localStorage.clear();
+      localStorage.setItem('guide:progress:m13', JSON.stringify({ v: 1, done: { 'lesson:01-billing-and-data-transfer': true, quiz: true } }));
+      localStorage.setItem('guide:other-site', '"x"');
+    });
+    await page.reload({ waitUntil: 'networkidle' });
+    await page.locator('.po').evaluate((e) => e.scrollIntoView());
+    await page.waitForFunction(() => document.querySelector('.guide-widget[data-widget="progress-overview"] astro-island:not([ssr])') !== null);
+    const mig = await page.evaluate(() => ({ keys: Object.keys(localStorage).sort(), count: document.querySelector('.po li[data-module="m13"] .po-count')?.textContent.trim() }));
+    const wantKeys = ['aws-newbie-guide:progress:m13', 'guide:other-site'];
+    if (JSON.stringify(mig.keys.filter((k) => k !== 'aws-newbie-guide:theme')) !== JSON.stringify(wantKeys) || !mig.count?.startsWith('2/'))
+      problems.push(`예전 키 옮기기: 기대 키 ${JSON.stringify(wantKeys)}·M13 2개 완료, 실제 ${JSON.stringify(mig)}`);
+    await page.evaluate(() => localStorage.clear());
+    done.push('예전 저장 키 옮기기');
   }
 
   if (pages.includes(EXAM_PAGE)) {
@@ -226,7 +241,7 @@ try {
     await tabUntil(focusIs, '[data-act=start]');
     await press('Enter');
     // 시험 중: 사이드바·이전/다음의 정답·해설 링크는 숨고, 본문의 링크는 확인을 거친다.
-    const KEY_HREF = '/curriculum/m14-capstone-exam/mock-exam/answer-key/';
+    const KEY_HREF = withBase('/curriculum/m14-capstone-exam/mock-exam/answer-key/'); // 본문 링크의 href 는 base 를 붙여 나온다
     const guard = await page.evaluate((href) => {
       const vis = (a) => a.getClientRects().length > 0 && getComputedStyle(a).visibility !== 'hidden';
       const links = [...document.querySelectorAll(`a[href="${href}"]`)];
@@ -308,7 +323,7 @@ try {
     const histRows = await page.$$eval('.exam-result [data-exam-history] tbody tr', (rs) => rs.map((r) => r.textContent));
     const tm = /전체 (\d+)\/(\d+) = ([\d.]+)%/.exec(totalText);
     if (histRows.length !== 1 || !histRows[0].includes(`${tm[1]}/${tm[2]} = ${tm[3]}%`)) problems.push(`응시 기록이 결과와 다름: ${JSON.stringify(histRows)} / ${totalText}`);
-    const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('guide:exam:m14-mock-exam:history') || 'null'));
+    const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('aws-newbie-guide:exam:m14-mock-exam:history') || 'null'));
     if (stored?.records?.length !== 1 || stored.records[0].domains.length !== 4) problems.push(`응시 기록 저장값: ${JSON.stringify(stored)?.slice(0, 200)}`);
     console.log(`모의고사(키보드): ${totalText} / ${verdictText} / 표시 ${flagged.length}개`);
     // 검토: 첫 번째 틀린 문항을 키보드로 열어 해설이 보이는지

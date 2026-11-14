@@ -4,11 +4,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { REPO_ROOT, routeForRepoPath, fileViewRoute, readTitle } from '../lib/repo.mjs';
 import { readModuleItems, countQuizQuestions, storageKey } from './progress.mjs';
+import { withBase } from '../lib/base.mjs';
 
 export const TRACKER_MARK = /^<!--\s*widget:\s*progress-tracker\s*-->\s*$/m;
 
 const read = (rel) => fs.readFileSync(path.join(REPO_ROOT, rel), 'utf8');
-const hrefFor = (file) => (file.endsWith('.md') ? routeForRepoPath(file) : fileViewRoute(file));
+// 링크 주소(href)에는 base 접두어를 붙이고, 저장 키에 쓰는 quizRoute 는 base 와 무관한 사이트 경로로 둔다.
+const hrefFor = (file) => withBase(file.endsWith('.md') ? routeForRepoPath(file) : fileViewRoute(file));
 
 /** 모듈 하나("m06-integration-messaging")의 추적 정보. */
 export function moduleProgress(modDir) {
@@ -27,7 +29,7 @@ export function moduleProgress(modDir) {
     modDir,
     code: mod.toUpperCase(),
     title: readTitle(`${dir}/README.md`).replace(/^M\d\d\.\s*/, ''),
-    href: routeForRepoPath(`${dir}/README.md`),
+    href: withBase(routeForRepoPath(`${dir}/README.md`)),
     key: storageKey(mod),
     quizRoute: routeForRepoPath(quizRel),
     quizTotal: quizQuestions ?? 0,

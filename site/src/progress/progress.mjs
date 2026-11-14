@@ -2,7 +2,7 @@
 // 단위 시험: progress.test.mjs. 항목 목록은 원고(모듈 README의 "## 레슨"·"## 실습" 표, quiz.md)에서 빌드 때 읽는다.
 // 사이트 쪽에 사본을 두지 않는다. 원고를 읽는 쪽은 catalog.mjs.
 
-/** 모듈 하나의 저장 키. storage.ts가 앞에 "guide:"를 붙인다 → localStorage "guide:progress:m06"(P1의 M06 값과 같다). */
+/** 모듈 하나의 저장 키. storage.ts가 앞에 "aws-newbie-guide:"를 붙인다 → localStorage "aws-newbie-guide:progress:m06"(예전 "guide:progress:m06"은 처음 한 번 옮긴다 — lib/storage-keys.mjs). */
 export const storageKey = (mod) => `progress:${mod}`;
 export const STORAGE_KEY = storageKey('m06'); // P1 호환(M06)
 export const QUIZ_STATE_KEY = (quizRoute) => `quiz:${quizRoute.replace(/\/+$/, '')}`; // guide-client.ts의 퀴즈 저장 키와 같은 규칙

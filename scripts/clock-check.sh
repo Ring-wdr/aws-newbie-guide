@@ -134,7 +134,10 @@ stability() {
               맥 시계와 VM 의 NTP(systemd-timesyncd) 시각이 0.5초 넘게 달라, Colima 게스트 에이전트(10초마다 맥 시각으로)와
               timesyncd(NTP 시각으로)가 VM 시계를 번갈아 옮기고 있습니다(0.5초 미만의 작은 보정은 세지 않습니다). 서명(15분 허용)에는 문제가 없지만, 그 순간
               에뮬레이터는 막 만든 리소스를 "아직 준비 안 됨"으로 볼 수 있습니다 — 예: Kinesis 스트림 ACTIVE → CREATING,
-              DynamoDB 테이블 ACTIVE 직후 PutItem 의 ResourceNotFoundException. 그 실패는 다시 실행하면 대개 통과합니다.
+              DynamoDB 테이블 ACTIVE 직후 PutItem 의 ResourceNotFoundException. VM 시계가 뒤로 옮겨질 때 관찰된 일시 실패도 있습니다(원인은 확인하지 않음):
+              Kinesis 의 ExpiredIteratorException("iterator created at … but now is …"의 생성 시각이 현재보다 뒤),
+              DynamoDB 백업이 AVAILABLE 이 된 직후 복원의 BackupInUseException("Backup is being created").
+              그 실패는 다시 실행하면 대개 통과합니다.
               VM 이 맥 시계만 따르게 하면 멈춥니다 (VM·에뮬레이터·만든 리소스는 그대로. 다음 VM 재시작 때 원래대로 돌아감):
                 colima ssh -- sudo systemctl stop systemd-timesyncd
               되돌리기:  colima ssh -- sudo systemctl start systemd-timesyncd

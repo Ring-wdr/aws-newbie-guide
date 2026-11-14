@@ -3,8 +3,10 @@
 import { ko } from '../i18n/ko.mjs';
 import { load, save, remove, mountStoragePanels, onStorageChange } from './storage';
 import { installExamGuard } from './exam-guard';
+import { siteRoute } from './base';
 
-const pageKey = location.pathname.replace(/\/+$/, '') || '/';
+// 저장 키는 base 를 뺀 사이트 경로로 만든다(하위 경로 배포에서도 로컬과 같은 키 — progress.mjs QUIZ_STATE_KEY 와 같은 규칙).
+const pageKey = siteRoute(location.pathname).replace(/\/+$/, '') || '/';
 
 /* ---------- 명령 복사 ---------- */
 let live: HTMLElement | null = null;
@@ -328,34 +330,86 @@ function initTables() {
   );
 }
 
-/* ---------- 맞춤 위젯이 붙기 전의 입력 막기 ---------- */
-// 위젯(Preact 아일랜드)은 화면에 보일 때 스크립트가 붙는다(client:visible). 붙기 전(서버가 그린 상태 — astro-island[ssr])에
-// 입력하면 값은 화면에 남지만 위젯 상태에는 들어가지 않아 결과가 갱신되지 않는다(초점 직후 수십 ms 사이에 재현됨).
-// 그래서 붙기 전에는 위젯 안 입력 요소의 값을 바꾸는 입력(글자·화살표·Space·Enter·누르기·붙여넣기)을 받지 않는다.
-// Tab 이동은 그대로 둔다. 붙으면 astro-island 의 ssr 속성이 사라져 막힘도 풀린다. 페이지가 열리자마자 건다(DOMContentLoaded 전).
+/* ---------- 맞춤 위젯이 붙기 전의 입력을 붙은 뒤에 넘겨주기 ---------- */
+// 위젯(Preact 아일랜드)은 화면에 보일 때 스크립트가 붙는다(client:visible). Tab 으로 들어가면 그제야 화면에 들어와 붙기 시작하므로,
+// 초점 직후 수십 ms(느린 기기·느린 네트워크에서는 더 길게) 동안은 서버가 그린 상태(astro-island[ssr])다. 그 사이의 입력은
+// 브라우저가 화면 요소에는 반영하지만(숫자 칸의 값, 체크 상자·라디오) 위젯 상태에는 들어가지 않고, 단추 누르기는 처리할 곳이 없다.
+// 예전에는 그 입력을 막았는데(조용히 버려짐) 지금은 받아 두었다가, 위젯이 붙는 순간(astro:hydrate — Preact 는 붙을 때 화면 요소의
+// 값·체크를 덮어쓰지 않는다) 순서대로 넘겨준다:
+//   - 값이 바뀐 입력 요소(숫자·글자·범위 칸, select, 체크 상자, 선택된 라디오): input/change 이벤트를 다시 보내 위젯이 화면 값을 읽게 한다.
+//     지금 값이 처음(서버가 그린) 값과 같으면 보내지 않는다(두 번 바꿔 제자리면 그대로).
+//   - 단추(button, [role=button])를 누른 것: 붙은 뒤 click() 을 다시 한다.
+// 페이지가 열리자마자 건다(DOMContentLoaded 전). 검사: tests/widget-early-input.mjs(keyboard 관문, 스크립트를 일부러 늦춰 확인).
 const HYDRATION_PENDING = '.guide-widget astro-island[ssr]';
-const CONTROL = 'input, select, textarea, button, label, summary, [role=button], [role=radio], [role=checkbox], [role=slider], [role=spinbutton], [contenteditable]';
-const PASS_KEYS = new Set(['Tab', 'Shift', 'Escape', 'Alt', 'Control', 'Meta']);
-function initHydrationGuard() {
-  const pending = (t: EventTarget | null) => t instanceof Element && t.closest(HYDRATION_PENDING) !== null && t.closest(CONTROL) !== null;
-  for (const type of ['beforeinput', 'keydown', 'click', 'paste', 'drop'] as const) {
+const EARLY_VALUE = 'input, select, textarea';
+const EARLY_BUTTON = 'button, [role=button]';
+function initEarlyInput() {
+  const queues = new Map<Element, Element[]>();
+  const islandOf = (t: EventTarget | null) => (t instanceof Element ? t.closest(HYDRATION_PENDING) : null);
+  const note = (island: Element, el: Element) => {
+    const q = queues.get(island) ?? [];
+    const at = q.indexOf(el);
+    if (at >= 0 && !el.matches(EARLY_BUTTON)) q.splice(at, 1); // 값은 마지막 상태만, 단추는 누른 횟수만큼
+    q.push(el);
+    queues.set(island, q);
+  };
+  document.addEventListener(
+    'click',
+    (ev) => {
+      const island = islandOf(ev.target);
+      const btn = island && (ev.target as Element).closest(EARLY_BUTTON);
+      if (island && btn && island.contains(btn) && !(btn as HTMLButtonElement).disabled) note(island, btn);
+    },
+    true,
+  );
+  for (const type of ['input', 'change']) {
     document.addEventListener(
       type,
       (ev) => {
-        if (!pending(ev.target)) return;
-        if (ev instanceof KeyboardEvent && PASS_KEYS.has(ev.key)) return;
-        ev.preventDefault();
+        const island = islandOf(ev.target);
+        if (island && (ev.target as Element).matches(EARLY_VALUE)) note(island, ev.target as Element);
       },
       true,
     );
   }
+  const changed = (el: Element): boolean => {
+    if (el instanceof HTMLInputElement) {
+      if (el.type === 'radio') return el.checked && !el.defaultChecked;
+      if (el.type === 'checkbox') return el.checked !== el.defaultChecked;
+      return el.value !== el.defaultValue;
+    }
+    if (el instanceof HTMLSelectElement) return [...el.options].some((o) => o.selected !== o.defaultSelected);
+    if (el instanceof HTMLTextAreaElement) return el.value !== el.defaultValue;
+    return false;
+  };
+  // astro:hydrate 는 버블링하지 않으므로 캡처 단계에서 받는다(Astro 가 ssr 속성을 지운 직후에 보낸다).
+  document.addEventListener(
+    'astro:hydrate',
+    (ev) => {
+      const island = ev.target as Element;
+      const q = queues.get(island);
+      if (!q) return;
+      queues.delete(island);
+      for (const el of q) {
+        if (!el.isConnected) continue;
+        if (el.matches(EARLY_BUTTON)) {
+          if (!(el as HTMLButtonElement).disabled) (el as HTMLElement).click();
+        } else if (changed(el)) {
+          const toggle = el instanceof HTMLInputElement && (el.type === 'checkbox' || el.type === 'radio');
+          if (!toggle && !(el instanceof HTMLSelectElement)) el.dispatchEvent(new Event('input', { bubbles: true }));
+          el.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+      }
+    },
+    true,
+  );
 }
-initHydrationGuard();
+initEarlyInput();
 
 // 붙기 전 상태를 aria-busy 로 표시하지 않는다. client:visible 위젯은 화면에 들어올 때까지 붙지 않으므로, 빠르게 지나치거나
 // (맨 끝으로 바로 이동) 화면에 머물지 않은 위젯은 busy 가 끝까지 남았고(전 위젯 페이지 101쪽 중 29곳), 화면 낭독기는 busy 영역을
 // 건너뛸 수 있어 서버가 그린 내용(진행 목록·처음 계산 결과)까지 가려졌다. 서버가 그린 내용은 그대로 읽을 수 있는 정상 내용이고,
-// 붙기 전 입력은 위의 막기가 받지 않으므로 busy 표시 없이 둔다. 검사: tests/widget-busy.mjs(sitecheck a11y 관문).
+// 붙기 전 입력은 위의 받아 두기가 붙은 뒤에 넘겨주므로 busy 표시 없이 둔다. 검사: tests/widget-busy.mjs(sitecheck a11y 관문).
 
 /* ---------- 좁은 화면 목차의 "지금 읽는 곳" 표시에도 등급 라벨 ---------- */
 // Starlight 는 현재 절 링크의 textContent 를 .display-current 에 그대로 넣어 등급 라벨(생성 콘텐츠·role=img)이 빠진다.

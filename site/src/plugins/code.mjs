@@ -5,6 +5,7 @@
 // 2) ```mermaid 블록 → 빌드 시점 SVG(라이트·다크) + 원문 텍스트. 다른 코드 블록 안에 실린 Mermaid 텍스트는
 //    그 블록의 일부(출력)일 뿐이므로 건드리지 않는다(마크다운 파서가 바깥 블록 하나로 읽는다).
 import { ko } from '../i18n/ko.mjs';
+import { withBase } from '../lib/base.mjs';
 import { box, html, esc, isComment, eachParent } from './util.mjs';
 
 const SHELL_LIKE = new Set(['sh', 'shell', 'zsh', 'console', 'shell-session']);
@@ -91,8 +92,8 @@ export function mermaidHtml(source, rendered, ids, narrow = null) {
   const open =
     Math.ceil(rendered.light.width) > 640
       ? `<p class="diagram-open">` +
-        `<a class="diagram-open-light" href="/diagrams/${ids.light}.svg" target="_blank" rel="noopener">${esc(ko.diagram.openFull)}</a>` +
-        `<a class="diagram-open-dark" href="/diagrams/${ids.dark}.svg" target="_blank" rel="noopener">${esc(ko.diagram.openFull)}</a>` +
+        `<a class="diagram-open-light" href="${withBase(`/diagrams/${ids.light}.svg`)}" target="_blank" rel="noopener">${esc(ko.diagram.openFull)}</a>` +
+        `<a class="diagram-open-dark" href="${withBase(`/diagrams/${ids.dark}.svg`)}" target="_blank" rel="noopener">${esc(ko.diagram.openFull)}</a>` +
         `</p>`
       : '';
   // 좁은 화면용 TB 배치(있을 때만). 클래스를 diagram-n-* 로 따로 두어 넓은 그림의 순번·검사와 섞이지 않게 한다.

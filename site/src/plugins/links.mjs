@@ -1,6 +1,7 @@
 // 상대 링크 재작성: 다른 원고(.md) → 사이트 경로, lab·sdk 등 그 밖의 파일 → 소스 보기 페이지.
 import { visit } from 'unist-util-visit';
 import { resolveLink } from '../lib/links.mjs';
+import { withBase } from '../lib/base.mjs';
 
 export function transformLinks(tree, ctx) {
   const { rep, rel } = ctx;
@@ -20,7 +21,7 @@ export function transformLinks(tree, ctx) {
       case 'unbuilt':
         rep.handled('links');
         if (r.kind === 'file' || r.kind === 'dir') ctx.linkedFiles.add(r.target);
-        node.url = r.href;
+        node.url = withBase(r.href); // 하위 경로 배포(GUIDE_BASE)면 접두어를 붙인다 — lib/base.mjs
         return;
       case 'outside':
         rep.unrecognised('links', `저장소 밖을 가리키는 링크: ${node.url}`, node);

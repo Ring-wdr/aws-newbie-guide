@@ -13,12 +13,12 @@
 // 사용: node tests/tables.mjs --port <포트> [--pages pilot|all|/a/,/b/] [--fail] [--json <파일>]
 //   --fail: 칸 넘침·스크롤 표시 문제·알려진 목록과의 차이가 있으면 종료 코드 1
 import fs from 'node:fs';
-import { offlineBrowser, pagesFromArgs, portFromArgs, serve } from './lib/harness.mjs';
+import { offlineBrowser, pagesFromArgs, portFromArgs, serve, baseUrl } from './lib/harness.mjs';
 
 const KNOWN_FILE = new URL('./tables-known.json', import.meta.url);
 const KNOWN = JSON.parse(fs.readFileSync(KNOWN_FILE, 'utf8')).known;
 const port = portFromArgs(4321);
-const base = `http://127.0.0.1:${port}`;
+const base = baseUrl(port); // 하위 경로(base)로 빌드한 산출물이면 그 경로까지
 const pages = pagesFromArgs({ withFiles: false });
 const jsonIdx = process.argv.indexOf('--json');
 const WIDTHS = [1280, 360];

@@ -8,7 +8,7 @@
 export const STALE_AFTER_MS = 24 * 60 * 60 * 1000;
 
 /**
- * @param {unknown} s 저장값(guide:exam:m14-mock-exam)
+ * @param {unknown} s 저장값(aws-newbie-guide:exam:m14-mock-exam)
  * @param {number} now Date.now()
  * @returns {'idle' | 'running' | 'stale' | 'submitted'}
  */
