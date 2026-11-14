@@ -6,6 +6,7 @@
 // 결과: --out 폴더에 keyboard-answers.txt(시험 모드가 내보낸 답안), keyboard-result.json(화면의 채점 결과).
 // 사용: node tests/keyboard.mjs --port <포트> --out <폴더> [--pages pilot|all|/a/,/b/]
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { EXAM_PAGE, isQuizPage, offlineBrowser, pagesFromArgs, portFromArgs, serve } from './lib/harness.mjs';
 
@@ -112,33 +113,104 @@ try {
     done.push('M06 위젯: 가시성 타임아웃 타임라인');
   }
 
-  if (pages.includes(M06_PAGE)) {
-    /* ---------------- M06 위젯: 진행 추적 ---------------- */
-    await page.goto(`${base}/curriculum/m06-integration-messaging/`, { waitUntil: 'networkidle' });
-    await page.evaluate(() => localStorage.clear());
-    await page.reload({ waitUntil: 'networkidle' });
+  /* ---------------- 진행 추적(전 모듈 공용): 대상의 모듈 첫 페이지마다 표시·새로 고침 뒤 유지·해제 ---------------- */
+  const modulePages = pages.filter((p) => /^\/curriculum\/m\d\d-[^/]+\/$/.test(p));
+  const leftDone = {}; // 모듈별로 남겨 둔 완료 수(홈 요약 대조용)
+  const openTracker = async (mp) => {
+    await page.goto(`${base}${mp}`, { waitUntil: 'networkidle' });
     await page.locator('.pt').evaluate((e) => e.scrollIntoView());
     await page.waitForSelector('.pt input[data-item]:not([disabled])');
+  };
+  const ptText = () => page.textContent('.pt [data-progress-text]');
+  if (modulePages.length) {
+    await page.goto(`${base}${modulePages[0]}`, { waitUntil: 'networkidle' });
+    await page.evaluate(() => localStorage.clear());
+  }
+  for (const mp of modulePages) {
+    await openTracker(mp);
+    const ids = await page.$$eval('.pt input[data-item]', (is) => is.map((i) => i.dataset.item));
+    const want = [ids.find((i) => i.startsWith('lesson:')), ids.find((i) => i.startsWith('lab:')), ids.at(-1)];
     await page.evaluate(() => document.activeElement?.blur());
-    for (const id of ['lesson:02-sqs', 'lab:labs/lab02-sqs-dlq-redrive.sh', 'quiz']) {
+    for (const id of want) {
       await tabUntil(focusIs, `.pt input[data-item="${id}"]`);
       await press('Space');
     }
-    let pt = await page.textContent('.pt [data-progress-text]');
-    if (!pt.includes('3항목 완료')) problems.push(`진행 추적: 3항목 완료가 아님 "${pt}"`);
-    await page.reload({ waitUntil: 'networkidle' });
-    await page.locator('.pt').evaluate((e) => e.scrollIntoView());
-    await page.waitForSelector('.pt input[data-item]:not([disabled])');
-    pt = await page.textContent('.pt [data-progress-text]');
-    if (!pt.includes('3항목 완료')) problems.push(`진행 추적: 새로 고친 뒤 저장이 유지되지 않음 "${pt}"`);
-    await tabUntil(focusIs, '.pt input[data-item="quiz"]');
+    let pt = await ptText();
+    if (!pt.includes(`${ids.length}항목 중 3항목 완료`)) problems.push(`${mp} 진행 추적: 3항목 완료가 아님 "${pt}"`);
+    await openTracker(mp);
+    pt = await ptText();
+    if (!pt.includes('3항목 완료')) problems.push(`${mp} 진행 추적: 새로 고친 뒤 저장이 유지되지 않음 "${pt}"`);
+    // 하나 해제(Space) → 2항목
+    await page.evaluate(() => document.activeElement?.blur());
+    await tabUntil(focusIs, `.pt input[data-item="${want[1]}"]`);
     await press('Space');
-    await tabUntil(focusIs, '.pt-reset');
-    await press('Enter');
-    pt = await page.textContent('.pt [data-progress-text]');
-    if (!pt.includes('0항목 완료')) problems.push(`진행 추적: 모두 지우기 뒤 "${pt}"`);
-    console.log('진행 추적(키보드): 체크 3개 → 새로 고침 뒤 유지 → 하나 해제 → 모두 지우기');
-    done.push('M06 위젯: 진행 추적');
+    pt = await ptText();
+    if (!pt.includes('2항목 완료')) problems.push(`${mp} 진행 추적: 해제 뒤 "${pt}"`);
+    leftDone[mp] = 2;
+    if (mp === M06_PAGE) {
+      // "모두 지우기"는 확인을 거친다: 처음 상자의 초점은 "취소" — Enter면 그대로, Tab → "모두 지우기" → Enter면 지운다.
+      await tabUntil(focusIs, '.pt-reset');
+      await press('Enter');
+      await page.waitForSelector('.guide-dialog[open]');
+      await press('Enter');
+      await page.waitForSelector('.guide-dialog', { state: 'detached' });
+      pt = await ptText();
+      if (!pt.includes('2항목 완료')) problems.push(`M06 진행 추적: 확인 상자에서 취소했는데 "${pt}"`);
+      if (!(await page.evaluate(focusIs, '.pt-reset'))) problems.push('M06 진행 추적: 취소 뒤 초점이 "모두 지우기"로 돌아오지 않음');
+      // 백업 내보내기(키보드) → 모두 지우기(확인) → 가져오기: 새로 고치지 않아도 바로 반영
+      await tabUntil(focusIs, '.pt-storage summary');
+      await press('Enter');
+      await tabUntil(focusIs, '.pt-storage button');
+      const [dl] = await Promise.all([page.waitForEvent('download'), press('Enter')]);
+      const backup = path.join(out || fs.mkdtempSync(path.join(os.tmpdir(), 'guide-kb-')), 'keyboard-progress-backup.json');
+      await dl.saveAs(backup);
+      await tabUntil(focusIs, '.pt-reset', { back: true });
+      await press('Enter');
+      await page.waitForSelector('.guide-dialog[open]');
+      await press('Tab');
+      await press('Enter');
+      pt = await ptText();
+      if (!pt.includes('0항목 완료')) problems.push(`M06 진행 추적: 모두 지우기 뒤 "${pt}"`);
+      await tabUntil(focusIs, '.pt-storage button:nth-of-type(2)');
+      const [chooser] = await Promise.all([page.waitForEvent('filechooser'), press('Enter')]);
+      await chooser.setFiles(backup);
+      const restored = await page.waitForFunction(() => /2항목 완료/.test(document.querySelector('.pt [data-progress-text]')?.textContent || ''), null, { timeout: 3000 }).then(() => true, () => false);
+      if (!restored) problems.push(`M06 진행 추적: 백업을 가져온 뒤 같은 창에서 바로 반영되지 않음 "${await ptText()}"`);
+    }
+    done.push(`진행 추적 ${mp.split('/')[2].slice(0, 3).toUpperCase()}(${ids.length}항목)`);
+  }
+  if (modulePages.length) console.log(`진행 추적(키보드): 모듈 ${modulePages.length}개 — 표시 3개 → 새로 고침 뒤 유지 → 하나 해제${modulePages.includes(M06_PAGE) ? ', M06: 모두 지우기 확인(취소·확인)·백업 내보내기/가져오기 즉시 반영' : ''}`);
+
+  if (pages.includes(SQS_PAGE)) {
+    /* ---------------- 레슨 끝의 "이 레슨 완료" ---------------- */
+    await page.goto(`${base}${SQS_PAGE}`, { waitUntil: 'networkidle' });
+    await page.locator('.ld').evaluate((e) => e.scrollIntoView());
+    await page.waitForSelector('.ld input:not([disabled])');
+    const before = await page.isChecked('.ld input');
+    await page.evaluate(() => document.activeElement?.blur());
+    await tabUntil(focusIs, '.ld input');
+    await press('Space');
+    if ((await page.isChecked('.ld input')) === before) problems.push('이 레슨 완료: Space로 바뀌지 않음');
+    const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('guide:progress:m06') || '{}'));
+    if (Boolean(stored.done?.['lesson:02-sqs']) === before) problems.push(`이 레슨 완료: 저장값이 진행 추적과 같은 키에 없음 ${JSON.stringify(stored)}`);
+    if (!before && leftDone[M06_PAGE] !== undefined) leftDone[M06_PAGE] += 1;
+    done.push('이 레슨 완료(M06 레슨 2)');
+  }
+
+  if (pages.includes('/') && modulePages.length) {
+    /* ---------------- 홈의 전체 진행 요약 ---------------- */
+    await page.goto(`${base}/`, { waitUntil: 'networkidle' });
+    await page.locator('.po').evaluate((e) => e.scrollIntoView());
+    await page.waitForFunction(() => document.querySelector('.guide-widget[data-widget="progress-overview"] astro-island:not([ssr])') !== null);
+    for (const [mp, n] of Object.entries(leftDone)) {
+      const mod = mp.split('/')[2].slice(0, 3);
+      const got = await page.textContent(`.po li[data-module="${mod}"] .po-count`);
+      if (!got.trim().startsWith(`${n}/`)) problems.push(`홈 요약 ${mod}: 기대 ${n}개 완료, 화면 "${got}"`);
+    }
+    // 요약의 모듈 링크도 키보드로 닿는다
+    await page.evaluate(() => document.activeElement?.blur());
+    await tabUntil(focusIs, '.po a.po-name');
+    done.push('홈 전체 진행 요약');
   }
 
   if (pages.includes(EXAM_PAGE)) {

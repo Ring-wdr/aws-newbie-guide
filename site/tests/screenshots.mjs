@@ -1,5 +1,5 @@
 // 시범 화면 스크린샷: 라이트/다크 × 1280px/360px. 검증자가 직접 열어 깨진 곳을 본다(GUIDE-SITE 5장).
-// 사용: node tests/screenshots.mjs --port <포트> --out <폴더> [--full]
+// 사용: node tests/screenshots.mjs --port <포트> --out <폴더> [--full] [--only 이름,이름]
 import fs from 'node:fs';
 import path from 'node:path';
 import { offlineBrowser, portFromArgs, serve } from './lib/harness.mjs';
@@ -10,7 +10,7 @@ if (outIdx < 0) throw new Error('--out <폴더> 가 필요하다');
 const out = path.resolve(process.argv[outIdx + 1]);
 fs.mkdirSync(out, { recursive: true });
 const full = process.argv.includes('--full');
-const only = process.argv.includes('--only') ? process.argv[process.argv.indexOf('--only') + 1] : null;
+const only = process.argv.includes('--only') ? process.argv[process.argv.indexOf('--only') + 1].split(',') : null;
 
 const SHOTS = [
   { name: 'lesson-sqs', path: '/curriculum/m06-integration-messaging/02-sqs/' },
@@ -28,6 +28,12 @@ const SHOTS = [
   // M06 맞춤 위젯(element: 위젯 상자만 찍는다)
   { name: 'widget-sqs-timeline', path: '/curriculum/m06-integration-messaging/02-sqs/', element: '.vt', prepare: timelineMid },
   { name: 'widget-progress', path: '/curriculum/m06-integration-messaging/', element: '.pt-wrap', prepare: progressSome },
+  // 진행 추적(전 모듈 공용)·홈 요약·레슨 완료
+  { name: 'home-progress', path: '/', element: '.po-wrap', prepare: homeProgress },
+  { name: 'widget-progress-m14', path: '/curriculum/m14-capstone-exam/', element: '.pt-wrap', prepare: m14Progress },
+  { name: 'widget-progress-m12', path: '/curriculum/m12-resilience-dr-migration/', element: '.pt-wrap', prepare: async (p) => { await p.locator('.pt-wrap').scrollIntoViewIfNeeded(); await p.waitForSelector('.pt input[data-item]:not([disabled])'); } },
+  { name: 'progress-reset-confirm', path: '/curriculum/m06-integration-messaging/', prepare: resetConfirm },
+  { name: 'lesson-done', path: '/curriculum/m06-integration-messaging/02-sqs/', element: '.ld', prepare: lessonDone },
   { name: 'diagram-m02', path: '/curriculum/m02-vpc-networking/02-vpc-subnet-route-igw/', prepare: (p) => p.locator('.diagram').first().evaluate((e) => e.scrollIntoView({ block: 'start' })) },
 ];
 
@@ -46,6 +52,34 @@ async function progressSome(page) {
   await page.locator('.pt-wrap').scrollIntoViewIfNeeded();
   await page.waitForSelector('.pt input[data-item]:not([disabled])');
   for (const id of ['lesson:01-why-decoupling', 'lesson:02-sqs', 'lab:labs/lab01-sqs-basics.sh']) await page.check(`.pt input[data-item="${id}"]`);
+}
+
+async function homeProgress(page) {
+  await page.evaluate(() => {
+    localStorage.setItem('guide:progress:m00', JSON.stringify({ v: 1, done: { 'lesson:01-cloud-and-global-infrastructure': true, 'lesson:02-what-is-aws-emulator': true, quiz: true } }));
+    localStorage.setItem('guide:progress:m06', JSON.stringify({ v: 1, done: { 'lesson:02-sqs': true } }));
+  });
+  await page.reload({ waitUntil: 'networkidle' });
+  await page.waitForFunction(() => /3항목|4항목/.test(document.querySelector('[data-overview-text]')?.textContent || ''));
+}
+
+async function m14Progress(page) {
+  await page.evaluate(() => localStorage.setItem('guide:progress:m14', JSON.stringify({ v: 1, done: { 'lesson:01-well-architected-review': true, 'exam:mock-exam': true } })));
+  await page.reload({ waitUntil: 'networkidle' });
+  await page.locator('.pt-wrap').scrollIntoViewIfNeeded();
+  await page.waitForSelector('.pt input[data-item]:not([disabled])');
+}
+
+async function resetConfirm(page) {
+  await progressSome(page);
+  await page.click('.pt-reset');
+  await page.waitForSelector('.guide-dialog[open]');
+}
+
+async function lessonDone(page) {
+  await page.locator('.ld').scrollIntoViewIfNeeded();
+  await page.waitForSelector('.ld input:not([disabled])');
+  await page.check('.ld input');
 }
 
 async function examResult(page) {
@@ -89,7 +123,7 @@ try {
   for (const theme of ['light', 'dark']) {
     for (const width of [1280, 360]) {
       const { browser, context, blocked } = await offlineBrowser({ colorScheme: theme, viewport: { width, height: width === 360 ? 780 : 900 } });
-      for (const s of SHOTS.filter((x) => !only || x.name === only)) {
+      for (const s of SHOTS.filter((x) => !only || only.includes(x.name))) {
         const page = await context.newPage();
         await page.goto(`http://127.0.0.1:${port}${s.path}`, { waitUntil: 'networkidle' });
         await page.evaluate(() => localStorage.clear());

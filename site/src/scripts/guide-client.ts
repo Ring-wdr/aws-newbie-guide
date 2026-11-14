@@ -1,7 +1,7 @@
 // 본문 장치의 브라우저 쪽 동작: 명령 복사, 퀴즈 채점, 체크리스트 저장, 진행 상태 백업.
 // 스크립트가 없어도 원고 내용은 모두 읽힌다(단추만 숨겨진 채 남는다).
 import { ko } from '../i18n/ko.mjs';
-import { load, save, remove, mountStoragePanels } from './storage';
+import { load, save, remove, mountStoragePanels, onStorageChange } from './storage';
 
 const pageKey = location.pathname.replace(/\/+$/, '') || '/';
 
@@ -152,6 +152,14 @@ function initQuiz() {
     render();
     cards[0]?.querySelector<HTMLInputElement>('input')?.focus();
   });
+  // 백업을 가져왔거나 다른 창에서 바꾸면 다시 읽는다.
+  onStorageChange((k) => {
+    if (k !== null && k !== key) return;
+    const next = load<QuizState>(key, { picked: {}, graded: {} });
+    if (JSON.stringify(next) === JSON.stringify(state)) return;
+    state = next;
+    render();
+  });
   render();
 }
 
@@ -184,6 +192,13 @@ function initChecklist() {
   summary.querySelector<HTMLButtonElement>('.checklist-reset')!.addEventListener('click', () => {
     state = {};
     remove(key);
+    render();
+  });
+  onStorageChange((k) => {
+    if (k !== null && k !== key) return;
+    const next = load<Record<string, boolean>>(key, {});
+    if (JSON.stringify(next) === JSON.stringify(state)) return;
+    state = next;
     render();
   });
   render();

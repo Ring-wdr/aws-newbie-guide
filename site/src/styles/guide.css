@@ -959,6 +959,7 @@ section.exam-q {
 
 /* 확인 상자 */
 .guide-dialog {
+  margin: auto; /* 모달 상자를 화면 가운데에(테마의 margin 초기화를 되돌린다) */
   max-width: min(28rem, calc(100vw - 2rem));
   border: 1px solid var(--guide-border);
   border-radius: var(--guide-radius);

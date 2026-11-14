@@ -3,6 +3,7 @@
 import { ko } from '../i18n/ko.mjs';
 import { formatAnswerSheet, gradeExam, parseAnswerSheet } from '../lib/exam-core.mjs';
 import { download, load, pickFile, remove, save } from './storage';
+import { confirmDialog } from './dialog';
 
 type Key = Record<string, { number: number; answer: string[]; domain: string; task: string; kind: string; topic: string }>;
 type Data = {
@@ -26,42 +27,6 @@ type State = {
 
 const STORE = 'exam:m14-mock-exam';
 
-/** 브라우저 기본 confirm() 대신 쓰는 확인 상자(<dialog>): 키보드로 조작되고 화면 낭독기가 읽는다. */
-function confirmDialog(message: string): Promise<boolean> {
-  return new Promise((resolve) => {
-    const dlg = document.createElement('dialog');
-    dlg.className = 'guide-dialog';
-    const p = document.createElement('p');
-    p.id = 'guide-dialog-msg';
-    p.textContent = message;
-    dlg.setAttribute('aria-labelledby', p.id);
-    const row = document.createElement('div');
-    row.className = 'guide-dialog-actions';
-    const cancel = document.createElement('button');
-    cancel.type = 'button';
-    cancel.textContent = ko.exam.confirmNo;
-    const ok = document.createElement('button');
-    ok.type = 'button';
-    ok.className = 'exam-primary';
-    ok.textContent = ko.exam.confirmYes;
-    row.append(cancel, ok);
-    dlg.append(p, row);
-    document.body.append(dlg);
-    const done = (v: boolean) => {
-      dlg.close();
-      dlg.remove();
-      resolve(v);
-    };
-    ok.addEventListener('click', () => done(true));
-    cancel.addEventListener('click', () => done(false));
-    dlg.addEventListener('cancel', (e) => {
-      e.preventDefault();
-      done(false);
-    });
-    dlg.showModal();
-    ok.focus();
-  });
-}
 const app = document.querySelector<HTMLElement>('[data-exam]');
 if (app) init(app);
 

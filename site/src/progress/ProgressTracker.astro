@@ -1,24 +1,18 @@
 ---
-// M06 진행 추적(레슨·실습·퀴즈 완료 표시와 진행률). 저장은 브라우저 localStorage에만(storage.ts).
-// 항목은 빌드 때 원고에서 읽는다: 모듈 README의 "## 레슨"·"## 실습" 표와 quiz.md 링크, 퀴즈 문항 수는 quiz.md.
-import fs from 'node:fs';
-import path from 'node:path';
-import { REPO_ROOT, routeForRepoPath, fileViewRoute } from '../../../lib/repo.mjs';
-import { readModuleItems, countQuizQuestions } from './progress.mjs';
+// 모듈 진행 추적(전 모듈 공용 — 원고의 표시 줄 <!-- widget: progress-tracker -->). 저장은 브라우저 localStorage에만(storage.ts).
+// 항목은 빌드 때 원고에서 읽는다(catalog.mjs): 모듈 README의 "## 레슨"·"## 실습" 표와 quiz.md 링크, 퀴즈 문항 수는 quiz.md.
+// M14처럼 퀴즈에 문항이 없으면 모의고사·캡스톤 자기 점검표를 대신 둔다. 저장 키는 "progress:mNN"(M06은 P1과 같은 키).
+import { moduleProgress } from './catalog.mjs';
 import Tracker from './Tracker.jsx';
 
-const MODULE_DIR = 'curriculum/m06-integration-messaging';
-const read = (rel: string) => fs.readFileSync(path.join(REPO_ROOT, rel), 'utf8');
-const items = readModuleItems(read(`${MODULE_DIR}/README.md`), MODULE_DIR).map((it) => ({
-  ...it,
-  href: it.file.endsWith('.md') ? routeForRepoPath(it.file) : fileViewRoute(it.file),
-}));
-const quizRoute = routeForRepoPath(`${MODULE_DIR}/quiz.md`);
-const quizTotal = countQuizQuestions(read(`${MODULE_DIR}/quiz.md`));
+interface Props {
+  modDir: string; // "m06-integration-messaging" (MarkdownContent.astro가 원고 경로에서 넘긴다)
+}
+const m = moduleProgress(Astro.props.modDir);
 ---
 
 <div class="pt-wrap">
-  <Tracker client:visible items={items} quizRoute={quizRoute} quizTotal={quizTotal} moduleTitle="M06" />
+  <Tracker client:visible items={m.items} storeKey={m.key} quizRoute={m.quizRoute} quizTotal={m.quizTotal} moduleTitle={m.code} />
   {/* 진행 상태 백업(JSON 내보내기/가져오기)은 공용 storage.ts가 이 자리에 붙인다. 완료 표시도 함께 담긴다. */}
   <div class="pt-storage" data-guide-storage></div>
 </div>
@@ -83,4 +77,7 @@ const quizTotal = countQuizQuestions(read(`${MODULE_DIR}/quiz.md`));
   .pt-reset:hover:not(:disabled) { border-color: var(--sl-color-accent); }
   .pt-reset:disabled { opacity: 0.55; cursor: not-allowed; }
   .pt-storage { margin-top: 0.75rem; }
+  .pt-msg { margin: 0.4rem 0 0 !important; color: var(--guide-muted); font-size: 0.8125rem; }
+  .pt-msg:empty { display: none; }
+  .pt-summary:focus-visible { outline: 2px solid var(--sl-color-accent); outline-offset: 2px; }
 </style>

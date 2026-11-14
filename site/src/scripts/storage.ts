@@ -4,6 +4,30 @@
 import { ko } from '../i18n/ko.mjs';
 
 const PREFIX = 'guide:';
+/** 같은 창 안에서 저장값이 바뀌었음을 알린다(브라우저의 storage 이벤트는 다른 창에만 간다).
+ *  detail.key: 바뀐 키("guide:" 뺀 것), 백업을 가져왔으면 null. 진행 추적·퀴즈·체크리스트·시험 모드가 듣고 다시 읽는다. */
+export const CHANGE_EVENT = 'guide:storage-change';
+function notify(key: string | null): void {
+  try {
+    window.dispatchEvent(new CustomEvent(CHANGE_EVENT, { detail: { key } }));
+  } catch {
+    /* 무시 */
+  }
+}
+/** 다른 창(storage 이벤트)이나 같은 창(CHANGE_EVENT)에서 저장값이 바뀌면 부른다. 해제 함수를 돌려준다. */
+export function onStorageChange(fn: (key: string | null) => void): () => void {
+  const local = (e: Event) => fn((e as CustomEvent).detail?.key ?? null);
+  const other = (e: StorageEvent) => {
+    if (!e.key) fn(null);
+    else if (e.key.startsWith(PREFIX)) fn(e.key.slice(PREFIX.length));
+  };
+  window.addEventListener(CHANGE_EVENT, local);
+  window.addEventListener('storage', other);
+  return () => {
+    window.removeEventListener(CHANGE_EVENT, local);
+    window.removeEventListener('storage', other);
+  };
+}
 const memory = new Map<string, string>();
 let available: boolean | null = null;
 
@@ -39,6 +63,19 @@ export function save(key: string, value: unknown): void {
   } catch {
     /* 저장 실패는 조용히 넘긴다 — 화면 상태는 유지된다 */
   }
+  notify(key);
+}
+
+/** 알림 없이 쓴다(가져오기에서 여러 키를 쓴 뒤 한 번만 알린다). */
+function setQuiet(key: string, value: unknown): void {
+  const k = PREFIX + key;
+  const raw = JSON.stringify(value);
+  memory.set(k, raw);
+  try {
+    if (storageAvailable()) window.localStorage.setItem(k, raw);
+  } catch {
+    /* 무시 */
+  }
 }
 
 export function remove(key: string): void {
@@ -48,6 +85,7 @@ export function remove(key: string): void {
   } catch {
     /* 무시 */
   }
+  notify(key);
 }
 
 function allEntries(): Record<string, unknown> {
@@ -125,7 +163,8 @@ export function mountStoragePanels(): void {
       try {
         const data = JSON.parse(text);
         if (data?.format !== 'aws-newbie-guide-progress' || typeof data.entries !== 'object') throw new Error('format');
-        for (const [k, v] of Object.entries(data.entries)) save(k, v);
+        for (const [k, v] of Object.entries(data.entries)) setQuiet(k, v);
+        notify(null); // 같은 창의 진행 표시·퀴즈·체크리스트가 바로 다시 읽는다
         note.textContent = ko.storage.imported;
       } catch {
         note.textContent = ko.storage.importFailed;

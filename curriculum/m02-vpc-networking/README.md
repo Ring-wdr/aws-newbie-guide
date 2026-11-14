@@ -53,6 +53,8 @@ curriculum/m02-vpc-networking/labs/verify.sh
 
 정리 자료: [cheatsheet.md](./cheatsheet.md) · [quiz.md](./quiz.md)
 
+<!-- widget: progress-tracker -->
+
 ## CIDR 계획
 
 이 모듈이 만드는 VPC의 기준이다. 이름·CIDR·연결 관계는 아래 표가 기준이며 [labs/_lib.sh](./labs/_lib.sh)의 `M02_SUBNETS`·`build_three_tier`와 같다. 모든 리소스에 `Name`과 `Project=todayorder` 태그를 붙인다. 리전 `us-east-1`.
