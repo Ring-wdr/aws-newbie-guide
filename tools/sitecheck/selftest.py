@@ -38,6 +38,11 @@ STATIC_CASES = [
     ("dist: 스크립트의 RTCPeerConnection", "dist", "_astro/c.js", "new RTCPeerConnection(c)"),
     ("dist: 스크립트의 service worker", "dist", "_astro/d.js", "navigator.serviceWorker.register(u)"),
     ("dist: fetch 외부 주소", "dist", "_astro/e.js", 'fetch("https://api.selftest.invalid/x")'),
+    ("dist: window.open 외부 주소", "dist", "_astro/f.js", 'window.open("https://popup.selftest.invalid/x")'),
+    ("dist: location.href 외부 주소", "dist", "p6/index.html", "<script>location.href = 'https://away.selftest.invalid/'</script>"),
+    ("dist: location.assign 외부 주소", "dist", "_astro/g.js", "location.assign(`https://away.selftest.invalid/2`)"),
+    ("dist: <object data>", "dist", "p7/index.html", '<object data="https://obj.selftest.invalid/o.svg"></object>'),
+    ("dist: srcset 2x 후보", "dist", "p8/index.html", '<img alt="" src="/a.png" srcset="/a.png 1x, https://img.selftest.invalid/a@2x.png 2x">'),
     ("dist: meta refresh", "dist", "p5/index.html", '<meta http-equiv="refresh" content="0; url=https://x.selftest.invalid">'),
 ]
 

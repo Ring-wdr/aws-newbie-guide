@@ -435,11 +435,16 @@ def gate_scanner() -> Gate:
 # ---------------------------------------------------------------- 외부 리소스 정적 검사
 URL_RE = re.compile(r"(?:https?|wss?|ftp):\/\/[^\s\"'<>)\\]+", re.I)
 NAMESPACE_OK = re.compile(r"^https?://www\.w3\.org/(1999/xhtml|2000/svg|1999/xlink|1998/Math/MathML|XML/1998/namespace|2000/xmlns/?)")
-RESOURCE_HTML = re.compile(
-    r"<(script|link|img|source|iframe|video|audio|embed|object|track|image|use|input|form)\b[^>]*?\s(src|href|srcset|data|poster|xlink:href|action|formaction)\s*=\s*\"([^\"]*)\"",
+# 리소스를 불러오는 태그와 그 속성(한 태그의 속성을 모두 본다 — srcset 의 모든 후보 포함)
+RESOURCE_TAG = re.compile(r"<(script|link|img|source|iframe|video|audio|embed|object|track|image|use|input|form)\b([^>]*)>", re.I)
+RESOURCE_ATTR = re.compile(r"\s(src|href|srcset|data|poster|xlink:href|action|formaction)\s*=\s*\"([^\"]*)\"", re.I)
+CSS_URL = re.compile(r"(?:url\(\s*['\"]?|@import\s+['\"])((?:https?:)?//[^'\")\s]+)", re.I)
+# 스크립트가 페이지를 외부로 옮기는 코드(주소가 글자 그대로 있을 때). 주소를 조립하면 브라우저 관문이 문서 요청으로 잡는다.
+JS_NAV = re.compile(
+    r"(?:window\s*\.\s*open|location\s*\.\s*(?:assign|replace))\s*\(\s*['\"`](?:(?:https?|wss?):)?//[^'\"`]+"
+    r"|location(?:\s*\.\s*href)?\s*=\s*['\"`](?:(?:https?|wss?):)?//[^'\"`]+",
     re.I,
 )
-CSS_URL = re.compile(r"(?:url\(\s*['\"]?|@import\s+['\"])((?:https?:)?//[^'\")\s]+)", re.I)
 JS_LOAD = re.compile(
     r"(?:fetch|import|importScripts|sendBeacon|WebSocket|EventSource|XMLHttpRequest[^;]{0,80}open)\s*\(\s*[^)]{0,40}?['\"`]((?:https?|wss?):)?//[^'\"`]+",
     re.I,
@@ -486,11 +491,12 @@ def gate_static(dist: Path, verbose: bool = True) -> Gate:
         text = p.read_text(encoding="utf-8", errors="replace")
         rel = p.relative_to(dist)
         if p.suffix in {".html", ".svg"}:
-            for tag, attr, val in RESOURCE_HTML.findall(text):
-                for u in re.split(r"\s*,\s*", val):
-                    u = u.strip().split(" ")[0]
-                    if re.match(r"^(?:[a-z]+:)?//", u, re.I) and not re.match(r"^(?:https?:)?//(127\.0\.0\.1|localhost)(:|/|$)", u) and not NAMESPACE_OK.match(u):
-                        g.fail(f"{rel}: <{tag} {attr}> 외부 리소스 {u}")
+            for tag, attrs in RESOURCE_TAG.findall(text):
+                for attr, val in RESOURCE_ATTR.findall(" " + attrs):
+                    for u in re.split(r"\s*,\s*", val):
+                        u = u.strip().split(" ")[0]
+                        if re.match(r"^(?:[a-z]+:)?//", u, re.I) and not re.match(r"^(?:https?:)?//(127\.0\.0\.1|localhost)(:|/|$)", u) and not NAMESPACE_OK.match(u):
+                            g.fail(f"{rel}: <{tag} {attr}> 외부 리소스 {u}")
             for m in re.finditer(r'<meta[^>]+http-equiv="refresh"[^>]*>', text, re.I):
                 g.fail(f"{rel}: meta refresh {m.group(0)[:80]}")
             nav_links += len(re.findall(r'<a\b[^>]*\shref="https?://', text))
@@ -500,6 +506,9 @@ def gate_static(dist: Path, verbose: bool = True) -> Gate:
         if p.suffix in {".js", ".mjs", ".html"}:
             for m in JS_LOAD.finditer(text):
                 g.fail(f"{rel}: 스크립트가 외부 주소를 불러옴 {m.group(0)[:100]}")
+            for m in JS_NAV.finditer(text):
+                if not re.search(r"//(127\.0\.0\.1|localhost)(:|/|$)", m.group(0)):
+                    g.fail(f"{rel}: 스크립트가 외부 주소로 이동함 {m.group(0)[:100]}")
             # 스크립트 코드(파일 또는 문서 안 <script>)에 네트워크 API가 있으면 실패. 본문 글자는 보지 않는다.
             if p.suffix == ".html":
                 code = "\n".join(body for attrs, body in INLINE_SCRIPT.findall(text) if "application/json" not in attrs)
