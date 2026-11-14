@@ -8,7 +8,7 @@ import { offlineBrowser, portFromArgs, serve } from '../../../../tests/lib/harne
 const PAGE = '/curriculum/m07-serverless-containers/01-lambda-execution-model/';
 const ROOT = '.lc';
 const port = portFromArgs(4333);
-const base = `http://127.0.0.1:${port}`;
+const base = `http://127.0.0.1:${port}`; // sitecheck-allow: 검사 스크립트가 여는 루프백 서버 주소(빌드 산출물에 들어가지 않는다)
 const shotsIdx = process.argv.indexOf('--shots');
 const shots = shotsIdx >= 0 ? path.resolve(process.argv[shotsIdx + 1]) : null;
 const problems = [];
