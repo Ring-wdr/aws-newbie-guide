@@ -14,6 +14,23 @@ scripts/guide-up.sh 4331     # 포트 지정 — 비대화형 실행(에이전�
 - 처음 한 번 `pnpm install --frozen-lockfile`이 npm 레지스트리에 접속한다(빌드하는 쪽에만 필요). 빌드된 사이트는 외부 요청을 하나도 하지 않는다.
 - 필요한 것: Node 24 이상, pnpm. Mermaid 그림은 빌드 때 Playwright의 Chromium으로 그린다 — `playwright` 1.64.1은 Chromium 1248을 쓴다(`~/Library/Caches/ms-playwright/chromium_headless_shell-1248`). 없으면 빌드가 브라우저를 찾지 못했다고 실패한다.
 
+## 공개 배포 (GitHub Pages)
+
+공개 주소는 `https://ring-wdr.github.io/aws-newbie-guide/`(프로젝트 Pages — 하위 경로)이다. `.github/workflows/pages.yml`이 `main`에 푸시될 때(와 수동 실행) 빌드·검사·배포한다.
+
+- **하위 경로 빌드**: `GUIDE_BASE=/aws-newbie-guide/ pnpm build`. 주지 않으면 지금처럼 루트(`/`)로 빌드한다(`guide-up.sh`·검사 기본값). 값은 `src/lib/base.mjs`가 받는다(경로 조각은 영문·숫자·`-_.`만). base를 붙이는 곳: 원고의 상대 링크를 바꾸는 변환기(`plugins/links.mjs` — 다른 원고·소스 보기 `/files/…`), Mermaid "원래 크기로 보기"(`plugins/code.mjs`, `/diagrams/…svg`), 소스 보기 페이지의 링크, 진행 추적·홈 요약·"이 레슨 완료"의 링크(`progress/catalog.mjs`), 모의고사 데이터. Starlight가 만드는 것(사이드바·이전/다음·검색 색인·자산·404 페이지)은 Astro `base`로 맞춰진다.
+- **저장 키는 경로와 무관하다**: 퀴즈·체크리스트 키는 base를 뺀 사이트 경로(`quiz:/curriculum/…/quiz`)로 만든다(`scripts/base.ts`의 `siteRoute`). 로컬과 배포본의 키가 같아서, 한쪽에서 내보낸 진행 상태를 다른 쪽에서 가져오면 그대로 맞는다(저장소 자체는 출처마다 따로다). 시험 중 정답 링크 가리기도 같은 함수로 경로를 비교한다.
+- **배포 주소(`site`)를 정하지 않는다**: Astro `site`를 정하면 Starlight가 sitemap·`<link rel=canonical>`·`og:url`에 절대 주소를 넣는다. 오프라인·무추적 원칙과 부딪히지는 않지만(같은 사이트 주소이고 불러오는 리소스가 아니다) 쓸 데가 없고, `static` 관문에 자기 주소 허용 목록을 더해야 한다. 그래서 만들지 않는다 — 빌드 로그의 `[@astrojs/sitemap] … requires the site … Skipping`은 그 결과다. 이 폴더(`site/src`)에는 배포 주소를 적지 않는다(`static` 관문은 `site/src`의 외부 주소를 실패로 본다).
+- **하위 경로 산출물의 검사**: 검사기는 산출물이 어느 base로 빌드됐는지 산출물에서 읽는다(홈이 불러오는 `/…/_astro/` 자산 경로 — `tests/lib/harness.mjs`의 `detectBase`, `sitecheck.py`의 `detect_base`). 브라우저 검사의 로컬 서버는 그 base 아래에서만 산출물을 보여 주고(`/aws-newbie-guide/…`, 그 밖은 404 — 배포본과 같다), `links` 관문은 `/`로 시작하는 주소가 모두 base 아래인지 본다. `GUIDE_BASE`를 주고 검사하면 산출물의 base와 같은지 먼저 확인한다.
+
+  ```bash
+  GUIDE_BASE=/aws-newbie-guide/ pnpm --dir site build
+  uv run python tools/sitecheck/sitecheck.py all --port 4331       # 같은 관문이 /aws-newbie-guide/ 아래에서 돈다
+  GUIDE_BASE=/aws-newbie-guide/ scripts/guide-up.sh 4331            # http://127.0.0.1:4331/aws-newbie-guide/
+  ```
+
+- 배포본도 외부 요청이 0건이다(같은 `offline`·`static` 관문). GitHub Pages가 방문 기록(접속 로그)을 남기는 것은 이 사이트가 정할 수 없는 호스팅의 성질이다.
+
 ## 개발
 
 ```bash

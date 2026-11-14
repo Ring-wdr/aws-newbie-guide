@@ -2,7 +2,7 @@
 // 사용: node tests/screenshots.mjs --port <포트> --out <폴더> [--full] [--only 이름,이름]
 import fs from 'node:fs';
 import path from 'node:path';
-import { offlineBrowser, portFromArgs, serve, shootElement } from './lib/harness.mjs';
+import { offlineBrowser, portFromArgs, serve, shootElement, baseUrl } from './lib/harness.mjs';
 import { widgetPages } from './lib/widget-checks.mjs';
 import { WIDGETS_DIR } from '../src/lib/repo.mjs';
 
@@ -160,7 +160,7 @@ try {
       const { browser, context, blocked } = await offlineBrowser({ colorScheme: theme, viewport: { width, height: width === 360 ? 780 : 900 } });
       for (const s of SHOTS.filter((x) => !only || only.includes(x.name))) {
         const page = await context.newPage();
-        await page.goto(`http://127.0.0.1:${port}${s.path}`, { waitUntil: 'networkidle' });
+        await page.goto(`${baseUrl(port)}${s.path}`, { waitUntil: 'networkidle' });
         await page.evaluate(() => localStorage.clear());
         await page.reload({ waitUntil: 'networkidle' });
         if (s.prepare) await s.prepare(page);

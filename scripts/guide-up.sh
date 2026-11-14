@@ -6,6 +6,7 @@
 #   scripts/guide-up.sh              # 대화형 터미널: 기본 포트 4321
 #   scripts/guide-up.sh 4331         # 포트 지정 (비대화형 실행에서는 반드시 지정)
 #   GUIDE_REBUILD=1 scripts/guide-up.sh 4331   # 원고가 바뀌지 않았어도 다시 빌드
+#   GUIDE_BASE=/aws-newbie-guide/ scripts/guide-up.sh 4331   # 공개 배포본과 같은 하위 경로로 빌드해 http://127.0.0.1:4331/aws-newbie-guide/ 에서 연다
 #
 # 처음 한 번은 site/ 의 Node 패키지를 lockfile 그대로 설치한다(npm 레지스트리 접속, 빌드하는 쪽에만 필요).
 set -euo pipefail
@@ -49,8 +50,21 @@ if ! node scripts/serve.mjs --port "$port" --check; then
   exit 1
 fi
 
+# 산출물이 빌드된 base 경로(site/src/lib/base.mjs 의 GUIDE_BASE)와 이번에 원하는 base 가 다르면 다시 빌드한다.
+# (하위 경로로 빌드한 산출물을 그대로 두고 루트로 열면 모든 링크가 /aws-newbie-guide/ 아래를 가리킨다.)
+want_base="${GUIDE_BASE:-}"
+want_base="${want_base#"${want_base%%[!/]*}"}"; want_base="${want_base%"${want_base##*[!/]}"}"
+[ -n "$want_base" ] && want_base="/$want_base"
+built_base=""
+if [ -f dist/index.html ]; then
+  built_base="$(grep -oE '(href|src)="(/[A-Za-z0-9._-]+)*/_astro/' dist/index.html | head -n 1 | sed -E 's/^(href|src)="//; s#/_astro/$##' || true)"
+fi
+
 needs_build=0
 if [ "${GUIDE_REBUILD:-0}" = "1" ] || [ ! -f dist/index.html ]; then
+  needs_build=1
+elif [ "$built_base" != "$want_base" ]; then
+  echo "== 산출물의 base(${built_base:-/})가 원하는 base(${want_base:-/})와 다르다 — 다시 빌드한다"
   needs_build=1
 elif [ -n "$(find "$ROOT/curriculum" "$ROOT/docs" "$ROOT/README.md" "$SITE/src" "$SITE/astro.config.mjs" \
           "$SITE/package.json" "$SITE/pnpm-lock.yaml" -newer dist/index.html -print -quit 2>/dev/null)" ]; then

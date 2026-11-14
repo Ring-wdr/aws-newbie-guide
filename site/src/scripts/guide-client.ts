@@ -3,8 +3,10 @@
 import { ko } from '../i18n/ko.mjs';
 import { load, save, remove, mountStoragePanels, onStorageChange } from './storage';
 import { installExamGuard } from './exam-guard';
+import { siteRoute } from './base';
 
-const pageKey = location.pathname.replace(/\/+$/, '') || '/';
+// 저장 키는 base 를 뺀 사이트 경로로 만든다(하위 경로 배포에서도 로컬과 같은 키 — progress.mjs QUIZ_STATE_KEY 와 같은 규칙).
+const pageKey = siteRoute(location.pathname).replace(/\/+$/, '') || '/';
 
 /* ---------- 명령 복사 ---------- */
 let live: HTMLElement | null = null;

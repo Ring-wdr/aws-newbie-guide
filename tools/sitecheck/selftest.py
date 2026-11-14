@@ -110,6 +110,26 @@ def main() -> int:
                 print(f"{'ok  ' if ok else 'BAD '} 실행 명령 관문: {name} → {g.failures[0] if g.failures else '통과'}")
                 if not ok:
                     failures.append(name)
+            # 링크 관문 + 하위 경로(base) 빌드: base 를 빠뜨린 내부 링크·자산은 잡고, base 아래 링크와 앵커는 통과
+            for name, body, want_fail in [
+                ("base 아래 링크·자산", '<link rel="stylesheet" href="/b/_astro/a.css"><a href="/b/p/#h">p</a><a href="/b/">홈</a>', False),
+                ("base 를 빠뜨린 링크", '<link rel="stylesheet" href="/b/_astro/a.css"><a href="/p/">p</a>', True),
+                ("base 를 빠뜨린 자산", '<link rel="stylesheet" href="/b/_astro/a.css"><script src="/_astro/a.js"></script>', True),
+                ("base 아래 없는 앵커", '<link rel="stylesheet" href="/b/_astro/a.css"><a href="/b/p/#none">p</a>', True),
+            ]:
+                dist = Path(d) / f"links-{abs(hash(name))}"
+                (dist / "_astro").mkdir(parents=True)
+                (dist / "_astro/a.css").write_text("", encoding="utf-8")
+                (dist / "_astro/a.js").write_text("", encoding="utf-8")
+                (dist / "p").mkdir()
+                (dist / "p/index.html").write_text('<h2 id="h">h</h2>', encoding="utf-8")
+                (dist / "index.html").write_text(f"<!doctype html><html><head></head><body>{body}</body></html>", encoding="utf-8")
+                base = sitecheck.detect_base(dist)
+                g = sitecheck.gate_links(dist, None)
+                ok = base == "/b" and bool(g.failures) == want_fail
+                print(f"{'ok  ' if ok else 'BAD '} 링크 관문(base {base or '/'}): {name} → {g.failures[0] if g.failures else '통과'}")
+                if not ok:
+                    failures.append(f"links {name}")
         # 내용 동등성: 원고 메타 줄의 백슬래시 이스케이프(CommonMark)는 화면 글자와 같게 풀고, 코드 스팬 안은 둔다
         from mdsource import strip_inline
         for md, want in [
@@ -159,7 +179,7 @@ def main() -> int:
     if failures:
         print(f"FAIL selftest: {failures}")
         return 1
-    print(f"PASS selftest: 정적 관문에 심은 결함 {len(STATIC_CASES)}가지와 실행 명령 결함 3가지를 모두 잡고, 근거 있는 경우는 통과, 메타 줄 이스케이프 2가지 일치, 등급 이모지 10가지(빈 라벨·빈 이름·이름만 있는 라벨 포함)와 목차·사이드바 4가지")
+    print(f"PASS selftest: 정적 관문에 심은 결함 {len(STATIC_CASES)}가지와 실행 명령 결함 3가지를 모두 잡고, 근거 있는 경우는 통과, 하위 경로 빌드의 링크 관문 4가지, 메타 줄 이스케이프 2가지 일치, 등급 이모지 10가지(빈 라벨·빈 이름·이름만 있는 라벨 포함)와 목차·사이드바 4가지")
     return 0
 
 

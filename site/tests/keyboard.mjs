@@ -11,11 +11,11 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { EXAM_PAGE, SITE_DIR, isQuizPage, offlineBrowser, pagesFromArgs, portFromArgs, serve } from './lib/harness.mjs';
+import { EXAM_PAGE, SITE_DIR, isQuizPage, offlineBrowser, pagesFromArgs, portFromArgs, serve, baseUrl, withBase } from './lib/harness.mjs';
 import { discoverWidgetChecks, runWidgetChecks } from './lib/widget-checks.mjs';
 
 const port = portFromArgs(4321);
-const base = `http://127.0.0.1:${port}`;
+const base = baseUrl(port); // 하위 경로(base)로 빌드한 산출물이면 그 경로까지
 const outIdx = process.argv.indexOf('--out');
 const out = outIdx >= 0 ? path.resolve(process.argv[outIdx + 1]) : null;
 const problems = [];
@@ -226,7 +226,7 @@ try {
     await tabUntil(focusIs, '[data-act=start]');
     await press('Enter');
     // 시험 중: 사이드바·이전/다음의 정답·해설 링크는 숨고, 본문의 링크는 확인을 거친다.
-    const KEY_HREF = '/curriculum/m14-capstone-exam/mock-exam/answer-key/';
+    const KEY_HREF = withBase('/curriculum/m14-capstone-exam/mock-exam/answer-key/'); // 본문 링크의 href 는 base 를 붙여 나온다
     const guard = await page.evaluate((href) => {
       const vis = (a) => a.getClientRects().length > 0 && getComputedStyle(a).visibility !== 'hidden';
       const links = [...document.querySelectorAll(`a[href="${href}"]`)];

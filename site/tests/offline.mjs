@@ -3,10 +3,10 @@
 // 검색(Pagefind)·퀴즈·시험 모드처럼 열 때 추가로 파일을 불러오는 동작도 실행한다. 저장소가 막힌 브라우저에서도 동작을 본다.
 // 사용: node tests/offline.mjs --port <포트> [--pages pilot|all|/a/,/b/] [--out <폴더>]
 // 상호작용 단계(퀴즈·시험)는 그 페이지가 대상에 있을 때만 돈다. 검색은 대상의 첫 페이지에서 한다.
-import { eachPage, EXAM_PAGE, isQuizPage, offlineBrowser, pagesFromArgs, portFromArgs, serve } from './lib/harness.mjs';
+import { eachPage, EXAM_PAGE, isQuizPage, offlineBrowser, pagesFromArgs, portFromArgs, serve, baseUrl, BASE } from './lib/harness.mjs';
 
 const port = portFromArgs(4321);
-const base = `http://127.0.0.1:${port}`;
+const base = baseUrl(port); // 하위 경로(base)로 빌드한 산출물이면 그 경로까지
 const pages = pagesFromArgs();
 const quizPage = pages.find(isQuizPage);
 const hasExam = pages.includes(EXAM_PAGE);
@@ -49,13 +49,13 @@ try {
     const page = await ctx.newPage();
     await page.goto(`${base}${searchPage}`, { waitUntil: 'networkidle' });
     for (const q of ['가시성 타임아웃', '큐', '디커플링', '멱등', 'SQS FIFO', '배달 못 한 편지']) {
-      const titles = await page.evaluate(async (query) => {
-        const pf = await import('/pagefind/pagefind.js');
+      const titles = await page.evaluate(async ([query, prefix]) => {
+        const pf = await import(`${prefix}/pagefind/pagefind.js`); // 하위 경로 빌드면 base 아래
         await pf.options({ excerptLength: 10 });
         const r = await pf.search(query);
         const top = await Promise.all(r.results.slice(0, 3).map((x) => x.data()));
         return { count: r.results.length, top: top.map((d) => d.meta.title) };
-      }, q);
+      }, [q, BASE]);
       searchResults[q] = titles;
     }
     if (quizPage) {

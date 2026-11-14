@@ -11,6 +11,7 @@ import { rehypeGuide } from './src/plugins/rehype-guide.mjs';
 import { buildSidebar } from './src/lib/sidebar.mjs';
 import { REPO_ROOT } from './src/lib/repo.mjs';
 import { ko } from './src/i18n/ko.mjs';
+import { ASTRO_BASE } from './src/lib/base.mjs';
 
 // 원격 측정·업데이트 확인을 끈다(package.json 스크립트와 scripts/guide-up.sh 도 같은 환경 변수를 준다).
 process.env.ASTRO_TELEMETRY_DISABLED = '1';
@@ -18,8 +19,11 @@ process.env.GUIDE_SITE_DIR ??= new URL('.', import.meta.url).pathname; // src/li
 process.env.ASTRO_DISABLE_UPDATE_CHECK = 'true';
 
 export default defineConfig({
-  // 로컬 전용. 공개 배포는 GUIDE-SITE 1장에 따라 소유자 승인 뒤에 정한다.
+  // 개발 서버는 127.0.0.1 에만 연다.
   server: { host: '127.0.0.1', port: 4321 },
+  // 하위 경로 배포(GitHub Pages 프로젝트 주소)는 GUIDE_BASE=/aws-newbie-guide/ 로 빌드한다. 없으면 루트(/) — src/lib/base.mjs.
+  // site(배포 주소)는 일부러 정하지 않는다: 정하면 Starlight 가 sitemap·canonical·og:url 에 절대 주소를 넣는다(site/README "공개 배포").
+  base: ASTRO_BASE,
   devToolbar: { enabled: false },
   prefetch: false,
   trailingSlash: 'always',

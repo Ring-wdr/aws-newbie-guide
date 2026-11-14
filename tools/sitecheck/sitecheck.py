@@ -57,6 +57,17 @@ def route_for(rel: str) -> str:
     return f"/{p.lower()}/"
 
 
+def detect_base(dist: Path) -> str:
+    """산출물이 빌드된 base 경로("" = 루트, "/aws-newbie-guide" 등 — site/src/lib/base.mjs 의 GUIDE_BASE).
+    홈(index.html)이 불러오는 /…/_astro/ 자산의 앞부분에서 읽는다(site/tests/lib/harness.mjs 의 detectBase 와 같은 규칙)."""
+    try:
+        text = (dist / "index.html").read_text(encoding="utf-8")
+    except OSError:
+        return ""
+    m = re.search(r'\s(?:href|src)="(/(?:[A-Za-z0-9._-]+/)*)_astro/', text)
+    return m.group(1).rstrip("/") if m else ""
+
+
 def html_for_route(dist: Path, route: str) -> Path:
     return dist / route.strip("/") / "index.html" if route != "/" else dist / "index.html"
 
@@ -375,8 +386,11 @@ def gate_exam(extra_sheets: list[Path] | None = None) -> Gate:
 
 
 # ---------------------------------------------------------------- 내부 링크·앵커
-def gate_links(dist: Path, routes: list[str] | None) -> Gate:
-    g = Gate("내부 링크·앵커")
+def gate_links(dist: Path, routes: list[str] | None, base: str | None = None) -> Gate:
+    """산출물의 내부 링크·자산 참조가 있는 파일·앵커를 가리키는지. 하위 경로(base)로 빌드한 산출물이면
+    "/"로 시작하는 주소는 모두 base 아래여야 한다(base 를 빠뜨린 링크는 배포본에서 사이트 밖 404가 된다)."""
+    base = detect_base(dist) if base is None else base
+    g = Gate("내부 링크·앵커" + (f"(base {base}/)" if base else ""))
     ids_cache: dict[Path, set[str]] = {}
 
     def ids_of(p: Path) -> set[str]:
@@ -401,8 +415,14 @@ def gate_links(dist: Path, routes: list[str] | None) -> Gate:
             g.checked += 1
             parts = urlsplit(url)
             if parts.path:
-                target = (dist / unquote(parts.path).lstrip("/")) if parts.path.startswith("/") else (page.parent / unquote(parts.path))
-                if target.is_dir() or parts.path.endswith("/"):
+                path = parts.path
+                if base and path.startswith("/"):
+                    if path != base and not path.startswith(base + "/"):
+                        g.fail(f"{page.relative_to(dist)}: base({base}/) 밖을 가리킴 {url}")
+                        continue
+                    path = path[len(base):] or "/"
+                target = (dist / unquote(path).lstrip("/")) if path.startswith("/") else (page.parent / unquote(path))
+                if target.is_dir() or path.endswith("/"):
                     target = target / "index.html"
             else:
                 target = page
@@ -730,6 +750,15 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     global DIST_IN_USE
     DIST_IN_USE = dist.resolve()
+    # 하위 경로(GUIDE_BASE)로 빌드한 산출물이면 그 base 를 산출물에서 읽는다. 브라우저 검사의 서버도 같은 base 아래에서 연다.
+    base = detect_base(dist)
+    if "GUIDE_BASE" in os.environ:
+        want = "/" + os.environ["GUIDE_BASE"].strip().strip("/") if os.environ["GUIDE_BASE"].strip().strip("/") else ""
+        if want != base:
+            print(f"GUIDE_BASE({want or '/'})와 산출물의 base({base or '/'})가 다르다: {dist} — 같은 GUIDE_BASE 로 다시 빌드한다", file=sys.stderr)
+            return 2
+    if base:
+        print(f"산출물 base: {base}/ (브라우저 검사는 http://127.0.0.1:<포트>{base}/ 에서 연다)")
     files = select_files(args.pages)
     routes = None if args.pages == "all" else [route_for(f) for f in files]
     gates: list[Gate] = []
@@ -743,7 +772,7 @@ def main(argv: list[str] | None = None) -> int:
     if c in ("all", "exam"):
         gates.append(gate_exam())
     if c in ("all", "links"):
-        gates.append(gate_links(dist, routes))
+        gates.append(gate_links(dist, routes, base))
     if c in ("all", "scanner"):
         gates.append(gate_scanner())
     if c in ("all", "selftest"):

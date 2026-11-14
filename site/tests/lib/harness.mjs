@@ -10,6 +10,39 @@ import { chromium } from 'playwright';
 export const SITE_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 export const DIST = path.resolve(process.env.GUIDE_DIST || path.join(SITE_DIR, 'dist'));
 
+/**
+ * 산출물이 빌드된 base 경로(""=루트, "/aws-newbie-guide" 등 — src/lib/base.mjs 의 GUIDE_BASE). 산출물 자체에서 읽는다:
+ * 홈(index.html)이 불러오는 /…/_astro/ 자산의 앞부분. 그래서 검사·로컬 서버는 따로 설정하지 않아도 빌드와 같은 주소에서 연다.
+ * GUIDE_BASE 를 주면 그 값이 산출물과 같은지 확인한다(다르면 실패 — 다른 base 로 빌드한 산출물을 검사하지 않게).
+ */
+export function detectBase(root = DIST) {
+  let html;
+  try {
+    html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+  } catch {
+    return '';
+  }
+  const m = /\s(?:href|src)="(\/(?:[A-Za-z0-9._-]+\/)*)_astro\//.exec(html);
+  return m ? m[1].replace(/\/$/, '') : '';
+}
+/** 검사 대상 산출물(DIST)의 base 접두어. 페이지 경로("/curriculum/…/")는 base 를 뺀 사이트 경로로 다루고, 주소에만 붙인다. */
+export const BASE = detectBase(DIST);
+/** GUIDE_BASE 를 줬다면 산출물의 base 와 같은지(serve 가 DIST 를 열 때 확인한다 — 불러오기만 하는 --check 에서는 보지 않는다). */
+function assertBaseMatches() {
+  if (process.env.GUIDE_BASE === undefined) return;
+  const s = process.env.GUIDE_BASE.trim().replace(/^\/+|\/+$/g, '');
+  const want = s ? `/${s}` : '';
+  if (want !== BASE) throw new Error(`GUIDE_BASE(${want || '/'})와 산출물의 base(${BASE || '/'})가 다르다: ${DIST} — 같은 GUIDE_BASE 로 다시 빌드한다`);
+}
+/** 사이트 경로 → 주소 경로(base 접두어를 붙인다). 링크의 href 를 비교할 때 쓴다. */
+export const withBase = (route) => BASE + route;
+/** 주소 경로 → 사이트 경로(base 를 뺀다). base 밖의 경로는 null. */
+export function siteRoute(pathname) {
+  if (!BASE) return pathname;
+  if (pathname === BASE || pathname === `${BASE}/`) return '/';
+  return pathname.startsWith(`${BASE}/`) ? pathname.slice(BASE.length) : null;
+}
+
 const TYPES = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
@@ -61,10 +94,21 @@ export async function portBusy(port) {
   return !(await binds());
 }
 
-export function serve(port, root = DIST) {
+/**
+ * root 를 127.0.0.1:port 에서 연다. base(기본: 검사 대상 산출물이면 BASE, 결함을 심은 임시 폴더면 "")가 있으면
+ * 산출물을 그 경로 아래에서만 보여 준다(GitHub Pages 프로젝트 주소와 같다): /aws-newbie-guide/… → root/…,
+ * /aws-newbie-guide → /aws-newbie-guide/ 로 이동, 그 밖의 경로는 404(base 를 빠뜨린 링크·자산이 검사에서 드러나게).
+ */
+export function serve(port, root = DIST, base = path.resolve(root) === DIST ? BASE : '') {
   if (!fs.existsSync(path.join(root, 'index.html')) && !fs.existsSync(path.join(root, '404.html'))) {
     throw new Error(`빌드 산출물이 없다: ${root} — 먼저 pnpm --dir site build`);
   }
+  if (path.resolve(root) === DIST) assertBaseMatches();
+  const notFound = (res) => {
+    const nf = path.join(root, '404.html');
+    res.writeHead(404, { 'content-type': TYPES['.html'] });
+    res.end(fs.existsSync(nf) ? fs.readFileSync(nf) : 'not found');
+  };
   const server = http.createServer((req, res) => {
     let p;
     try {
@@ -72,6 +116,17 @@ export function serve(port, root = DIST) {
     } catch {
       res.writeHead(400).end();
       return;
+    }
+    if (base) {
+      if (p === base) {
+        res.writeHead(301, { location: `${base}/` }).end();
+        return;
+      }
+      if (!p.startsWith(`${base}/`)) {
+        notFound(res);
+        return;
+      }
+      p = p.slice(base.length);
     }
     let file = path.join(root, p);
     // 경로를 실제 위치(심볼릭 링크를 따라간 뒤)로 바꿔, 실제 dist 폴더 밖이면 거절한다(형제 폴더·링크로 빠져나가기 방지).
@@ -97,9 +152,7 @@ export function serve(port, root = DIST) {
       }
     }
     if (!fs.existsSync(file)) {
-      const nf = path.join(root, '404.html');
-      res.writeHead(404, { 'content-type': TYPES['.html'] });
-      res.end(fs.existsSync(nf) ? fs.readFileSync(nf) : 'not found');
+      notFound(res);
       return;
     }
     res.writeHead(200, { 'content-type': TYPES[path.extname(file)] || 'application/octet-stream' });
@@ -357,7 +410,8 @@ export const PILOT_PAGES = [
 ];
 
 /** 이 검사 스크립트가 연 루프백 서버의 주소. 위젯 keyboard.check.mjs 는 이것을 쓴다(static 관문은 루프백 주소도 허용한다). */
-export const baseUrl = (port) => `http://127.0.0.1:${port}`;
+// 산출물이 하위 경로(BASE)로 빌드됐으면 그 경로까지 붙는다 — 검사는 `${baseUrl(port)}${사이트 경로}` 로 연다.
+export const baseUrl = (port) => `http://127.0.0.1:${port}${BASE}`;
 
 /**
  * 위젯 하나의 좁은 화면 가로 넘침 검사 — 위젯 keyboard.check.mjs 가 --shots 없이도 늘 부른다(GUIDE-SITE 원칙 6: 360px에서 가로 스크롤 없음).
