@@ -53,8 +53,19 @@ try {
   await press('Enter');
   await expect('스스로 확인 1번', /^△ 저장됨 — 주의 .*13일만 두고.*17일치 조기 삭제/);
 
+  // 3b) 만료를 전환(7일)보다 빠른 5일로 → 거부, 다시 20일로 → 주의
+  await tabUntil('.lc input[data-field=exp-days]');
+  for (let i = 0; i < 6; i++) await press('Backspace');
+  await page.keyboard.type('5');
+  keys += 1;
+  await expect('만료 5일(전환 7일보다 빠름)', /^✗ 거부됨 .*만료\(5일\)가 Standard-IA 전환\(7일\)보다 빠르거나 같아 거부된다.*8일 이후/);
+  for (let i = 0; i < 6; i++) await press('Backspace');
+  await page.keyboard.type('20');
+  keys += 2;
+  await expect('만료 20일로 되돌림', /^△ 저장됨 — 주의 .*17일치/);
+
   // 4) 전환 1의 클래스를 글자 입력으로 Deep Archive로 → 13일만 두고 167일치
-  await tabUntil('.lc select[data-field=cls-0]');
+  await tabUntil('.lc select[data-field=cls-0]', { back: true });
   await page.keyboard.type('Glacier D');
   keys += 9;
   await expect('Deep Archive로 바꿈', /Glacier Deep Archive에 13일만 두고.*167일치/);

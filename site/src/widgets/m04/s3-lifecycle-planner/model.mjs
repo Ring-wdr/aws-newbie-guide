@@ -4,10 +4,14 @@
 // 규칙의 출처(줄 번호는 화면에 원고에서 읽은 값으로 표시한다 — facts.mjs):
 //  - 클래스별 최소 보관 기간·검색 시간: 레슨 "스토리지 클래스 한눈에" 표
 //  - 갈 수 있는 전환: 레슨 수명 주기 절의 폭포(waterfall) Mermaid 그림의 간선
-//  - 거부(InvalidArgument): 폭포를 거스르는 전환, 한 규칙 안에서 다음 전환이 이전 클래스의 최소 보관 기간보다 빠름,
-//    0일 만료(레슨 "AWS가 거부하는 규칙"·lab02 11·12단계 설명)
-//  - 저장되지만 돈이 새는 규칙(조기 삭제 요금), 만료가 마지막 전환보다 빠르거나 같음:
-//    curriculum/m04-storage/sdk/lifecycle_lint.py 의 _lint_chain 과 같은 판정(WARN)
+//  - 거부(InvalidArgument): 폭포를 거스르는 전환(같은 클래스로 두 번 전환 포함), 한 규칙 안에서 다음 전환이 이전 클래스의
+//    최소 보관 기간보다 빠름, 0일 만료(레슨 "AWS가 거부하는 규칙"·lab02 11·12단계 설명),
+//    만료가 어느 전환보다 빠르거나 같음 — 만료 일수는 모든 전환 일수보다 커야 한다(레슨 같은 목록. 근거 문서:
+//    AWS CloudFormation 템플릿 참조 "AWS::S3::Bucket Rule"의 ExpirationInDays·Transitions 설명
+//    "The expiration time must also be later than the transition time.", S3 오류 메시지
+//    "'Days' in the Expiration action … must be greater than 'Days' in the Transition action").
+//    이 저장소의 에뮬레이터는 이 규칙을 검사하지 않고 저장한다(레슨에 적힘).
+//  - 저장되지만 돈이 새는 규칙(조기 삭제 요금): curriculum/m04-storage/sdk/lifecycle_lint.py 의 _lint_chain 과 같은 판정(WARN)
 //  - 128 KB 미만 객체는 기본적으로 전환되지 않음, 2026-07 이전에는 IA 전환이 30일 이상이어야 했음: 레슨 본문(INFO)
 //
 // 모형의 가정(화면에도 적는다):
@@ -60,15 +64,20 @@ export function evaluate(input, rules) {
   let prev = 'STANDARD';
   let prevDay = 0;
   let hasPrev = false;
+  const seen = new Set();
   for (const s of steps) {
     if ((s.cls === 'STANDARD_IA' || s.cls === 'ONEZONE_IA') && s.days < rules.oldIaMinDays) {
       findings.push({ level: 'info', code: 'old-ia', data: { cls: s.cls, days: s.days, min: rules.oldIaMinDays } });
     }
-    if (!(rules.next[prev] || []).includes(s.cls)) {
+    if (seen.has(s.cls)) {
+      // 같은 클래스로 두 번 전환: 폭포에 X → X 간선이 없으니 거부(문구만 따로)
+      findings.push({ level: 'error', code: 'duplicate-class', data: { cls: s.cls, day: s.days } });
+    } else if (!(rules.next[prev] || []).includes(s.cls)) {
       findings.push({ level: 'error', code: 'backwards', data: { from: prev, to: s.cls, fromDay: hasPrev ? prevDay : null, day: s.days } });
     } else if (hasPrev && s.days - prevDay < rules.minDays[prev]) {
       findings.push({ level: 'error', code: 'too-soon', data: { from: prev, to: s.cls, fromDay: prevDay, day: s.days, min: rules.minDays[prev], need: prevDay + rules.minDays[prev] } });
     }
+    seen.add(s.cls);
     prev = s.cls;
     prevDay = s.days;
     hasPrev = true;
@@ -76,13 +85,16 @@ export function evaluate(input, rules) {
   if (exp !== null && exp < rules.expirationMinDays) {
     findings.push({ level: 'error', code: 'expire-zero', data: { days: exp, min: rules.expirationMinDays } });
   }
+  // 만료는 모든 전환보다 늦어야 한다(위 머리 주석의 근거 문서). steps 는 날짜순이라 마지막이 가장 늦은 전환이다.
+  const lastStep = steps[steps.length - 1];
+  if (exp !== null && lastStep && exp <= lastStep.days) {
+    findings.push({ level: 'error', code: 'expire-not-after-transition', data: { exp, lastDay: lastStep.days, cls: lastStep.cls, need: lastStep.days + 1 } });
+  }
   const saved = !findings.some((f) => f.level === 'error');
 
   if (exp !== null && steps.length && saved) {
-    const last = steps[steps.length - 1];
-    if (exp <= last.days) {
-      findings.push({ level: 'warn', code: 'expire-before-last', data: { exp, lastDay: last.days } });
-    } else if (exp - last.days < rules.minDays[last.cls]) {
+    const last = lastStep;
+    if (exp - last.days < rules.minDays[last.cls]) {
       const held = exp - last.days;
       findings.push({ level: 'warn', code: 'early-delete', data: { cls: last.cls, held, min: rules.minDays[last.cls], remaining: rules.minDays[last.cls] - held } });
     }
@@ -138,8 +150,10 @@ export function describeFinding(f, name) {
       return `${name(d.from)}(${d.fromDay}일) → ${name(d.to)}(${d.day}일): 다음 전환이 ${name(d.from)}의 최소 보관 기간 ${d.min}일보다 빨라 거부된다(InvalidArgument). ${d.need}일 이후여야 한다.`;
     case 'expire-zero':
       return `만료 ${d.days}일: 0일 만료는 거부된다. ${d.min}일 이상이어야 한다.`;
-    case 'expire-before-last':
-      return `만료(${d.exp}일)가 마지막 전환(${d.lastDay}일)보다 빠르거나 같다 — 그 전환은 일어나지 않아 의미가 없다.`;
+    case 'expire-not-after-transition':
+      return `만료(${d.exp}일)가 ${name(d.cls)} 전환(${d.lastDay}일)보다 빠르거나 같아 거부된다(InvalidArgument). 만료는 모든 전환보다 늦어야 한다 — ${d.need}일 이후여야 한다.`;
+    case 'duplicate-class':
+      return `한 규칙에 같은 클래스 전환 중복: ${name(d.cls)}(${d.day}일)로 이미 전환했다 — 거부된다(InvalidArgument).`;
     case 'early-delete':
       return `${name(d.cls)}에 ${d.held}일만 두고 삭제한다 → 최소 보관 ${d.min}일 중 남은 ${d.remaining}일치 조기 삭제 요금이 나온다(저장은 된다).`;
     case 'old-ia':

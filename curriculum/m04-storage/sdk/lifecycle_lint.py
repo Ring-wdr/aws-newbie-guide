@@ -8,6 +8,9 @@
          - 한 규칙 안에서 다음 전환이 이전 클래스의 최소 보관 기간보다 빨리 옴
            (예: Glacier IR 4일 → Deep Archive 20일. 94일 이후여야 함) — 첫 전환이 0일이어도 검사한다
          - 폭포(waterfall) 방향을 거스르는 전환 (예: GLACIER → STANDARD_IA)
+         - 만료(Expiration)가 전환보다 빠르거나 같음 — 만료 일수는 모든 전환 일수보다 커야 한다
+           (CloudFormation 템플릿 참조 "AWS::S3::Bucket Rule": "The expiration time must also be later than
+           the transition time." 이전 버전 전환·만료도 같다). 에뮬레이터는 이 규칙을 검사하지 않고 저장한다
   WARN   저장은 되지만 돈이 새는 규칙
          - 마지막 클래스의 최소 보관 기간이 끝나기 전에 만료(삭제) → 조기 삭제 요금
   INFO   알아 둘 것
@@ -87,7 +90,8 @@ def _lint_chain(rid: str, label: str, steps: list[tuple[int, str]], expire: int 
     if expire is not None and steps:
         last_day, last_cls = steps[-1]
         if expire <= last_day:
-            out.append(Finding("WARN", rid, f"[{label}] 만료({expire}일)가 마지막 전환({last_day}일)보다 빠르거나 같음 — 전환이 의미 없음"))
+            out.append(Finding("ERROR", rid, f"[{label}] 만료({expire}일)가 마지막 전환({last_day}일)보다 빠르거나 같음 — "
+                               "만료는 모든 전환보다 늦어야 해 실제 AWS는 거부함"))
         elif expire - last_day < MIN_DAYS[last_cls]:
             short = MIN_DAYS[last_cls] - (expire - last_day)
             out.append(Finding("WARN", rid, f"[{label}] {last_cls} 에 {expire - last_day}일만 두고 삭제 → 최소 보관 "

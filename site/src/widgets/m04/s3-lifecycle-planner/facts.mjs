@@ -78,6 +78,10 @@ export function readLifecycleFacts(text) {
   const ex = findLine(lines, /예: Glacier IR (\d+)일 → Deep Archive (\d+)일은 안 되고 (\d+)일 이후여야 한다/, '거부 규칙의 예');
   const rejectExample = { girDays: Number(ex.m[1]), daDays: Number(ex.m[2]), okFrom: Number(ex.m[3]), line: ex.line };
 
+  // 3b) 만료는 모든 전환보다 늦어야 한다: "만료 일수는 그 규칙의 모든 전환 일수보다 커야 한다"
+  const ea = findLine(lines, /만료 일수는 그 규칙의 모든 전환 일수보다 커야 한다/, '만료·전환 순서 규칙');
+  const expireAfter = { line: ea.line };
+
   // 4) 2026-07 변경 전 규칙: "Standard-IA·One Zone-IA로의 전환은 생성 후 30일 이상"
   const old = findLine(lines, /Standard-IA·One Zone-IA로의 전환은 생성 후 (\d+)일 이상/, '2026-07 이전 IA 최소 전환 일수');
   const oldIaMin = { days: Number(old.m[1]), line: old.line };
@@ -129,5 +133,5 @@ export function readLifecycleFacts(text) {
     answer: { held: Number(ans.m[1]), remaining: Number(ans.m[2]), line: ans.line },
   };
 
-  return { lesson: LESSON, classes, tableLine: head.line, waterfall, rejectExample, oldIaMin, smallObject, restore, restoreLine, expirationMin, receipts, labRejects, selfCheck };
+  return { lesson: LESSON, classes, tableLine: head.line, waterfall, rejectExample, expireAfter, oldIaMin, smallObject, restore, restoreLine, expirationMin, receipts, labRejects, selfCheck };
 }

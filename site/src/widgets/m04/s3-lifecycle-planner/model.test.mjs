@@ -106,20 +106,45 @@ test('IA 전환 2026-07 변경: 0일도 저장(참고만), 30일은 참고 없�
 test('폭포: One Zone-IA → Glacier IR, 같은 클래스로 다시 전환, Deep Archive 다음은 모두 거부', () => {
   assert.deepEqual(codes(run([{ cls: 'ONEZONE_IA', days: 30 }, { cls: 'GLACIER_IR', days: 90 }])), ['error:backwards']);
   assert.deepEqual(codes(run([{ cls: 'ONEZONE_IA', days: 30 }, { cls: 'GLACIER', days: 90 }])), []);
-  assert.deepEqual(codes(run([{ cls: 'STANDARD_IA', days: 30 }, { cls: 'STANDARD_IA', days: 90 }])), ['error:backwards']);
+  const dup = run([{ cls: 'STANDARD_IA', days: 30 }, { cls: 'STANDARD_IA', days: 90 }]);
+  assert.deepEqual(codes(dup), ['error:duplicate-class']);
+  assert.match(describeFinding(dup.findings[0], name), /^한 규칙에 같은 클래스 전환 중복: Standard-IA\(90일\)/);
   assert.deepEqual(codes(run([{ cls: 'DEEP_ARCHIVE', days: 0 }, { cls: 'GLACIER', days: 200 }])), ['error:backwards']);
   // Intelligent-Tiering 은 최소 보관 0일이라 같은 날 다음 전환도 받는다
   assert.equal(run([{ cls: 'INTELLIGENT_TIERING', days: 5 }, { cls: 'GLACIER', days: 5 }]).result, 'ok');
 });
 
-test('만료: 0일은 거부, 1일은 저장. 마지막 전환 이전·같은 날 만료는 경고, 그 전환은 일어나지 않는다', () => {
+test('만료: 0일은 거부, 1일은 저장', () => {
   assert.deepEqual(codes(run([], 0)), ['error:expire-zero']);
   const one = run([], 1);
   assert.equal(one.result, 'ok');
   assert.deepEqual(one.stages.map((s) => [s.cls, s.from, s.to]), [['STANDARD', 0, 1]]);
-  const r = run([{ cls: 'STANDARD_IA', days: 30 }, { cls: 'GLACIER', days: 90 }], 90);
-  assert.deepEqual(codes(r), ['warn:expire-before-last']);
-  assert.deepEqual(r.stages.map((s) => [s.cls, s.from, s.to]), [['STANDARD', 0, 30], ['STANDARD_IA', 30, 90]]);
+});
+
+test('만료가 어느 전환보다 빠르거나 같으면 거부(레슨 목록·CloudFormation AWS::S3::Bucket Rule), 하루 늦으면 저장(경계)', () => {
+  assert.match(text.split('\n')[facts.expireAfter.line - 1], /만료 일수는 그 규칙의 모든 전환 일수보다 커야 한다/);
+  // 검증자 재현: Glacier Flexible 90일 + 만료 60일·90일
+  for (const exp of [60, 90]) {
+    const r = run([{ cls: 'GLACIER', days: 90 }], exp);
+    assert.equal(r.result, 'rejected', String(exp));
+    assert.deepEqual(codes(r), ['error:expire-not-after-transition']);
+    assert.equal(r.stages.length, 0);
+    assert.match(describeFinding(r.findings[0], name), /거부된다\(InvalidArgument\).*91일 이후/);
+  }
+  const ok = run([{ cls: 'GLACIER', days: 90 }], 91);
+  assert.equal(ok.saved, true);
+  assert.deepEqual(codes(ok), ['warn:early-delete']);
+  assert.equal(ok.findings[0].data.remaining, 89);
+  // 가운데 전환보다만 늦어도 마지막 전환보다 빠르면 거부(만료는 모든 전환보다 늦어야)
+  assert.deepEqual(codes(run([{ cls: 'STANDARD_IA', days: 30 }, { cls: 'GLACIER', days: 120 }], 100)), ['error:expire-not-after-transition']);
+  // 입력 순서와 상관없다
+  assert.deepEqual(codes(run([{ cls: 'GLACIER', days: 120 }, { cls: 'STANDARD_IA', days: 30 }], 120)), ['error:expire-not-after-transition']);
+  assert.match(summarize(run([{ cls: 'GLACIER', days: 90 }], 90), name), /저장되지 않는다/);
+});
+
+test('sdk/lifecycle_lint.py 도 만료가 마지막 전환보다 빠르거나 같으면 ERROR(위젯과 같은 판정)', () => {
+  const py = fs.readFileSync(path.join(REPO, 'curriculum/m04-storage/sdk/lifecycle_lint.py'), 'utf8');
+  assert.match(py, /if expire <= last_day:\n\s+out\.append\(Finding\("ERROR"/);
 });
 
 test('128 KB 미만: 규칙은 저장되지만 객체는 Standard에 머문다', () => {
