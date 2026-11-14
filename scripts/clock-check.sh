@@ -34,8 +34,9 @@
 #           4 = 불안정 — 0.5초 이상(60초 미만) 보정이 3번 이상(설명과 해결 방법 출력)
 #           2 = 확인하지 못함 (Colima VM 이 아님·colima ssh 실패·시간 초과 — 이유를 한 줄 출력)
 #           (--summary 는 언제나 0)
-# 부르는 곳: emulator-up.sh·emulator-status.sh(경고만), M00 labs/verify.sh(요약). env.sh·dr-env.sh 는 부르지 않는다
-# (lab 마다 source 되므로 colima ssh 비용을 붙이지 않는다). 기본 모드의 종료 코드 0·3·2 는 그대로다.
+# 부르는 곳: emulator-up.sh·emulator-status.sh(_common.sh 의 warn_if_clock_unstable — 경고만), 15개 모듈(M00~M14)의
+# labs/verify.sh(--stability --summary — M01~M14 는 실패할 때만, M00 은 통과할 때에도). env.sh·dr-env.sh 는 이 모드를
+# 부르지 않는다(lab 마다 source 되므로 colima ssh 비용을 붙이지 않는다). 기본 모드의 종료 코드 0·3·2 는 그대로다.
 # (EMULATOR_CLOCK_FAKE_JOURNAL: 테스트용으로 VM 저널 대신 읽을 파일. 'journalctl -o short-unix' 형식)
 set -uo pipefail
 
