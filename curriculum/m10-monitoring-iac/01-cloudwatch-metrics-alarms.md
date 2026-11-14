@@ -40,7 +40,7 @@ stateDiagram-v2
 ```
 
 - **Period × EvaluationPeriods × DatapointsToAlarm** — "최근 N개 구간 중 M개가 위반이면 ALARM" (M of N). 순간 튀는 값에 깨지 않게 하는 장치다.
-- **TreatMissingData** — 데이터가 안 올 때: `missing`(판단 보류) · `notBreaching`(정상 취급) · `breaching`(위반 취급) · `ignore`(직전 상태 유지). 하트비트 지표가 끊기면 장애로 보고 싶다면 `breaching`. CloudWatch는 평가할 때 EvaluationPeriods보다 많은 최근 데이터 포인트를 가져오는데(이 시간 폭이 **평가 범위**), TreatMissingData는 평가 범위에 실제 데이터 포인트가 평가 기간 수보다 적을 때 모자라는 만큼만 채운다 — 실제 포인트가 평가 기간 수 이상이면 쓰이지 않는다.
+- **TreatMissingData** — 데이터가 안 올 때: `missing`(판단 보류) · `notBreaching`(정상 취급) · `breaching`(위반 취급) · `ignore`(직전 상태 유지). 하트비트 지표가 끊기면 장애로 보고 싶다면 `breaching`. 기본인 슬라이딩 평가 창에서 CloudWatch는 평가할 때 EvaluationPeriods보다 많은 최근 데이터 포인트를 가져오는데(이 시간 폭이 **평가 범위**. 벽시계 평가 창을 쓰는 알람은 Period × EvaluationPeriods 구간의 데이터 포인트만 가져온다), TreatMissingData는 평가 범위에 실제 데이터 포인트가 평가 기간 수보다 적을 때 모자라는 만큼만 채운다 — 실제 포인트가 평가 기간 수 이상이면 쓰이지 않는다.
 - **액션** — 상태가 **바뀔 때** 실행: SNS 알림, Lambda 함수 호출, EC2 Auto Scaling 정책, EC2 동작(중지·종료·재부팅·복구), Systems Manager OpsItem·Incident Manager 인시던트. 상태에 머물러 있는 동안 다시 실행하지 않는다 — **단, Auto Scaling 액션은 예외**로, 알람이 그 상태에 머무는 동안 1분에 한 번씩 계속 호출된다(그래서 부하가 안 내려가면 조정이 계속된다).
 - **복합 알람(composite alarm)** — 여러 알람을 `AND`/`OR`/`NOT`으로 묶는다. "지연 높음 AND 5xx 많음"일 때만 당직을 깨워 **알람 피로**를 줄인다. 복합 알람은 SNS·Lambda·Systems Manager 액션은 실행하지만 **EC2 동작이나 Auto Scaling 액션은 실행할 수 없다.**
 - **지표 수학(metric math)** — `100*errors/requests` 처럼 지표끼리 계산한 값에 알람을 건다.
