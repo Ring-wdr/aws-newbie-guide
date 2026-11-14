@@ -11,15 +11,18 @@
     "build:pilot": "GUIDE_SCOPE=pilot ASTRO_TELEMETRY_DISABLED=1 ASTRO_DISABLE_UPDATE_CHECK=true astro build --force",
     "preview": "ASTRO_TELEMETRY_DISABLED=1 ASTRO_DISABLE_UPDATE_CHECK=true astro preview --host 127.0.0.1",
     "report": "node scripts/converter-report.mjs",
-    "test:widgets": "node --test 'src/widgets/**/*.test.mjs' 'src/progress/*.test.mjs' 'src/lib/*.test.mjs'"
+    "test:widgets": "node --test 'src/widgets/**/*.test.mjs' 'src/progress/*.test.mjs' 'src/lib/*.test.mjs' 'src/plugins/*.test.mjs'"
   },
   "dependencies": {
     "@astrojs/markdown-remark": "7.3.8",
     "@astrojs/preact": "6.1.5",
     "@astrojs/starlight": "0.42.11",
+    "@fontsource/noto-sans-kr": "5.3.1",
+    "@fontsource/noto-sans-symbols-2": "5.3.0",
     "astro": "7.4.11",
     "axe-core": "4.14.0",
     "github-slugger": "2.0.0",
+    "harfbuzzjs": "1.6.4",
     "hast-util-to-string": "3.0.1",
     "mdast-util-to-string": "4.0.0",
     "mermaid-isomorphic": "3.1.0",
@@ -29,6 +32,7 @@
     "remark-parse": "11.0.0",
     "unified": "11.0.5",
     "unist-util-visit": "5.2.0",
-    "vfile": "6.0.3"
+    "vfile": "6.0.3",
+    "wawoff2": "2.0.1"
   }
 }

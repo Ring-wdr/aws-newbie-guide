@@ -82,7 +82,8 @@ export function transformCode(tree, ctx) {
   });
 }
 
-export function mermaidHtml(source, rendered, ids, narrow = null) {
+// fontCss: 다이어그램 글꼴의 @font-face(같은 사이트의 /fonts/…woff2). 페이지의 첫 그림에만 넣는다(remark-guide.mjs).
+export function mermaidHtml(source, rendered, ids, narrow = null, fontCss = '') {
   const svgBox = (theme) => {
     const r = rendered[theme];
     // SVG의 가로 크기를 원래 크기로 유지해, 좁은 화면에서는 줄이지 않고 상자 안에서 가로로 스크롤한다.
@@ -104,6 +105,7 @@ export function mermaidHtml(source, rendered, ids, narrow = null) {
     : '';
   return (
     `<figure class="diagram${narrow ? ' has-narrow' : ''}">` +
+    (fontCss ? `<style data-diagram-font>${fontCss}</style>` : '') +
     `<div class="diagram-scroll diagram-scroll-wide" tabindex="0" role="group" aria-label="${esc(ko.diagram.label)}">${svgBox('light')}${svgBox('dark')}</div>` +
     narrowBox +
     open +

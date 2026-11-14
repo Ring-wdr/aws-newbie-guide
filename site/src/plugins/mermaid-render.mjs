@@ -5,14 +5,35 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
+import { pathToFileURL } from 'node:url';
 import { SITE_DIR } from '../lib/repo.mjs';
+import { FONT_STACK, DIAGRAM_FAMILY, EMOJI_SEQ, diagramFonts, fontFaceCssInline, assertCovered } from './diagram-font.mjs';
 
 const require = createRequire(import.meta.url);
 const CACHE_DIR = path.join(SITE_DIR, 'node_modules/.cache/guide-mermaid');
 
-// 페이지와 같은 시스템 글꼴 스택. 빌드 때 글자 폭을 이 글꼴로 재므로 화면과 어긋남이 작다.
-export const FONT_STACK =
-  '-apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", "Segoe UI", sans-serif';
+// 그림 글자는 사이트에 실은 다이어그램 글꼴("Guide Diagram", diagram-font.mjs)로 재고 그 글꼴로 보인다.
+// 시스템 글꼴로 재면 빌드한 기계와 보는 기계의 글꼴이 다를 때 라벨이 줄바꿈되어 상자 밖으로 넘치고 잘린다.
+export { FONT_STACK };
+
+// 라벨 안 글자를 상자 밖으로 넘쳐도 자르지 않는다(대체 글꼴로 그려질 때의 방어선 — guide.css 와 단독 SVG 도 같다).
+export const OVERFLOW_CSS = 'svg[id^="mmd-"],svg[id^="mmd-"] foreignObject{overflow:visible}';
+
+// 그리기·재기 페이지에 넣는 글꼴 스타일시트(data: 주소 — 요청 없이 읽힌다). mermaid-isomorphic 은 스타일시트를 주소로만 받는다.
+let fontCssUrl;
+async function fontStylesheet() {
+  if (!fontCssUrl) {
+    fontCssUrl = (async () => {
+      const css = await fontFaceCssInline();
+      const { hash } = await diagramFonts();
+      fs.mkdirSync(CACHE_DIR, { recursive: true });
+      const file = path.join(CACHE_DIR, `font-${hash}.css`);
+      fs.writeFileSync(file, css);
+      return { url: pathToFileURL(file).href, css };
+    })();
+  }
+  return fontCssUrl;
+}
 
 const THEMES = {
   light: { theme: 'default' },
@@ -30,22 +51,49 @@ function cacheVersion() {
         return '?';
       }
     };
-    versionTag = `mi${v('mermaid-isomorphic')}-pw${v('playwright')}-v7`;
+    versionTag = `mi${v('mermaid-isomorphic')}-pw${v('playwright')}-v9-${DOC_LANG}`;
   }
   return versionTag;
 }
+
+// 사이트 문서의 언어(<html lang="ko">). 글꼴은 언어에 따라 글자 폭이 달라질 수 있다(Noto Sans KR 의 공백은 lang=ko 에서
+// 4.48px, 그 밖에서 3.58px — 16px). mermaid-isomorphic 의 그리기 페이지는 lang="en" 이라, 같은 언어로 재도록 바꾼다.
+export const DOC_LANG = 'ko';
+const SET_LANG = `(() => { const set = () => { document.documentElement.lang = ${JSON.stringify(DOC_LANG)}; }; document.addEventListener('DOMContentLoaded', set); })();`;
 
 let renderer;
 async function getRenderer() {
   if (!renderer) {
     const { createMermaidRenderer } = await import('mermaid-isomorphic');
-    renderer = createMermaidRenderer();
+    const { chromium } = await import('playwright');
+    // 그리기 페이지마다 문서 언어를 사이트와 같게(init 스크립트). mermaid-isomorphic 은 browserType.launch → newContext → newPage 를 쓴다.
+    const browserType = {
+      async launch(opts) {
+        const browser = await chromium.launch(opts);
+        const newContext = browser.newContext.bind(browser);
+        browser.newContext = async (o) => {
+          const ctx = await newContext(o);
+          await ctx.addInitScript(SET_LANG);
+          return ctx;
+        };
+        return browser;
+      },
+    };
+    renderer = createMermaidRenderer({ browserType });
   }
   return renderer;
 }
 
-function keyFor(source, theme) {
-  return crypto.createHash('sha256').update(`${cacheVersion()}\0${JSON.stringify(THEMES[theme])}\0${source}`).digest('hex').slice(0, 24);
+// 그림에 넣는 CSS(시퀀스 자동 번호 글꼴, 글자 폭 계산 방식). 캐시 열쇠에도 넣는다.
+// text-rendering: geometricPrecision — Linux 의 Chromium 은 기본으로 글자 폭(advance)을 정수 px 로 맞춰(힌팅) 재고,
+// macOS·Windows 는 소수점까지 잰다. 같은 글꼴이어도 빌드한 OS 에 따라 라벨 폭이 1px 안팎 달라져 보는 쪽에서 줄이 바뀐다.
+// geometricPrecision 이면 Linux 에서도 힌팅 없이 소수점 폭(선형 글자 폭)으로 재고 그려 OS 와 상관없이 같은 폭이 된다.
+// (Mermaid 는 이 CSS 를 그림 id 아래로 묶으며 선택자를 소문자로 바꾼다 — SVG 요소 이름(foreignObject)으로는 고르지 못하므로
+//  그림 안 모든 요소(*)에 준다. 라벨 넘침 허용은 guide.css·단독 SVG 의 OVERFLOW_CSS 가 맡는다.)
+const THEME_CSS = `*{text-rendering:geometricPrecision}.sequenceNumber{font-family:${FONT_STACK}}`;
+
+function keyFor(source, theme, fontHash) {
+  return crypto.createHash('sha256').update(`${cacheVersion()}\0${fontHash}\0${FONT_STACK}\0${THEME_CSS}\0${JSON.stringify(THEMES[theme])}\0${source}`).digest('hex').slice(0, 24);
 }
 
 // 다이어그램마다 고유한 id 접두어. SVG 안의 <style>이 id로 범위를 잡으므로 한 페이지 안에서 겹치면 안 된다.
@@ -76,17 +124,109 @@ async function measurePageFor() {
   }
   return browserPromise;
 }
-async function overlaps(svg, width) {
+async function withMeasurePage(svg, width, fn) {
   const { browser } = await measurePageFor();
   const measurePage = await browser.newPage({ viewport: { width: 1600, height: 1200 } });
   try {
-    return await measure(measurePage, svg, width);
+    const { css } = await fontStylesheet();
+    await measurePage.setContent(`<!doctype html><html lang="${DOC_LANG}"><head><style>${css}${OVERFLOW_CSS}</style></head><body><div style="width:${Math.ceil(width)}px">${svg}</div></body></html>`);
+    // 실린 글꼴이 실제로 읽혔는지 확인한다(못 읽으면 시스템 글꼴로 재게 되어 다른 기계에서 잘린다 → 빌드 실패).
+    const fonts = await measurePage.evaluate(async (family) => {
+      await document.fonts.ready;
+      const faces = [...document.fonts].filter((f) => f.family.replace(/"/g, '') === family);
+      return { total: faces.length, bad: faces.filter((f) => f.status === 'error').length };
+    }, DIAGRAM_FAMILY);
+    if (!fonts.total || fonts.bad) throw new Error(`다이어그램 글꼴을 읽지 못했다(@font-face ${fonts.total}개 중 오류 ${fonts.bad}개)`);
+    return await fn(measurePage);
   } finally {
     await measurePage.close().catch(() => {});
   }
 }
-async function measure(measurePage, svg, width) {
-  await measurePage.setContent(`<div style="width:${Math.ceil(width)}px">${svg}</div>`);
+async function overlaps(svg, width) {
+  return withMeasurePage(svg, width, measure);
+}
+
+/**
+ * 고른 그림을 실린 글꼴로 다시 열어 확인한다(빌드 실패 조건):
+ *  - 모든 글자가 실린 글꼴로 그려졌다(Chromium 이 실제로 쓴 글꼴 — DevTools 프로토콜 CSS.getPlatformFontsForNode).
+ *    시스템 글꼴로 대신 그려진 글자가 있으면 보는 기계마다 폭이 달라진다. 그림 글자(이모지)만 예외(diagram-font.mjs).
+ *  - HTML 라벨(foreignObject) 안 내용이 상자보다 넓거나 높지 않다(잰 글꼴 = 보이는 글꼴이면 잘림이 없어야 한다).
+ *  - 그림 글자가 든 라벨은 그림 글자마다 0.35em 넓혀도 넘치지 않는다(OS 마다 그림 글자 폭이 다르다).
+ */
+async function verifyRendered(svg, width, what) {
+  return withMeasurePage(svg, width, async (page) => {
+    const clipCheck = () =>
+      page.evaluate(() => {
+        const out = [];
+        for (const fo of document.querySelectorAll('foreignObject')) {
+          const inner = fo.firstElementChild;
+          if (!inner) continue;
+          const fr = fo.getBoundingClientRect();
+          const ir = inner.getBoundingClientRect();
+          // 잰 글꼴 = 보이는 글꼴이므로 오차는 반올림 정도뿐이다(0.1px 넘게 넓으면 그리기와 재기의 조건이 다르다는 뜻).
+          if (ir.width - fr.width > 0.1 || ir.height - fr.height > 0.5) out.push(`"${inner.textContent.trim().slice(0, 30)}" (+${(ir.width - fr.width).toFixed(2)}×+${(ir.height - fr.height).toFixed(2)}px)`);
+        }
+        return out;
+      });
+    const clipped = await clipCheck();
+    const emojiSrc = EMOJI_SEQ.source;
+    await page.evaluate(() => {
+      let n = 0;
+      const walker = document.createTreeWalker(document.querySelector('svg'), NodeFilter.SHOW_TEXT);
+      for (let t = walker.nextNode(); t; t = walker.nextNode()) {
+        if (!t.nodeValue.trim() || t.parentElement.closest('style, title, desc')) continue;
+        if (!t.parentElement.hasAttribute('data-fchk')) t.parentElement.setAttribute('data-fchk', String(n++));
+      }
+    });
+    const cdp = await page.context().newCDPSession(page);
+    const foreign = [];
+    try {
+      await cdp.send('DOM.enable');
+      await cdp.send('CSS.enable');
+      const { root } = await cdp.send('DOM.getDocument', { depth: -1 });
+      const { nodeIds } = await cdp.send('DOM.querySelectorAll', { nodeId: root.nodeId, selector: '[data-fchk]' });
+      for (const nodeId of nodeIds) {
+        const { fonts } = await cdp.send('CSS.getPlatformFontsForNode', { nodeId });
+        const sys = fonts.filter((f) => !f.isCustomFont && f.glyphCount > 0);
+        if (!sys.length) continue;
+        const { outerHTML } = await cdp.send('DOM.getOuterHTML', { nodeId });
+        const text = outerHTML.replace(/<[^>]+>/g, '');
+        const emoji = (text.match(new RegExp(emojiSrc, 'gu')) || []).length;
+        const sysGlyphs = sys.reduce((a, f) => a + f.glyphCount, 0);
+        if (sysGlyphs > emoji) foreign.push(`${sys.map((f) => `${f.familyName} ${f.glyphCount}자`).join(', ')}: ${text.trim().slice(0, 40)}`);
+      }
+    } finally {
+      await cdp.detach().catch(() => {});
+    }
+    // 그림 글자 여유: 그림 글자 묶음마다 0.35em 의 빈 폭을 붙여 다시 잰다.
+    const wideEmoji = await page.evaluate((src) => {
+      const re = new RegExp(src, 'gu');
+      let n = 0;
+      for (const fo of document.querySelectorAll('foreignObject')) {
+        const walker = document.createTreeWalker(fo, NodeFilter.SHOW_TEXT);
+        const texts = [];
+        for (let t = walker.nextNode(); t; t = walker.nextNode()) if (re.test(t.nodeValue)) texts.push(t);
+        for (const t of texts) {
+          re.lastIndex = 0;
+          const html = t.nodeValue.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c]).replace(re, (m) => `<span style="padding-inline-end:.35em">${m}</span>`);
+          const span = document.createElement('span');
+          span.innerHTML = html;
+          t.replaceWith(...span.childNodes);
+          n++;
+        }
+      }
+      return n;
+    }, emojiSrc);
+    const emojiClipped = wideEmoji ? await clipCheck() : [];
+    const problems = [
+      ...clipped.map((c) => `라벨 잘림 ${c}`),
+      ...foreign.map((f) => `시스템 글꼴로 그려진 글자(${f})`),
+      ...emojiClipped.filter((c) => !clipped.includes(c)).map((c) => `그림 글자(이모지) 폭이 조금만 넓어도 라벨이 잘림 ${c} — 그 줄을 짧게 하거나 줄을 나눈다`),
+    ];
+    if (problems.length) throw new Error(`${what}: 실린 글꼴로 다시 재 보니 ${problems.slice(0, 5).join('; ')}`);
+  });
+}
+async function measure(measurePage) {
   return measurePage.evaluate(() => {
     const inter = (a, b) => a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1;
     const con = (a, b) => a.left <= b.left + 1 && a.right >= b.right - 1 && a.top <= b.top + 1 && a.bottom >= b.bottom - 1;
@@ -132,12 +272,20 @@ export function darkTextForLightFills(source) {
 
 async function renderOne(source, theme, layout) {
   const render = await getRenderer();
+  const { url } = await fontStylesheet();
   const [res] = await render([theme === 'dark' ? darkTextForLightFills(source) : source], {
     prefix: prefixFor(source, theme), // id 접두어는 원고 원문으로 정한다(페이지·단독 SVG 이름과 맞게)
+    // 실린 글꼴을 그리기 페이지에도 넣는다. mermaid-isomorphic 은 그리기 전에 document.fonts 를 모두 읽고(font.load),
+    // 읽기에 실패하면 그리기가 실패한다.
+    css: [url],
     mermaidConfig: {
       ...THEMES[theme],
       fontFamily: FONT_STACK,
       securityLevel: 'strict',
+      // 시퀀스 그림의 글꼴은 따로 정해진다(기본 "Open Sans"·"trebuchet ms"). 자동 번호(sequenceNumber)는 font-family="sans-serif"
+      // 속성이 박혀 있어 CSS 로 덮는다(themeCSS 는 그림 id 아래로 범위가 잡힌다). 라벨은 넘쳐도 자르지 않는다.
+      sequence: { actorFontFamily: FONT_STACK, noteFontFamily: FONT_STACK, messageFontFamily: FONT_STACK },
+      themeCSS: THEME_CSS,
       flowchart: { htmlLabels: true, ...layout.spacing },
       state: { ...layout.spacing },
     },
@@ -166,14 +314,16 @@ export async function renderMermaid(sources) {
 
 async function renderAll(sources) {
   fs.mkdirSync(CACHE_DIR, { recursive: true });
+  const { hash } = await diagramFonts();
   const out = [];
   for (const src of sources) {
-    const files = Object.fromEntries(Object.keys(THEMES).map((t) => [t, path.join(CACHE_DIR, `${keyFor(src, t)}.json`)]));
+    const files = Object.fromEntries(Object.keys(THEMES).map((t) => [t, path.join(CACHE_DIR, `${keyFor(src, t, hash)}.json`)]));
     if (Object.values(files).every((f) => fs.existsSync(f))) {
       out.push(Object.fromEntries(Object.entries(files).map(([t, f]) => [t, JSON.parse(fs.readFileSync(f, 'utf8'))])));
       continue;
     }
     try {
+      await assertCovered(src, 'Mermaid 원문');
       // 라이트 테마로 배치를 정하고(겹침이 없는 첫 설정), 다크 테마도 같은 배치로 그린다.
       // 겹침이 없는 첫 배치를 쓰고, 모두 겹치면 겹침이 가장 적은 배치를 쓴다.
       let best;
@@ -186,6 +336,8 @@ async function renderAll(sources) {
       const light = best.cand;
       const chosen = best.layout;
       const dark = await renderOne(src, 'dark', chosen);
+      await verifyRendered(light.svg, light.width, '라이트 그림');
+      await verifyRendered(dark.svg, dark.width, '다크 그림');
       fs.writeFileSync(files.light, JSON.stringify(light));
       fs.writeFileSync(files.dark, JSON.stringify(dark));
       out.push({ light, dark });
