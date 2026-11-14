@@ -1,14 +1,17 @@
 // 접근성 자동 검사(axe-core, site/ 의 고정 의존성): 시범 페이지 × 라이트/다크 × 1280/360px, 그리고 상호작용 뒤의 상태.
 // WCAG 2.x A/AA 규칙 위반이 하나라도 있으면 실패. 모범 사례(best-practice) 규칙은 참고로만 출력한다.
-// 사용: node tests/a11y.mjs --port <포트> [--all]
+// 사용: node tests/a11y.mjs --port <포트> [--pages pilot|all|/a/,/b/]
+// 상호작용 뒤 상태(퀴즈 채점·시험)는 그 페이지가 대상에 있을 때만 본다.
 import { createRequire } from 'node:module';
-import { listPages, offlineBrowser, PILOT_PAGES, portFromArgs, serve } from './lib/harness.mjs';
+import { eachPage, EXAM_PAGE, isQuizPage, offlineBrowser, pagesFromArgs, portFromArgs, serve } from './lib/harness.mjs';
 
 const require = createRequire(import.meta.url);
 const AXE = require.resolve('axe-core/axe.min.js');
 const port = portFromArgs(4321);
 const base = `http://127.0.0.1:${port}`;
-const pages = process.argv.includes('--all') ? listPages() : PILOT_PAGES;
+const pages = pagesFromArgs();
+const quizPage = pages.find(isQuizPage);
+const hasExam = pages.includes(EXAM_PAGE);
 const WCAG = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'];
 const failures = [];
 const advisories = new Map();
@@ -34,32 +37,39 @@ try {
   for (const colorScheme of ['light', 'dark']) {
     for (const width of [1280, 360]) {
       const { browser, context } = await offlineBrowser({ colorScheme, viewport: { width, height: 900 } });
+      await eachPage(context, pages, async (pg, p) => {
+        await pg.goto(base + p, { waitUntil: 'networkidle' });
+        await audit(pg, `${p} (${colorScheme} ${width})`);
+      });
       const page = await context.newPage();
-      for (const p of pages) {
-        await page.goto(base + p, { waitUntil: 'networkidle' });
-        await audit(page, `${p} (${colorScheme} ${width})`);
-      }
       // 상호작용 뒤 상태
-      await page.goto(`${base}/curriculum/m06-integration-messaging/quiz/`, { waitUntil: 'networkidle' });
-      await page.evaluate(() => localStorage.clear());
-      await page.reload({ waitUntil: 'networkidle' });
-      await page.check('section.quiz-q[data-q="1"] input[value="A"]');
-      await page.click('section.quiz-q[data-q="1"] .quiz-check');
-      await page.check('section.quiz-q[data-q="2"] input[value="D"]');
-      await page.click('section.quiz-q[data-q="2"] .quiz-check');
-      await audit(page, `퀴즈 채점 뒤 (${colorScheme} ${width})`);
-      await page.goto(`${base}/curriculum/m14-capstone-exam/mock-exam/questions/`, { waitUntil: 'networkidle' });
-      await page.evaluate(() => localStorage.clear());
-      await page.reload({ waitUntil: 'networkidle' });
-      await page.click('[data-act=start]');
-      await page.check('section.exam-q[data-q="1"] input[value="C"]');
-      await page.click('[data-act=flag]');
-      await audit(page, `시험 진행 중 (${colorScheme} ${width})`);
-      await page.click('[data-act=submit]');
-      await audit(page, `제출 확인 상자 (${colorScheme} ${width})`);
-      await page.click('.guide-dialog .exam-primary');
-      await page.waitForSelector('.exam-result:not([hidden])');
-      await audit(page, `시험 결과·검토 (${colorScheme} ${width})`);
+      if (quizPage) {
+        await page.goto(`${base}${quizPage}`, { waitUntil: 'networkidle' });
+        await page.evaluate(() => localStorage.clear());
+        await page.reload({ waitUntil: 'networkidle' });
+        // 1번은 맞히고 2번은 틀린다(정답·오답 표시를 모두 본다)
+        const a1 = await page.getAttribute('section.quiz-q[data-q="1"]', 'data-answer');
+        await page.check(`section.quiz-q[data-q="1"] input[value="${a1}"]`);
+        await page.click('section.quiz-q[data-q="1"] .quiz-check');
+        const a2 = await page.getAttribute('section.quiz-q[data-q="2"]', 'data-answer');
+        await page.locator(`section.quiz-q[data-q="2"] input:not([value="${a2}"])`).first().check();
+        await page.click('section.quiz-q[data-q="2"] .quiz-check');
+        await audit(page, `퀴즈 채점 뒤 ${quizPage} (${colorScheme} ${width})`);
+      }
+      if (hasExam) {
+        await page.goto(`${base}${EXAM_PAGE}`, { waitUntil: 'networkidle' });
+        await page.evaluate(() => localStorage.clear());
+        await page.reload({ waitUntil: 'networkidle' });
+        await page.click('[data-act=start]');
+        await page.check('section.exam-q[data-q="1"] input[value="C"]');
+        await page.click('[data-act=flag]');
+        await audit(page, `시험 진행 중 (${colorScheme} ${width})`);
+        await page.click('[data-act=submit]');
+        await audit(page, `제출 확인 상자 (${colorScheme} ${width})`);
+        await page.click('.guide-dialog .exam-primary');
+        await page.waitForSelector('.exam-result:not([hidden])');
+        await audit(page, `시험 결과·검토 (${colorScheme} ${width})`);
+      }
       await browser.close();
     }
   }
