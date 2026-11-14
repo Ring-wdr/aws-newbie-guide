@@ -32,7 +32,10 @@ def strip_inline(md: str) -> str:
     """제목·메타 비교용: 링크 [글](주소) → 글, 굵게·기울임·코드 표시를 뺀다."""
     s = re.sub(r"!?\[([^\]]*)\]\([^)]*\)", r"\1", md)
     s = re.sub(r"(\*\*|__)(.+?)\1", r"\2", s)
-    s = re.sub(r"`([^`]*)`", r"\1", s)
+    # CommonMark: ASCII 구두점 앞의 백슬래시만 이스케이프로 푼다. 코드 스팬 안은 그대로 둔다.
+    parts = re.split(r"(`[^`]*`)", s)
+    s = "".join(p[1:-1] if p.startswith("`") and p.endswith("`") and len(p) > 1
+                else re.sub(r"\\([!-/:-@\[-`{-~])", r"\1", p) for p in parts)
     return re.sub(r"\s+", " ", s).strip()
 
 

@@ -101,12 +101,23 @@ def main() -> int:
                 print(f"{'ok  ' if ok else 'BAD '} 실행 명령 관문: {name} → {g.failures[0] if g.failures else '통과'}")
                 if not ok:
                     failures.append(name)
+        # 내용 동등성: 원고 메타 줄의 백슬래시 이스케이프(CommonMark)는 화면 글자와 같게 풀고, 코드 스팬 안은 둔다
+        from mdsource import strip_inline
+        for md, want in [
+            (r"D1\~D4, 2\~3시간", "D1~D4, 2~3시간"),
+            (r"\*별표\* \a `x\~y`", r"*별표* \a x\~y"),
+        ]:
+            got = strip_inline(md)
+            ok = got == want
+            print(f"{'ok  ' if ok else 'BAD '} 내용 동등성 이스케이프: {md!r} → {got!r}")
+            if not ok:
+                failures.append(f"escape {md}")
     finally:
         sitecheck.SITE = original_site
     if failures:
         print(f"FAIL selftest: {failures}")
         return 1
-    print(f"PASS selftest: 정적 관문에 심은 결함 {len(STATIC_CASES)}가지와 실행 명령 결함 3가지를 모두 잡고, 근거 있는 경우는 통과")
+    print(f"PASS selftest: 정적 관문에 심은 결함 {len(STATIC_CASES)}가지와 실행 명령 결함 3가지를 모두 잡고, 근거 있는 경우는 통과, 메타 줄 이스케이프 2가지 일치")
     return 0
 
 
