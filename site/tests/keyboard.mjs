@@ -176,8 +176,17 @@ try {
       await tabUntil(focusIs, '.pt-reset', { back: true });
       await press('Enter');
       await page.waitForSelector('.guide-dialog[open]');
+      // 요약이 초점을 받는 그 순간의 글자를 적어 둔다: 화면 낭독기는 초점이 닿을 때의 내용을 읽으므로, 그때 이미 지운 뒤의
+      // 값(0항목 완료)이어야 한다. 다시 그리기 전에 초점부터 옮기면 지우기 전 값("…2항목 완료")을 읽는다.
+      await page.evaluate(() => {
+        const s = document.querySelector('.pt-summary');
+        window.__ptFocusText = null;
+        s.addEventListener('focus', () => (window.__ptFocusText = s.querySelector('[data-progress-text]')?.textContent ?? ''), { once: true });
+      });
       await press('Tab');
       await press('Enter');
+      const focusText = await page.evaluate(() => window.__ptFocusText);
+      if (focusText === null || !focusText.includes('0항목 완료')) problems.push(`M06 진행 추적: 모두 지운 뒤 진행 요약이 초점을 받을 때 글자가 지운 값이 아님 "${focusText}"`);
       // 지운 뒤 초점은 곧바로 진행 요약에 있어야 한다. 다음 프레임으로 미루면 그 사이 Tab으로 옮긴 초점을 빼앗아
       // 다음 Enter가 요약 문단에 가 버린다(아래 "가져오기"의 파일 선택 창이 가끔 열리지 않던 원인 중 하나 — 다른 하나는 맨 위 filechooser 리스너 주석).
       if (!(await page.evaluate(focusIs, '.pt-summary'))) problems.push(`M06 진행 추적: 모두 지운 직후 초점이 진행 요약에 없음(${await page.evaluate(() => document.activeElement?.outerHTML.slice(0, 80))})`);

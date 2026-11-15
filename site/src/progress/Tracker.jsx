@@ -1,6 +1,6 @@
 // 모듈 진행 추적(전 모듈 공용). 항목은 ProgressTracker.astro가 원고에서 읽어 props로 준다.
 // 저장은 storage.ts(try/catch, 막혀도 동작). 같은 창에서 백업을 가져오거나 레슨 페이지에서 바꿔도 바로 다시 읽는다.
-import { useEffect, useRef, useState } from 'preact/hooks';
+import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { load, save, remove, storageAvailable, onStorageChange } from '../scripts/storage';
 import { confirmDialog } from '../scripts/dialog';
 import { GROUPS, EXAM_HISTORY_KEY, QUIZ_STATE_KEY, sanitize, toggle, computeProgress, quizGradedCount } from './progress.mjs';
@@ -32,6 +32,7 @@ export default function Tracker({ items, storeKey, quizRoute, quizTotal, moduleT
   const [lastExam, setLastExam] = useState(null);
   const [msg, setMsg] = useState('');
   const resetRef = useRef(null);
+  const focusSummaryRef = useRef(false); // "모두 지우기" 확인 뒤, 다시 그린 다음 요약으로 초점을 옮긴다(아래 useLayoutEffect)
   const hasExam = items.some((it) => it.id === 'exam:mock-exam');
 
   useEffect(() => {
@@ -74,12 +75,21 @@ export default function Tracker({ items, storeKey, quizRoute, quizTotal, moduleT
     setState(next);
     remove(storeKey);
     setMsg(`${moduleTitle}의 완료 표시를 모두 지웠다.`);
-    // 지운 뒤에는 단추가 비활성화되므로 초점을 진행 요약으로 옮긴다(body로 빠지지 않게). 확인 상자는 이미 닫혔고 요약 문단은
-    // 늘 그려져 있으므로 곧바로 옮긴다. 다음 프레임(requestAnimationFrame)으로 미루면, 그 사이 사용자가 Tab으로 옮겨 간 초점을
-    // 늦게 도착한 이 이동이 빼앗아 다음 Enter가 엉뚱한 곳(요약 문단)에 간다 — keyboard 관문의 "가져오기" 파일 선택 창이
-    // 가끔 열리지 않던 원인 중 하나다(tests/keyboard.mjs 진행 추적 M06).
-    resetRef.current?.focus();
+    // 지운 뒤에는 단추가 비활성화되므로 초점을 진행 요약으로 옮긴다(body로 빠지지 않게). 여기서 바로 옮기면 아직 다시 그리기
+    // 전이라 요약 글자가 지우기 전 값("…2항목 완료")이고, 화면 낭독기가 초점이 닿을 때 그 값을 읽는다. 그래서 표시만 해 두고
+    // 다시 그린 직후(useLayoutEffect)에 옮긴다. 다음 프레임(requestAnimationFrame)으로 미루면 안 된다 — 그 사이 사용자가 Tab으로
+    // 옮겨 간 초점을 늦게 도착한 이 이동이 빼앗아 다음 Enter가 엉뚱한 곳(요약 문단)에 간다(tests/keyboard.mjs 진행 추적 M06).
+    // useLayoutEffect는 그렇지 않다: Preact는 setState의 다시 그리기를 마이크로태스크(queueMicrotask)로 미루고, 그 그리기의
+    // 끝(commit)에서 layout effect를 동기로 부른다. 이 함수의 나머지도 확인 단추의 키·클릭 이벤트가 resolve한 약속의 마이크로태스크
+    // 안에서 돈다. 키 입력은 다음 태스크로만 들어오고, 브라우저는 태스크 사이에 마이크로태스크 큐를 끝까지 비우므로 그 이벤트
+    // 처리가 끝나기 전(= 다음 키 입력 전)에 초점이 옮겨진다.
+    focusSummaryRef.current = true;
   };
+  useLayoutEffect(() => {
+    if (!focusSummaryRef.current) return;
+    focusSummaryRef.current = false;
+    resetRef.current?.focus();
+  });
   const p = computeProgress(items, state);
   const groups = GROUPS.filter((g) => p.by[g.kind]);
   const titleId = `pt-title-${storeKey.replace(/[^a-z0-9]+/gi, '-')}`;
