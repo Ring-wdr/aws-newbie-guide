@@ -68,6 +68,8 @@ export default defineConfig({
         TableOfContents: './src/components/TableOfContents.astro',
         MobileTableOfContents: './src/components/MobileTableOfContents.astro',
         Sidebar: './src/components/Sidebar.astro',
+        // 끝에 다이어그램 글꼴 라이선스(/fonts/OFL.txt) 안내 한 줄 — 기본 컴포넌트를 감싸기만 한다
+        Footer: './src/components/Footer.astro',
       },
       expressiveCode: false,
       pagefind: true,

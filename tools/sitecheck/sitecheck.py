@@ -2,7 +2,7 @@
 
 사용 (저장소 루트에서, 먼저 `pnpm --dir site build`):
 
-    uv run python tools/sitecheck/sitecheck.py all --port 4390            # 모든 관문(전 페이지가 기본, 약 9분)
+    uv run python tools/sitecheck/sitecheck.py all --port 4390            # 모든 관문(전 페이지가 기본, 354쪽일 때 약 13분)
     uv run python tools/sitecheck/sitecheck.py all --pages pilot --port 4390  # 시범 페이지만(빠른 확인)
     uv run python tools/sitecheck/sitecheck.py parity --pages all         # 내용 동등성(전 페이지)
     uv run python tools/sitecheck/sitecheck.py parity --pages /curriculum/m06-integration-messaging/02-sqs/

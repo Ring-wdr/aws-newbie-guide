@@ -33,6 +33,8 @@ export const ko = {
     source: '다이어그램 원문(Mermaid 텍스트)',
     openFull: '그림을 원래 크기로 보기(새 탭)',
     fullTitle: '다이어그램 원래 크기',
+    fontNote: '다이어그램 글꼴은 Noto Sans KR·Noto Sans Symbols 2의 부분집합이다(SIL Open Font License 1.1).',
+    fontLicence: '글꼴 라이선스 전문',
   },
   widget: {
     // 위젯 공용 틀(MarkdownContent.astro)의 <noscript> — JavaScript 가 꺼지면 조작부만 보이고 동작하지 않는다.

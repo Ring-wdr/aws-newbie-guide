@@ -2,10 +2,16 @@
 // 다크 그림은 바탕색을 넣어 단독으로 열어도 읽히게 한다. 외부 리소스는 없다(빌드 시점 SVG).
 // 단독 SVG 는 페이지의 @font-face 를 읽지 못하므로(새 탭·<img>), 그 그림의 글자만 남긴 다이어그램 글꼴을 data: 주소로 파일 안에 담는다
 // (src/plugins/diagram-font.mjs embeddedFontCss). 라벨은 넘쳐도 잘리지 않게 한다(overflow: visible).
+// 담은 글꼴은 OFL 1.1 의 수정본이라, 글꼴 이름·라이선스와 전문의 사이트 안 경로(/fonts/OFL.txt, base 포함)를 XML 주석으로 적는다.
+// 외부 주소는 적지 않는다(static 관문이 산출물 SVG 의 외부 주소를 본다).
 import { getCollection } from 'astro:content';
 import type { APIRoute } from 'astro';
-import { embeddedFontCss } from '../../plugins/diagram-font.mjs';
+import { embeddedFontCss, DIAGRAM_FAMILY } from '../../plugins/diagram-font.mjs';
 import { OVERFLOW_CSS, DOC_LANG } from '../../plugins/mermaid-render.mjs';
+import { withBase } from '../../lib/base.mjs';
+
+/** 단독 SVG 에 담은 글꼴의 라이선스 안내(XML 주석 — 주석 안에 "--"가 없어야 한다). */
+const FONT_LICENCE_COMMENT = `<!-- ${DIAGRAM_FAMILY} 글꼴: Noto Sans KR, Noto Sans Symbols 2 의 부분집합(SIL Open Font License 1.1). 저작권 고지와 라이선스 전문: ${withBase('/fonts/OFL.txt')} -->`;
 
 /** SVG 안의 보이는 글자(스타일 제외, 엔티티 풀기). 글꼴 부분집합을 고르는 데만 쓴다. */
 function visibleText(svg: string): string {
@@ -53,7 +59,7 @@ export const GET: APIRoute = async ({ props }) => {
     .replace(/^<svg\b([^>]*?)\sstyle="[^"]*"/, '<svg$1')
     .replace(/^<svg\b([^>]*?)\swidth="[^"]*"/, '<svg$1')
     .replace(/^<svg\b/, `<svg${size} xml:lang="${DOC_LANG}" style="background-color:${bg}"`) // 페이지와 같은 언어로 그린다(글자 폭이 같게)
-    .replace(/^(<svg\b[^>]*>)/, `$1<style>${await embeddedFontCss(visibleText(svg))}${OVERFLOW_CSS}</style>`)
+    .replace(/^(<svg\b[^>]*>)/, `$1${FONT_LICENCE_COMMENT}<style>${await embeddedFontCss(visibleText(svg))}${OVERFLOW_CSS}</style>`)
     // 단독 SVG 파일은 XML 로 해석되므로 HTML 식 빈 요소(<br>)를 닫아 준다.
     .replace(/<(br|hr|wbr|img)\b([^>]*?)\/?>/g, '<$1$2/>');
   return new Response(`<?xml version="1.0" encoding="UTF-8"?>\n${body}`, { headers: { 'Content-Type': 'image/svg+xml; charset=utf-8' } });
