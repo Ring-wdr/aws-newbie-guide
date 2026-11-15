@@ -1,0 +1,24 @@
+---
+// Starlight Footer 를 그대로 쓰고, 끝에 다이어그램 글꼴의 라이선스 안내 한 줄을 붙인다.
+// SIL OFL 1.1 은 글꼴을 배포할 때 저작권 고지와 라이선스를 함께 싣도록 한다 — 전문은 /fonts/OFL.txt(src/pages/fonts/OFL.txt.ts,
+// 하위 경로 배포면 그 아래). 단독 SVG(/diagrams/<id>.svg)에는 같은 경로를 XML 주석으로 적는다.
+import Default from '@astrojs/starlight/components/Footer.astro';
+import { withBase } from '../lib/base.mjs';
+import { ko } from '../i18n/ko.mjs';
+---
+
+<Default />
+<p class="guide-font-licence">
+  {ko.diagram.fontNote} <a href={withBase('/fonts/OFL.txt')}>{ko.diagram.fontLicence}</a>
+</p>
+
+<style>
+  .guide-font-licence {
+    margin: 1.5rem 0 0;
+    font-size: var(--sl-text-xs);
+    color: var(--sl-color-gray-3);
+  }
+  .guide-font-licence a {
+    color: inherit;
+  }
+</style>

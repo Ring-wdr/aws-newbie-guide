@@ -26,6 +26,11 @@ const done = [];
 const server = await serve(port);
 const { browser, context } = await offlineBrowser({ viewport: { width: 1280, height: 900 } });
 const page = await context.newPage();
+// 파일 선택 창 가로채기(CDP Page.setInterceptFileChooserDialog)는 Playwright가 'filechooser' 리스너가 처음 생길 때 켜는데,
+// 그 요청을 기다리지 않고 보낸다. waitForEvent('filechooser')와 키 입력을 함께 보내면 가로채기가 켜지기 전에 페이지가
+// 파일 선택 창을 여는 경우가 있고(드물게 — 루프로 2~3%), 헤드리스에서 가로채지 않은 창은 소리 없이 닫혀 이벤트가 오지 않는다.
+// 그래서 처음부터 리스너를 하나 걸어 가로채기를 켜 둔다(아래 "가져오기"의 waitForEvent는 그대로 쓴다).
+page.on('filechooser', () => {});
 let keys = 0;
 
 async function press(k) {
@@ -173,6 +178,9 @@ try {
       await page.waitForSelector('.guide-dialog[open]');
       await press('Tab');
       await press('Enter');
+      // 지운 뒤 초점은 곧바로 진행 요약에 있어야 한다. 다음 프레임으로 미루면 그 사이 Tab으로 옮긴 초점을 빼앗아
+      // 다음 Enter가 요약 문단에 가 버린다(아래 "가져오기"의 파일 선택 창이 가끔 열리지 않던 원인 중 하나 — 다른 하나는 맨 위 filechooser 리스너 주석).
+      if (!(await page.evaluate(focusIs, '.pt-summary'))) problems.push(`M06 진행 추적: 모두 지운 직후 초점이 진행 요약에 없음(${await page.evaluate(() => document.activeElement?.outerHTML.slice(0, 80))})`);
       pt = await ptText();
       if (!pt.includes('0항목 완료')) problems.push(`M06 진행 추적: 모두 지우기 뒤 "${pt}"`);
       await tabUntil(focusIs, '.pt-storage button:nth-of-type(2)');

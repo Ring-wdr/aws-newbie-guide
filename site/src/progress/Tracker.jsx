@@ -74,8 +74,11 @@ export default function Tracker({ items, storeKey, quizRoute, quizTotal, moduleT
     setState(next);
     remove(storeKey);
     setMsg(`${moduleTitle}의 완료 표시를 모두 지웠다.`);
-    // 지운 뒤에는 단추가 비활성화되므로 초점을 진행 요약으로 옮긴다(body로 빠지지 않게).
-    requestAnimationFrame(() => resetRef.current?.focus());
+    // 지운 뒤에는 단추가 비활성화되므로 초점을 진행 요약으로 옮긴다(body로 빠지지 않게). 확인 상자는 이미 닫혔고 요약 문단은
+    // 늘 그려져 있으므로 곧바로 옮긴다. 다음 프레임(requestAnimationFrame)으로 미루면, 그 사이 사용자가 Tab으로 옮겨 간 초점을
+    // 늦게 도착한 이 이동이 빼앗아 다음 Enter가 엉뚱한 곳(요약 문단)에 간다 — keyboard 관문의 "가져오기" 파일 선택 창이
+    // 가끔 열리지 않던 원인 중 하나다(tests/keyboard.mjs 진행 추적 M06).
+    resetRef.current?.focus();
   };
   const p = computeProgress(items, state);
   const groups = GROUPS.filter((g) => p.by[g.kind]);
